@@ -1,5 +1,16 @@
 Based on cpython 3.10.11 which is the default used on meta devgpu.
 
+# Scratch
+- check `tok_reserve_buf`
+- Quest 0: create the tokenizer
+- Quest 1: convert a file to a list of tokens
+
+- Dive into `print("hello")` and make spy support the same
+  - lexical analysis
+- support import
+
+# BELOW ARE OLD ################################################
+
 # Dive into `print("hello")`
 
 ## General API
@@ -111,7 +122,7 @@ main: Programs/python.c
 # Done
 - roughly understand the tokenizer. Haven't checked the codegen part for tokenizer in Parser/token.c though.
 
-# Scratch
+# old-Scratch
 - how cpython do lexical and syntax analysis
 - how does cprofile work
 - how does the eval function work
@@ -122,7 +133,7 @@ main: Programs/python.c
   - search for print in the file and found the c function name `builtin_print`
   - set breakpoint at `builtin_print` and run a print statement in cpython. This will reveal stacktraces from main to calling `builtin_print`
 
-## TODO
+## old-TODO
 - Eval
 - Parser code generation <++ TODO HERE
   - Parser/parser.c # generated code
