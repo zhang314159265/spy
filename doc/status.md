@@ -1,8 +1,12 @@
 Based on cpython 3.10.11 which is the default used on meta devgpu.
 
+# NOTE
+- run `make regen-pegen` to regenerated CPython parser.
+
 # Scratch
-- check `tok_reserve_buf`
-- Quest 0: create the tokenizer
+- QUEST: Use CPython peg-generator first. Once it works end-2-end for the toy example, write a generator myself.
+- QUEST: explore the parser <++++
+  - entry Parser/parser.c: `_PyPegen_parse`
 - Quest 1: convert a file to a list of tokens
 
 - Dive into `print("hello")` and make spy support the same

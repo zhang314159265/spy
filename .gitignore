@@ -1,2 +1,8 @@
 a.out
+# generated when creating a.out with debug symbols on MacOS
+a.out.dSYM/
+
 .*.swp
+
+# skip generated file
+Parser/parser.c

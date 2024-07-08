@@ -1,0 +1,16 @@
+ENDMARKER
+NAME
+DM_0
+STRING
+NEWLINE
+DM_1
+DM_2
+
+LPAR '('
+RPAR ')'
+
+# TODO order for COMMA is wrong
+COMMA ','
+# TODO order for SEMI is wrong
+SEMI ';'
+

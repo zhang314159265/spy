@@ -8,4 +8,7 @@
 
 #define Py_UNREACHABLE() assert(0)
 
+// Check if pointer 'p' is aligned to 'a'-bytes boundary
+#define _Py_IS_ALIGNED(p, a) (!((uintptr_t)(p) & (uintptr_t)((a) - 1)))
+
 #endif

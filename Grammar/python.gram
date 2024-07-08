@@ -1,0 +1,25 @@
+start: file
+
+file[mod_ty]: a=[statements] ENDMARKER { _PyPegen_make_module(p, a) }
+
+statements[asdl_stmt_seq*]: a=statement+ { (asdl_stmt_seq*) _PyPegen_seq_flatten(p, a) }
+
+statement[asdl_stmt_seq*]: a[asdl_stmt_seq*]=simple_stmts {a}
+
+simple_stmts[asdl_stmt_seq*]: a=simple_stmt !';' NEWLINE {
+	(asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) }
+
+simple_stmt[stmt_ty]: e=primary { _PyAST_Expr(e) }
+
+primary[expr_ty]: a=primary '(' b=[arguments] ')' {
+		_PyAST_Call(a,
+			(b) ? ((expr_ty) b)->v.Call.args : NULL,
+			(b) ? ((expr_ty) b)->v.Call.keywords : NULL) }
+	| atom
+
+arguments[expr_ty]: a[asdl_expr_seq*]=','.primary+ {
+		_PyPegen_collect_call_seqs(p, a, NULL);
+	}
+
+atom[expr_ty]: NAME
+	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }

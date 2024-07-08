@@ -8,6 +8,7 @@
 #define LPAR 7
 #define RPAR 8
 #define OP 54
+#define TYPE_IGNORE 57
 
 const char * const _PyParser_TokenNames[] = {
 	[ENDMARKER] = "ENDMARKER",

@@ -160,6 +160,8 @@ void tok_backup(struct tok_state *tok, int c) {
 int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 	int c;
 
+	*p_start = *p_end = NULL;
+
  again:
 	// Skip spaces
 	do {
@@ -184,6 +186,8 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 			c = tok_nextc(tok);
 		}
 		tok_backup(tok, c);
+		*p_start = tok->start;
+		*p_end = tok->cur;
 		return NAME;
 	}
 
@@ -214,6 +218,8 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 				break;
 			}
 		}
+		*p_start = tok->start;
+		*p_end = tok->cur;
 		return STRING;
 	}
 
@@ -223,6 +229,12 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// Punctuation character
 	return PyToken_OneChar(c);
+}
+
+int
+PyTokenizer_Get(struct tok_state *tok, const char **p_start, const char **p_end) {
+	int result = tok_get(tok, p_start, p_end);
+	return result;
 }
 
 #endif

@@ -11,4 +11,12 @@ void *PyMem_Realloc(void *ptr, size_t new_size) {
 	return realloc(ptr, new_size);
 }
 
+void *PyMem_Calloc(size_t nelem, size_t elsize) {
+	return calloc(nelem, elsize);
+}
+
+void PyMem_Free(void *ptr) {
+	free(ptr);
+}
+
 #endif

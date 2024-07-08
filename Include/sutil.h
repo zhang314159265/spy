@@ -1,6 +1,10 @@
 #ifndef SUTIL_H
 #define SUTIL_H
 
+#define SIZEOF_SIZE_T 8
+#define ALIGNOF_SIZE_T 8
+#define SIZEOF_VOID_P 8
+
 #define true 1
 #define false 0
 
