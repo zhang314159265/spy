@@ -44,5 +44,6 @@ GENERATE_ASDL_SEQ_CONSTRUCTOR(generic, void*);
 
 #define asdl_seq_LEN(S) ((S) == NULL ? 0 : (S)->size)
 #define asdl_seq_GET_UNTYPED(S, I) (S)->elements[(I)]
+#define asdl_seq_GET(S, I) (S)->typed_elements[(I)]
 
 #endif
