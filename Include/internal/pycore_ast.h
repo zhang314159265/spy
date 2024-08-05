@@ -50,6 +50,7 @@ struct _mod {
 enum _expr_kind {
 	Call_kind=17,
 	Constant_kind=20,
+	Starred_kind=23,
 	Name_kind=24,
 };
 

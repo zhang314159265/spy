@@ -10,7 +10,9 @@ PyObject *PyErr_NoMemory(void) {
 }
 
 PyObject *PyErr_Occurred(void) {
-	assert(false);
+	// assert(false);
+  printf("WARNING: PyErr_Occurred not implemented yet\n");
+  return NULL;
 }
 
 #endif

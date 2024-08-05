@@ -1,4 +1,4 @@
-#include "objimpl.h"
+#include <objimpl.h>
 #include "internal/pycore_object.h"
 
 #define PyUnicode_GET_LENGTH(op) \
@@ -55,12 +55,6 @@
 #define PyUnicode_2BYTE_DATA(op) ((Py_UCS2*) PyUnicode_DATA(op))
 #define PyUnicode_4BYTE_DATA(op) ((Py_UCS4*) PyUnicode_DATA(op))
 
-PyTypeObject PyUnicode_Type = {
-	PyVarObject_HEAD_INIT(&PyType_Type, 0)
-	.tp_name = "str",
-	.tp_flags = Py_TPFLAGS_UNICODE_SUBCLASS,
-};
-
 typedef struct {
 	PyObject_HEAD
 	Py_ssize_t length; // number of code points in the string
@@ -80,6 +74,23 @@ typedef struct {
 typedef struct {
 	PyASCIIObject _base;
 } PyCompactUnicodeObject;
+
+typedef struct {
+  PyCompactUnicodeObject _base;
+} PyUnicodeObject;
+
+static Py_hash_t unicode_hash(PyObject *self);
+static void unicode_dealloc(PyObject *unicode);
+
+// defined in cpy/Objects/unicodeobject.c
+PyTypeObject PyUnicode_Type = {
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
+	.tp_name = "str",
+  .tp_basicsize = sizeof(PyUnicodeObject),
+	.tp_flags = Py_TPFLAGS_UNICODE_SUBCLASS,
+	.tp_hash = (hashfunc) unicode_hash,
+	.tp_dealloc = (destructor) unicode_dealloc,
+};
 
 enum PyUnicode_Kind {
 	// string contains only wstr byte characters. This is only possible
@@ -164,4 +175,8 @@ PyUnicode_New(
 int
 _PyUnicode_Ready(PyObject *unicode) {
 	assert(false);
+}
+
+static void unicode_dealloc(PyObject *unicode) {
+	printf("WARNING: dealloc str object is not implemented yet\n");
 }

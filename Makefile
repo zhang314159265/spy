@@ -1,5 +1,7 @@
 ifeq ($(DBG), 1)
-PREFIX := lldb --
+# TODO use lldb or gdb according to the presence of the tools
+# PREFIX := lldb --
+PREFIX := gdb --args
 else
 PREFIX :=
 endif
@@ -9,15 +11,14 @@ first: mine
 
 PEGEN_FLAGS := -v
 
-pegen:
-	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python.exe -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/tokens -o Parser/parser.c
-
 # CPY_DBG_FLAGS := DBG_TOK_GET=1
 cpy:
-	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/python.exe tutor.py
+	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/python tutor.py
+
+pegen:
+	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
 CFLAGS := -IInclude -I.
-mine: pegen
-# mine: 
+mine: # pegen
 	gcc -g main.c $(CFLAGS)
 	$(PREFIX) ./a.out tutor.py

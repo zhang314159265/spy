@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 typedef uint32_t Py_UCS4;
 typedef uint16_t Py_UCS2;
 typedef uint8_t Py_UCS1;
@@ -160,9 +162,21 @@ unicode_hash(PyObject *self) {
 }
 
 void
-PyUnicode_InternInplace(PyObject **p) {
+PyUnicode_InternInPlace(PyObject **p) {
 	PyObject *s = *p;
 	(void) unicode_hash(s);
 }
 
+PyObject *
+PyUnicode_FromString(const char *u) {
+	size_t size = strlen(u);
+	return PyUnicode_DecodeUTF8Stateful(u, (Py_ssize_t) size, NULL, NULL);
+}
 
+PyObject *PyUnicode_InternFromString(const char *cp) {
+	PyObject *s = PyUnicode_FromString(cp);
+	if (s == NULL)
+		return NULL;
+	PyUnicode_InternInPlace(&s);
+	return s;
+}

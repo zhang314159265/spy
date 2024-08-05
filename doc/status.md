@@ -4,6 +4,23 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 - run `make regen-pegen` to regenerated CPython parser.
 
 # Scratch
+
+## Read interprter initialization code
+- `pymain_init`
+  - `Py_InitializeFromConfig`
+    - `pyinit_core`
+      - `pyinit_config`
+        - `pycore_create_interpreter`
+          - `PyInterpreterState_New` <==
+          - `PyThreadState_New`
+          - `PyThreadState_Swap`
+        - `pycore_interp_init` <==
+
+- TODO: initialize the python runtime (for thread state and interpreter state)
+    - call `_PyRuntime_Initialize` first
+    - and then `Py_InitializeFromConfig` which calls `_PyGILState_SetTstate`
+
+- Next: build symbol table `_PySymtable_Build` <+++++
 - QUEST: generate bytecode.
 - QUEST: Use CPython peg-generator first. Once it works end-2-end for the toy example, write a generator myself.
 - QUEST: explore the parser <++++

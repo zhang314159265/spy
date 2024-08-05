@@ -234,7 +234,7 @@ _PyPegen_new_identifier(Parser *p, const char *n) {
 	if (!PyUnicode_IS_ASCII(id)) {
 		assert(false);
 	}
-	PyUnicode_InternInplace(&id);
+	PyUnicode_InternInPlace(&id);
 	// _PyArena_AddPyObject
 	return id;
 }
