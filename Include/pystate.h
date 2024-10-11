@@ -12,6 +12,17 @@ typedef struct _is PyInterpreterState;
 // #include "internal/pycore_pystate.h"
 static PyThreadState *_PyThreadState_GET(void);
 
+#define PyThreadState_GET() PyThreadState_Get()
+
+PyThreadState *
+PyThreadState_Get(void) {
+	PyThreadState *tstate = _PyThreadState_GET();
+	assert(tstate != NULL);
+	return tstate;
+}
+
+PyObject * _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag);
+
 // defined in cpy/Python/pystate.c
 PyInterpreterState *PyInterpreterState_New() {
   PyThreadState *tstate = _PyThreadState_GET();
@@ -26,6 +37,8 @@ PyInterpreterState *PyInterpreterState_New() {
   // Don't get runtine from tstate since tstate can be NULL
   _PyRuntimeState *runtime = &_PyRuntime;
   interp->runtime = runtime;
+
+	interp->eval_frame = _PyEval_EvalFrameDefault;
 
 	struct pyinterpreters *interpreters = &runtime->interpreters;
 	if (interpreters->main == NULL) {
@@ -54,6 +67,8 @@ new_threadstate(PyInterpreterState *interp, int init) {
     return NULL;
   }
   tstate->interp = interp;
+
+  tstate->frame = NULL;
   if (init) {
     _PyThreadState_Init(tstate);
   }

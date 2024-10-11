@@ -8,8 +8,8 @@
 #include "pylifecycle.h"
 #include "typeobject.h"
 #include "tupleobject.h"
-#include "Objects/object.c.h"
-#include "Objects/tupleobject.c.h"
+
+#include "allc.h"
 
 #define DEBUG_TOKENIZER 0
 
@@ -110,7 +110,8 @@ int main(int argc, char **argv) {
 	#endif
 
   pymain_init();
-	pyrun_file(fp);
+	PyObject *d = PyDict_New(); // TODO follow how cpy does
+	pyrun_file(fp, d, d);
 
 	fclose(fp);
 	printf("bye\n");

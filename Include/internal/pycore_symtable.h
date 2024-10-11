@@ -511,6 +511,13 @@ _PySymtable_Build(struct _mod *mod) {
 	assert(false);
 }
 
+void
+_PySymtable_Free(struct symtable *st) {
+	Py_XDECREF(st->st_blocks);
+	Py_XDECREF(st->st_stack);
+	PyMem_Free((void *) st);
+}
+
 // defined in cpy/Python/symtable.c
 PySTEntryObject *PySymtable_Lookup(struct symtable *st, void *key) {
   PyObject *k, *v;

@@ -526,7 +526,10 @@ dict_dealloc(PyDictObject *mp) {
   PyDictKeysObject *keys = mp->ma_keys;
 
   if (values != NULL) {
-    assert(false);
+    if (values != empty_values) {
+      assert(false);
+    }
+    dictkeys_decref(keys);
   } else if (keys != NULL) {
     assert(keys->dk_refcnt == 1);
     dictkeys_decref(keys);
@@ -550,10 +553,73 @@ find_empty_slot(PyDictKeysObject *keys, Py_hash_t hash) {
   return i;
 }
 
+// Internal routine used by dictresize() to build a hashtable of entries.
+static void
+build_indices(PyDictKeysObject *keys, PyDictKeyEntry *ep, Py_ssize_t n) {
+  size_t mask = (size_t) DK_SIZE(keys) - 1;
+  for (Py_ssize_t ix = 0; ix != n; ix++, ep++) {
+    Py_hash_t hash = ep->me_hash;
+    size_t i = hash & mask;
+    for (size_t perturb = hash; dictkeys_get_index(keys, i) != DKIX_EMPTY;) {
+      perturb >>= PERTURB_SHIFT;
+      i = mask & (i * 5 + perturb + 1);
+    }
+    dictkeys_set_index(keys, i, ix);
+  }
+}
+
 static int
 dictresize(PyDictObject *mp, Py_ssize_t newsize)
 {
-  assert(false);
+  Py_ssize_t numentries;
+  PyDictKeysObject *oldkeys;
+  PyObject **oldvalues;
+  PyDictKeyEntry *oldentries, *newentries;
+
+  if (newsize <= 0) {
+    assert(false);
+  }
+  assert(IS_POWER_OF_2(newsize));
+  assert(newsize >= PyDict_MINSIZE);
+
+  oldkeys = mp->ma_keys;
+
+  mp->ma_keys = new_keys_object(newsize);
+  if (mp->ma_keys == NULL) {
+    assert(false);
+  }
+  // New table must be large enough
+  assert(mp->ma_keys->dk_usable >= mp->ma_used);
+  if (oldkeys->dk_lookup == lookdict)
+    mp->ma_keys->dk_lookup = lookdict;
+
+  numentries = mp->ma_used;
+  oldentries = DK_ENTRIES(oldkeys);
+  newentries = DK_ENTRIES(mp->ma_keys);
+  oldvalues = mp->ma_values;
+  if (oldvalues != NULL) {
+    assert(false);
+  } else {  // combined table.
+    if (oldkeys->dk_nentries == numentries) {
+      memcpy(newentries, oldentries, numentries * sizeof(PyDictKeyEntry));
+    } else {
+      PyDictKeyEntry *ep = oldentries;
+      for (Py_ssize_t i = 0; i < numentries; i++) {
+        while (ep->me_value == NULL)
+          ep++;
+        newentries[i] = *ep++;
+      }
+    }
+
+    assert(oldkeys->dk_lookup != lookdict_split);
+    assert(oldkeys->dk_refcnt == 1);
+    PyObject_Free(oldkeys);
+  }
+
+  build_indices(mp->ma_keys, newentries, numentries);
+  mp->ma_keys->dk_usable -= numentries;
+  mp->ma_keys->dk_nentries = numentries;
+  return 0;
 }
 
 static int

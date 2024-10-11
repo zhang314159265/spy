@@ -15,4 +15,8 @@ typedef size_t Py_uhash_t;
 
 #define Py_SAFE_DOWNCAST(VALUE, WIDE, NARROW) (NARROW)(VALUE)
 
+#ifndef INT_MAX
+#define INT_MAX 2147483647
+#endif
+
 #endif

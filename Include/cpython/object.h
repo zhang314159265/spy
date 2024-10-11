@@ -40,6 +40,6 @@ typedef struct _heaptypeobject {
 } PyHeapTypeObject;
 
 // defined in cpy/Objects/object.c
-PyObject *_PyObject_NextNotImplemented(PyObject *) {
+PyObject *_PyObject_NextNotImplemented(PyObject *self) {
   assert(false);
 }

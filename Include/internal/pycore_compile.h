@@ -240,6 +240,28 @@ list2dict(PyObject *list)
 	return dict;
 }
 
+static void
+compiler_unit_free(struct compiler_unit *u) {
+
+  basicblock *b, *next;
+
+  b = u->u_blocks;
+  while (b != NULL) {
+    if (b->b_instr)
+      PyObject_Free((void *) b->b_instr);
+    next = b->b_list;
+    PyObject_Free((void *) b);
+    b = next;
+  }
+
+  Py_CLEAR(u->u_ste);
+  Py_CLEAR(u->u_name);
+  Py_CLEAR(u->u_consts);
+  Py_CLEAR(u->u_names);
+  Py_CLEAR(u->u_varnames);
+  PyObject_Free(u);
+}
+
 static int
 compiler_enter_scope(struct compiler *c, identifier name,
 		int scope_type, void *key, int lineno) {
@@ -726,12 +748,32 @@ dict_keys_inorder(PyObject *dict, Py_ssize_t offset)
 	return tuple;
 }
 
+static int
+compute_code_flags(struct compiler *c) {
+  // TODO return 0 for now
+  return 0;
+}
+
+/* Find the flow path that needs the largest stack.  We assume that
+ * cycles in the flow graph have no net effect on the stack depth.
+ */
+static int
+stackdepth(struct compiler *c) {
+  // TODO: do a real implementation
+  return 128;
+}
+
 static PyCodeObject *
 makecode(struct compiler *c, struct assembler *a, PyObject *consts)
 {
+  PyCodeObject *co = NULL;
 	PyObject *names = NULL;
 	PyObject *varnames = NULL;
 	// PyObject *cellvars = NULL;
+  Py_ssize_t nlocals;
+  int nlocals_int;
+  int flags;
+  int maxdepth;
 
 	names = dict_keys_inorder(c->u->u_names, 0);
 	varnames = dict_keys_inorder(c->u->u_varnames, 0);
@@ -744,7 +786,41 @@ makecode(struct compiler *c, struct assembler *a, PyObject *consts)
 			!merge_const_one(c, &varnames)) {
 	  assert(false);
 	}
-	assert(false);
+
+  nlocals = PyDict_GET_SIZE(c->u->u_varnames);
+  assert(nlocals < INT_MAX);
+  nlocals_int = Py_SAFE_DOWNCAST(nlocals, Py_ssize_t, int);
+
+  flags = compute_code_flags(c);
+  if (flags < 0)
+    assert(false);
+
+  consts = PyList_AsTuple(consts); /* PyCode_New requires a tuple */
+  if (consts == NULL) {
+    assert(false);
+  }
+
+  if (!merge_const_one(c, &consts)) {
+    assert(false);
+  }
+
+  maxdepth = stackdepth(c);
+  if (maxdepth < 0) {
+    assert(false);
+  }
+
+  co = PyCode_NewWithPosOnlyArgs(
+    nlocals_int, maxdepth, flags, a->a_bytecode, consts,
+    names, varnames, c->u->u_name,
+    c->u->u_firstlineno, a->a_lnotab);
+  Py_DECREF(consts);
+  Py_XDECREF(names);
+  Py_XDECREF(varnames);
+  // Py_XDECREF(name);
+  // Py_XDECREF(freevars);
+  // Py_XDECREF(cellvars);
+
+  return co;
 }
 
 static void
@@ -831,6 +907,13 @@ assemble(struct compiler *c, int addNone) {
 	return co;
 }
 
+static void
+compiler_exit_scope(struct compiler *c)
+{
+  compiler_unit_free(c->u);
+  c->u = NULL;
+}
+
 static PyCodeObject *
 compiler_mod(struct compiler *c, mod_ty mod) {
 	PyCodeObject *co;
@@ -856,7 +939,16 @@ compiler_mod(struct compiler *c, mod_ty mod) {
 		assert(false);
 	}
 	co = assemble(c, addNone);
-	assert(false);
+  compiler_exit_scope(c);
+  return co;
+}
+
+static void
+compiler_free(struct compiler *c) {
+  if (c->c_st)
+    _PySymtable_Free(c->c_st);
+
+  Py_DECREF(c->c_const_cache);
 }
 
 // Defined in cpy/Python/compile.c
@@ -878,6 +970,8 @@ _PyAST_Compile(struct _mod *mod) {
 
 	co = compiler_mod(&c, mod);
  finally:
-  assert(false);
+  compiler_free(&c);
+  assert(co);
+  return co;
 }
 

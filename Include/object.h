@@ -94,8 +94,10 @@ void _Py_INCREF(PyObject *op) {
 }
 
 void _Py_Dealloc(PyObject *op) {
-  // printf("call _Py_Dealloc on obj of type %s\n", Py_TYPE(op)->tp_name);
   destructor dealloc = Py_TYPE(op)->tp_dealloc;
+	if (!dealloc) {
+    printf("call _Py_Dealloc on obj of type %s with NULL dealloc function\n", Py_TYPE(op)->tp_name);
+	}
   (*dealloc)(op);
 }
 
@@ -264,5 +266,21 @@ static inline Py_ssize_t _Py_REFCNT(const PyObject *ob) {
 
 #define _PyObject_CAST_CONST(op) ((const PyObject*)(op))
 #define Py_REFCNT(ob) _Py_REFCNT(_PyObject_CAST_CONST(ob))
+
+#define Py_CLEAR(op) \
+	do { \
+		PyObject *_py_tmp = _PyObject_CAST(op); \
+		if (_py_tmp != NULL) { \
+			(op) = NULL; \
+			Py_DECREF(_py_tmp); \
+		} \
+	} while (0)
+
+static inline PyObject *_Py_XNewRef(PyObject *obj) {
+	Py_XINCREF(obj);
+	return obj;
+}
+
+#define Py_XNewRef(obj) _Py_XNewRef(_PyObject_CAST(obj))
 
 #endif

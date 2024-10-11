@@ -39,6 +39,7 @@ PyObject *PyTuple_Pack(Py_ssize_t n, ...) {
 
 static Py_hash_t tuplehash(PyTupleObject *v);
 static PyObject *tuplerichcompare(PyObject *v, PyObject *w, int op);
+static void tupledealloc(PyTupleObject *op);
 
 PyTypeObject PyTuple_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -48,6 +49,8 @@ PyTypeObject PyTuple_Type = {
 	.tp_flags = Py_TPFLAGS_TUPLE_SUBCLASS,
 	.tp_hash = (hashfunc) tuplehash,
 	.tp_richcompare = tuplerichcompare,
+	.tp_dealloc = (destructor) tupledealloc,
+	.tp_free = PyObject_GC_Del,
 };
 
 static PyTupleObject *
@@ -136,4 +139,14 @@ static Py_hash_t tuplehash(PyTupleObject *v) {
 	return acc;
 }
 
-
+static void tupledealloc(PyTupleObject *op) {
+	Py_ssize_t len = Py_SIZE(op);
+	// PyObject_GC_UnTrack(op);
+	if (len > 0) {
+		Py_ssize_t i = len;
+		while (--i >= 0) {
+			Py_XDECREF(op->ob_item[i]);
+		}
+	}
+	Py_TYPE(op)->tp_free((PyObject *) op);
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+// #include "longobject.h"
 #include "longintrepr.h"
 
 #define Py_False ((PyObject *) &_Py_FalseStruct)
@@ -26,3 +27,14 @@ struct _longobject _Py_TrueStruct = {
 };
 
 #define PyBool_Check(x) Py_IS_TYPE(x, &PyBool_Type)
+
+PyObject *PyBool_FromLong(long ok) {
+  PyObject *result;
+
+  if (ok)
+    result = Py_True;
+  else
+    result = Py_False;
+  Py_INCREF(result);
+  return result;
+}

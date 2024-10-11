@@ -1,5 +1,6 @@
 #include <objimpl.h>
 #include "internal/pycore_object.h"
+// #include "boolobject.h"
 
 #define PyUnicode_GET_LENGTH(op) \
 	(assert(PyUnicode_Check(op)), \
@@ -81,6 +82,7 @@ typedef struct {
 
 static Py_hash_t unicode_hash(PyObject *self);
 static void unicode_dealloc(PyObject *unicode);
+PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op);
 
 // defined in cpy/Objects/unicodeobject.c
 PyTypeObject PyUnicode_Type = {
@@ -90,6 +92,7 @@ PyTypeObject PyUnicode_Type = {
 	.tp_flags = Py_TPFLAGS_UNICODE_SUBCLASS,
 	.tp_hash = (hashfunc) unicode_hash,
 	.tp_dealloc = (destructor) unicode_dealloc,
+  .tp_richcompare = PyUnicode_RichCompare,
 };
 
 enum PyUnicode_Kind {
@@ -179,4 +182,48 @@ _PyUnicode_Ready(PyObject *unicode) {
 
 static void unicode_dealloc(PyObject *unicode) {
 	printf("WARNING: dealloc str object is not implemented yet\n");
+}
+
+static int
+unicode_compare_eq(PyObject *str1, PyObject *str2)
+{
+  int kind;
+  const void *data1, *data2;
+  Py_ssize_t len;
+  int cmp;
+
+  len = PyUnicode_GET_LENGTH(str1);
+  if (PyUnicode_GET_LENGTH(str2) != len)
+    return 0;
+  kind = PyUnicode_KIND(str1);
+  if (PyUnicode_KIND(str2) != kind)
+    return 0;
+  data1 = PyUnicode_DATA(str1);
+  data2 = PyUnicode_DATA(str2);
+
+  cmp = memcmp(data1, data2, len * kind);
+  return (cmp == 0);
+}
+
+PyObject *PyBool_FromLong(long ok);
+
+PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op) {
+  int result;
+
+  if (!PyUnicode_Check(left) || !PyUnicode_Check(right))
+    Py_RETURN_NOTIMPLEMENTED;
+
+  if (PyUnicode_READY(left) == -1 ||
+      PyUnicode_READY(right) == -1)
+    return NULL;
+
+  if (left == right) {
+    assert(false);
+  } else if (op == Py_EQ || op == Py_NE) {
+    result = unicode_compare_eq(left, right);
+    result ^= (op == Py_NE);
+    return PyBool_FromLong(result);
+  } else {
+    assert(false);
+  }
 }
