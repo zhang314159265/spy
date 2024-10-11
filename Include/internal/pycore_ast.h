@@ -4,6 +4,10 @@
 
 #include "internal/pycore_asdl.h"
 
+typedef enum _operator {
+	Add=1,
+} operator_ty;
+
 typedef enum _expr_context { Load=1, Store=2, Del=3} expr_context_ty;
 
 typedef struct _mod *mod_ty;
@@ -11,6 +15,23 @@ typedef struct _mod *mod_ty;
 typedef struct _expr *expr_ty;
 
 typedef struct _stmt *stmt_ty;
+
+typedef struct _arguments *arguments_ty;
+
+typedef struct _arg *arg_ty;
+
+typedef struct {
+	_ASDL_SEQ_HEAD
+	arg_ty typed_elements[1];
+} asdl_arg_seq;
+
+struct _arg {
+	identifier arg;
+};
+
+struct _arguments {
+	asdl_arg_seq *args;
+};
 
 typedef struct {
 	_ASDL_SEQ_HEAD
@@ -48,6 +69,7 @@ struct _mod {
 };
 
 enum _expr_kind {
+	BinOp_kind = 3,
 	Call_kind=17,
 	Constant_kind=20,
 	Starred_kind=23,
@@ -57,6 +79,12 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			expr_ty left;
+			operator_ty op;
+			expr_ty right;
+		} BinOp;
+
 		struct {
 			identifier id;
 			expr_context_ty ctx;
@@ -75,6 +103,11 @@ struct _expr {
 };
 
 enum _stmt_kind {
+	FunctionDef_kind = 1,
+	Return_kind = 4,
+	Assign_kind = 6,
+	AugAssign_kind = 7,
+	For_kind = 9,
 	Expr_kind = 23,
 };
 
@@ -82,8 +115,39 @@ struct _stmt {
 	enum _stmt_kind kind;
 	union {
 		struct {
+			expr_ty target;
+			expr_ty iter;
+			asdl_stmt_seq *body;
+			asdl_stmt_seq *orelse;
+		} For;
+
+		struct {
+			expr_ty target;
+			operator_ty op;
+			expr_ty value;
+		} AugAssign;
+
+		struct {
+			identifier name;
+			arguments_ty args;
+			asdl_stmt_seq *body;
+			asdl_expr_seq *decorator_list;
+			expr_ty returns;
+			string type_comment;
+		} FunctionDef;
+
+		struct {
+			expr_ty value;
+		} Return;
+
+		struct {
 			expr_ty value;
 		} Expr;
+
+		struct {
+			asdl_expr_seq *targets;
+			expr_ty value;
+		} Assign;
 	} v;
 };
 

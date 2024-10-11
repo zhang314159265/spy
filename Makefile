@@ -6,7 +6,8 @@ else
 PREFIX :=
 endif
 
-TUTOR=tutor/print.py
+# TUTOR=tutor/print.py
+TUTOR=tutor/sum.py
 
 first: mine
 # first: pegen
@@ -15,10 +16,10 @@ PEGEN_FLAGS := -v
 
 # CPY_DBG_FLAGS := DBG_TOK_GET=1
 cpy:
-	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/python.exe tutor.py
+	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/python.exe $(TUTOR)
 
 pegen:
-	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
+	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python.exe -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
 CFLAGS := -IInclude -I.
 mine: # pegen

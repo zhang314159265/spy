@@ -40,6 +40,8 @@ PyStatus _PyTypes_Init() {
 	INIT_TYPE(PyLong_Type);
 	INIT_TYPE(_PyNone_Type);
 	INIT_TYPE(PyBytes_Type);
+	INIT_TYPE(PyUnicode_Type);
+	INIT_TYPE(PyCode_Type);
 
 	return _PyStatus_OK();
 

@@ -16,6 +16,40 @@ PyObject *PyNumber_InPlaceOr(PyObject *o1, PyObject *o2);
     (*(binaryfunc*) (&((char*) nb_methods)[slot]))
 
 static PyObject *
+binary_op1(PyObject *v, PyObject *w, const int op_slot) {
+	binaryfunc slotv;
+	if (Py_TYPE(v)->tp_as_number != NULL) {
+		slotv = NB_BINOP(Py_TYPE(v)->tp_as_number, op_slot);
+	} else {
+		slotv = NULL;
+	}
+
+	binaryfunc slotw;
+	if (!Py_IS_TYPE(w, Py_TYPE(v)) && Py_TYPE(w)->tp_as_number != NULL) {
+		slotw = NB_BINOP(Py_TYPE(w)->tp_as_number, op_slot);
+		if (slotw == slotv) {
+			slotw = NULL;
+		}
+	} else {
+		slotw = NULL;
+	}
+
+	if (slotv) {
+		PyObject *x;
+		if (slotw && PyType_IsSubtype(Py_TYPE(w), Py_TYPE(v))) {
+			assert(false);
+		}
+		x = slotv(v, w);
+		assert(x != NULL);
+		if (x != Py_NotImplemented) {
+			return x;
+		}
+		Py_DECREF(x);
+	}
+	assert(false);
+}
+
+static PyObject *
 binary_iop1(PyObject *v, PyObject *w, const int iop_slot, const int op_slot
 #ifndef NDEBUG
     , const char *op_name
@@ -23,6 +57,7 @@ binary_iop1(PyObject *v, PyObject *w, const int iop_slot, const int op_slot
     )
 {
   PyNumberMethods *mv = Py_TYPE(v)->tp_as_number;
+	// printf("v type %s\n", Py_TYPE(v)->tp_name);
   if (mv != NULL) {
     binaryfunc slot = NB_BINOP(mv, iop_slot);
     if (slot) {
@@ -34,7 +69,7 @@ binary_iop1(PyObject *v, PyObject *w, const int iop_slot, const int op_slot
       Py_DECREF(x);
     }
   }
-  assert(false);
+	return binary_op1(v, w, op_slot);
 }
 
 #ifdef NDEBUG
@@ -42,6 +77,8 @@ binary_iop1(PyObject *v, PyObject *w, const int iop_slot, const int op_slot
 #else
 #define BINARY_IOP1(v, w, iop_slot, op_slot, op_name) binary_iop1(v, w, iop_slot, op_slot, op_name)
 #endif
+
+#define BINARY_OP1(v, w, op_slot, op_name) binary_op1(v, w, op_slot)
 
 static PyObject *
 binary_iop(PyObject *v, PyObject *w, const int iop_slot, const int op_slot,
@@ -77,6 +114,7 @@ PyObject *PyObject_GetIter(PyObject * o) {
 
   f = t->tp_iter;
   if (f == NULL) {
+		printf("type %s has no tp_iter\n", t->tp_name);
     assert(false);
   } else {
     PyObject *res = (*f)(o);
@@ -121,7 +159,7 @@ PyVectorcall_Function(PyObject *callable) {
 
 	assert(callable != NULL);
 	tp = Py_TYPE(callable);
-	printf("PyVectorcall_Function got type %s\n", tp->tp_name);
+	// printf("PyVectorcall_Function got type %s\n", tp->tp_name);
 	if (!PyType_HasFeature(tp, Py_TPFLAGS_HAVE_VECTORCALL)) {
 		return NULL;
 	}
@@ -143,6 +181,7 @@ _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
 	vectorcallfunc func;
 	PyObject *res;
 
+	// printf("name %s\n", ((PyTypeObject *) callable)->tp_name);
 	func = PyVectorcall_Function(callable);
 	if (func == NULL) {
 		assert(false);
@@ -162,4 +201,86 @@ PyObject_Vectorcall(PyObject *callable, PyObject *const *args,
 static inline Py_ssize_t
 PyVectorcall_NARGS(size_t n) {
 	return n & ~PY_VECTORCALL_ARGUMENTS_OFFSET;
+}
+
+int
+PySequence_DelItem(PyObject *s, Py_ssize_t i) {
+	printf("PySequence_DelItem type is %s\n", Py_TYPE(s)->tp_name);
+	if (s == NULL) {
+		assert(false);
+	}
+
+	PySequenceMethods *m = Py_TYPE(s)->tp_as_sequence;
+	if (m && m->sq_ass_item) {
+		if (i < 0) {
+			assert(false);
+		}
+		int res = m->sq_ass_item(s, i, (PyObject *) NULL);
+		assert(res >= 0);
+		return res;
+	}
+	assert(false);
+}
+
+PyObject *
+PyNumber_InPlaceAdd(PyObject *v, PyObject *w) {
+	PyObject *result = BINARY_IOP1(v, w, NB_SLOT(nb_inplace_add),
+			NB_SLOT(nb_add), "+=");
+	if (result == Py_NotImplemented) {
+		assert(false);
+	}
+	return result;
+}
+
+PyObject *
+PyNumber_Add(PyObject *v, PyObject *w) {
+	PyObject *result = BINARY_OP1(v, w, NB_SLOT(nb_add), "+");
+	if (result != Py_NotImplemented) {
+		return result;
+	}
+	assert(false);
+}
+
+PyObject *
+_PyNumber_Index(PyObject *item) {
+	if (item == NULL) {
+		assert(false);
+	}
+
+	if (PyLong_Check(item)) {
+		Py_INCREF(item);
+		return item;
+	}
+	assert(false);
+}
+
+PyObject *
+PyNumber_Index(PyObject *item) {
+	PyObject *result = _PyNumber_Index(item);
+	if (result != NULL && !PyLong_CheckExact(result)) {
+		assert(false);
+	}
+	return result;
+}
+
+static PyObject *
+binary_op(PyObject *v, PyObject *w, const int op_slot, const char *op_name) {
+	PyObject *result = BINARY_OP1(v, w, op_slot, op_name);
+	if (result == Py_NotImplemented) {
+		assert(false);
+	}
+	return result;
+}
+
+#define BINARY_FUNC(func, op, op_name) \
+	PyObject * \
+	func(PyObject *v, PyObject *w) { \
+		return binary_op(v, w, NB_SLOT(op), op_name); \
+	}
+
+BINARY_FUNC(PyNumber_Subtract, nb_subtract, "-")
+
+PyObject *
+PyNumber_FloorDivide(PyObject *v, PyObject *w) {
+	return binary_op(v, w, NB_SLOT(nb_floor_divide), "//");
 }

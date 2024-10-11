@@ -2,6 +2,7 @@
 
 #include "moduleobject.h"
 #include "modsupport.h"
+#include "rangeobject.h"
 
 PyDoc_STRVAR(print_doc,
 "print...");
@@ -15,8 +16,13 @@ builtin_print(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 		if (i > 0) {
 			printf(" ");
 		}
-		assert(PyUnicode_Check(args[i]));
-		printf("%s", PyUnicode_1BYTE_DATA(args[i]));
+		if (PyUnicode_Check(args[i])) {
+			printf("%s", PyUnicode_1BYTE_DATA(args[i]));
+		} else if (PyLong_Check(args[i])) {
+			printf("%ld", PyLong_AsLong(args[i]));
+		} else {
+			assert(false);
+		}
 	}
 	printf("\n");
 	Py_RETURN_NONE;
@@ -65,10 +71,23 @@ static struct PyModuleDef builtinsmodule = {
 PyObject *
 _PyBuiltin_Init(PyInterpreterState *interp)
 {
-	PyObject *mod;
+	PyObject *mod, *dict;
 
 	mod = _PyModule_CreateInitialized(&builtinsmodule, PYTHON_API_VERSION);
 	if (mod == NULL)
 		return NULL;
+	dict = PyModule_GetDict(mod);
+
+#define ADD_TO_ALL(OBJECT) (void)0
+
+#define SETBUILTIN(NAME, OBJECT) \
+	if (PyDict_SetItemString(dict, NAME, (PyObject *) OBJECT) < 0) \
+		return NULL; \
+	ADD_TO_ALL(OBJECT)
+
+	SETBUILTIN("range", &PyRange_Type);
+
 	return mod;
+#undef ADD_TO_ALL
+#undef SETBUILTIN
 }

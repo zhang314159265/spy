@@ -4,12 +4,93 @@ file[mod_ty]: a=[statements] ENDMARKER { _PyPegen_make_module(p, a) }
 
 statements[asdl_stmt_seq*]: a=statement+ { (asdl_stmt_seq*) _PyPegen_seq_flatten(p, a) }
 
-statement[asdl_stmt_seq*]: a[asdl_stmt_seq*]=simple_stmts {a}
+statement[asdl_stmt_seq*]: a=compound_stmt { (asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) } | a[asdl_stmt_seq*]=simple_stmts {a}
+
+compound_stmt[stmt_ty]:
+	| &'def' function_def
+	| &'for' for_stmt
+
+for_stmt[stmt_ty]:
+	| 'for' t=star_targets 'in' ~ ex=star_expressions ':' b=block {
+		_PyAST_For(t, ex, b, NULL);
+	}
+
+function_def[stmt_ty]:
+	| function_def_raw
+
+function_def_raw[stmt_ty]:
+	| 'def' n=NAME '(' params=[params] ')' ':' b=block {
+			_PyAST_FunctionDef(n->v.Name.id,
+				params, b, NULL, NULL)
+	}
+
+block[asdl_stmt_seq*] (memo):
+	| NEWLINE INDENT a=statements DEDENT {a}
+
+params[arguments_ty]:
+	| parameters
+
+parameters[arguments_ty]:
+	| a[asdl_arg_seq*]=param_no_default+ {
+		_PyPegen_make_arguments(p, NULL, NULL, a, NULL, NULL)
+	}
+
+param_no_default[arg_ty]:
+	| a=param &')' {
+		_PyPegen_add_type_comment_to_arg(p, a, NULL) }
+
+param[arg_ty]: a=NAME {
+	_PyAST_arg(a->v.Name.id, NULL, NULL) }
 
 simple_stmts[asdl_stmt_seq*]: a=simple_stmt !';' NEWLINE {
 	(asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) }
 
-simple_stmt[stmt_ty]: e=primary { _PyAST_Expr(e) }
+simple_stmt[stmt_ty] (memo):
+	| assignment
+	| &'return' return_stmt
+	| e=primary { _PyAST_Expr(e) }
+
+return_stmt[stmt_ty]:
+	| 'return' a=[star_expressions] { _PyAST_Return(a) }
+
+star_expressions[expr_ty]:
+	| star_expression
+
+star_expression[expr_ty] (memo):
+	| expression
+
+# TODO follow cpy
+expression[expr_ty] (memo): sum
+
+sum[expr_ty]:
+	| a=sum '+' b=primary { _PyAST_BinOp(a, Add, b) }
+	| primary
+
+assignment[stmt_ty]:
+	| a[asdl_expr_seq*]=(z=star_targets '=' {z})+ b=star_expressions !'=' {
+			_PyAST_Assign(a, b, NULL)
+		}
+	| a=single_target b=augassign ~ c=star_expressions {
+		_PyAST_AugAssign(a, b->kind, c);
+	}
+
+single_target[expr_ty]:
+	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
+
+augassign[AugOperator*]:
+	| '+=' { _PyPegen_augoperator(p, Add) }
+
+star_targets[expr_ty]:
+	| a=star_target !',' {a}
+
+star_target[expr_ty] (memo):
+	| target_with_star_atom
+
+target_with_star_atom[expr_ty] (memo):
+	| star_atom
+
+star_atom[expr_ty]:
+	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
 
 primary[expr_ty]: a=primary '(' b=[arguments] ')' {
 		_PyAST_Call(a,
@@ -17,9 +98,11 @@ primary[expr_ty]: a=primary '(' b=[arguments] ')' {
 			(b) ? ((expr_ty) b)->v.Call.keywords : NULL) }
 	| atom
 
-arguments[expr_ty]: a[asdl_expr_seq*]=','.primary+ {
+arguments[expr_ty]: a[asdl_expr_seq*]=','.expression+ {
 		_PyPegen_collect_call_seqs(p, a, NULL);
 	}
 
-atom[expr_ty]: NAME
+atom[expr_ty]:
+	| NAME
+	| NUMBER
 	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }

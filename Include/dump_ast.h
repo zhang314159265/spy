@@ -2,14 +2,24 @@
 
 #include "internal/pycore_ast.h"
 
-#define INDENT() fprintf(stderr, "%*s", indent, "")
+#define _INDENT() fprintf(stderr, "%*s", indent, "")
 
 void dump_expr(expr_ty expr, int indent);
+void dump_stmt(stmt_ty stmt, int indent);
+
+void dump_stmt_seq(asdl_stmt_seq *stmt_seq, int indent) {
+	int l = asdl_seq_LEN(stmt_seq);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "stmt seq %d/%d\n", i + 1, l);
+		dump_stmt(asdl_seq_GET_UNTYPED(stmt_seq, i), indent + 2);
+	}
+}
 
 void dump_expr_seq(asdl_expr_seq *expr_seq, int indent) {
 	int l = asdl_seq_LEN(expr_seq);
 	for (int i = 0; i < l; ++i) {
-		INDENT();
+		_INDENT();
 		fprintf(stderr, "expr seq %d/%d\n", i + 1, l);
 		dump_expr(asdl_seq_GET_UNTYPED(expr_seq, i), indent + 2);
 	}
@@ -19,12 +29,12 @@ void dump_identifier(identifier id, int indent) {
 	assert(PyUnicode_Check(id));
 	assert(PyUnicode_KIND(id) == PyUnicode_1BYTE_KIND);
 	const char *data = PyUnicode_DATA(id);
-	INDENT();
+	_INDENT();
 	fprintf(stderr, "id[%s]\n", data);
 }
 
 void dump_expr_context(expr_context_ty ctx, int indent) {
-	INDENT();
+	_INDENT();
 	switch (ctx) {
 	case Load: fprintf(stderr, "CTX=LOAD\n"); break;
 	case Store: fprintf(stderr, "CTX=STORE\n"); break;
@@ -38,8 +48,18 @@ void dump_keyword_seq(asdl_keyword_seq *keyword_seq, int indent) {
 	assert(!keyword_seq);
 }
 
+void dump_operator_ty(operator_ty op, int indent) {
+	_INDENT();
+	switch (op) {
+	case Add:
+		fprintf(stderr, "+\n"); break;
+	default:
+		assert(false);
+	}
+}
+
 void dump_expr(expr_ty expr, int indent) {
-	INDENT();
+	_INDENT();
 	switch (expr->kind) {
 	case Name_kind:
 		fprintf(stderr, "Name:\n");
@@ -55,8 +75,19 @@ void dump_expr(expr_ty expr, int indent) {
 	case Constant_kind:
 		fprintf(stderr, "Constant: ");
 		// only support string constant now
-		assert(PyUnicode_CheckExact(expr->v.Constant.value));
-		fprintf(stderr, "'%s'\n", (char *) PyUnicode_DATA(expr->v.Constant.value));
+		if (PyUnicode_CheckExact(expr->v.Constant.value)) {
+			fprintf(stderr, "'%s'\n", (char *) PyUnicode_DATA(expr->v.Constant.value));
+		} else if (PyLong_Check(expr->v.Constant.value)) {
+			fprintf(stderr, "%ld\n", PyLong_AsLong(expr->v.Constant.value));
+		} else {
+			assert(false);
+		}
+		break;
+	case BinOp_kind:
+		fprintf(stderr, "BinOp:\n");
+		dump_expr(expr->v.BinOp.left, indent + 2);
+		dump_operator_ty(expr->v.BinOp.op, indent + 2);
+		dump_expr(expr->v.BinOp.right, indent + 2);
 		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
@@ -64,12 +95,50 @@ void dump_expr(expr_ty expr, int indent) {
 	}
 }
 
+void dump_arguments_ty(arguments_ty args, int indent) {
+	int l = asdl_seq_LEN(args->args);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "param seq %d/%d: ", i + 1, l);
+		arg_ty arg = (arg_ty) asdl_seq_GET_UNTYPED(args->args, i);
+		fprintf(stderr, "%s\n", (char *) PyUnicode_DATA(arg->arg));
+	}
+}
+
 void dump_stmt(stmt_ty stmt, int indent) {
-	INDENT();
+	_INDENT();
 	switch (stmt->kind) {
 	case Expr_kind:
 		fprintf(stderr, "ExprStmt:\n");
 		dump_expr(stmt->v.Expr.value, indent + 2);
+		break;
+	case FunctionDef_kind:
+		fprintf(stderr, "FunctionDef: %s\n", (char *) PyUnicode_DATA(stmt->v.FunctionDef.name));
+		dump_arguments_ty(stmt->v.FunctionDef.args, indent + 2);
+		dump_stmt_seq(stmt->v.FunctionDef.body, indent + 2);
+		// assert(false);
+		break;
+	case Assign_kind:
+		fprintf(stderr, "Assign:\n");
+		dump_expr_seq(stmt->v.Assign.targets, indent + 2);
+		dump_expr(stmt->v.Assign.value, indent + 2);
+		break;
+	case AugAssign_kind:
+		fprintf(stderr, "AugAssign:\n");
+		dump_expr(stmt->v.AugAssign.target, indent + 2);
+		dump_operator_ty(stmt->v.AugAssign.op, indent + 2);
+		dump_expr(stmt->v.AugAssign.value, indent + 2);
+		break;
+	case Return_kind:
+		fprintf(stderr, "Return:\n");
+		dump_expr(stmt->v.Return.value, indent + 2);
+		break;
+	case For_kind:
+		fprintf(stderr, "For:\n");
+		dump_expr(stmt->v.For.target, indent + 2);
+		dump_expr(stmt->v.For.iter, indent + 2);
+		dump_stmt_seq(stmt->v.For.body, indent + 2);
+		assert(!stmt->v.For.orelse);
 		break;
 	default:
 		assert(false && "dump_stmt");
@@ -78,9 +147,10 @@ void dump_stmt(stmt_ty stmt, int indent) {
 
 void dump_mod(mod_ty mod, int indent) {
 	assert(mod->kind == Module_kind);
-	INDENT();
+	_INDENT();
 	fprintf(stderr, "module:\n");
 	for (int i = 0; i < asdl_seq_LEN(mod->v.Module.body); ++i) {
 		dump_stmt(asdl_seq_GET_UNTYPED(mod->v.Module.body, i), indent + 2);
 	}
+	fprintf(stderr, "dump done\n");
 }

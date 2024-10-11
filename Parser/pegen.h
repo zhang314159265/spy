@@ -11,7 +11,21 @@
 #include "bytesobject.h"
 #include "Parser/tokenizer.h"
 
+#include "Python/Python-ast.h"
+
+#if 0
+// trigger debug messages in Parser/parser.c
+#define Py_DEBUG
+#define Py_BUILD_CORE
+#define Py_DebugFlag 1
+#endif
+
 #define UNUSED(expr) (void) (expr)
+
+long PyOS_strtol(const char *, char **, int );
+PyObject *PyLong_FromLong(long ival);
+
+typedef struct { operator_ty kind; } AugOperator;
 
 typedef struct _memo {
 	int type;  // specify the rule
@@ -398,6 +412,124 @@ _PyPegen_concatenate_strings(Parser *p, asdl_seq *strings) {
 	}
 
 	return _PyPegen_FstringParser_Finish(p, &state, first, last);
+}
+
+arg_ty
+_PyPegen_add_type_comment_to_arg(Parser *p, arg_ty a, Token *tc) {
+	if (tc == NULL) {
+		return a;
+	}
+	assert(false);
+}
+
+static int
+_make_posargs(Parser *p,
+		asdl_arg_seq *plain_names,
+		asdl_seq *names_with_default,
+		asdl_arg_seq **posargs) {
+	assert(plain_names);
+	assert(!names_with_default);
+
+	*posargs = plain_names;
+	return *posargs == NULL ? -1 : 0;
+}
+
+typedef void *SlashWithDefault;
+typedef void *StarEtc;
+
+arguments_ty
+_PyPegen_make_arguments(Parser *p, asdl_arg_seq *slash_without_default,
+		SlashWithDefault *slash_with_default, asdl_arg_seq *plain_names,
+		asdl_seq *names_with_default, StarEtc *star_etc) {
+	
+	asdl_arg_seq *posargs;
+	if (_make_posargs(p, plain_names, NULL, &posargs) == -1) {
+		assert(false);
+		return NULL;
+	}
+	return _PyAST_arguments(posargs);
+}
+
+static PyObject *
+parsenumber_raw(const char *s) {
+	const char *end;
+	long x;
+	int imflag;
+
+	assert(s != NULL);
+	end = s + strlen(s) - 1;
+
+	imflag = *end == 'j' || *end == 'J';
+	if (s[0] == '0') {
+		x = PyOS_strtol(s, (char **) &end, 0);
+	} else {
+		x = PyOS_strtol(s, (char **) &end, 0);
+	}
+	if (*end == '\0') {
+		return PyLong_FromLong(x);
+	}
+	assert(false);
+}
+
+static PyObject *
+parsenumber(const char *s) {
+	assert(s != NULL);
+
+	if (strchr(s, '_') == NULL) {
+		return parsenumber_raw(s);
+	}
+	assert(false);
+}
+
+expr_ty
+_PyPegen_number_token(Parser *p) {
+	Token *t = _PyPegen_expect_token(p, NUMBER);
+	if (t == NULL) {
+		return NULL;
+	}
+
+	const char *num_raw = PyBytes_AsString(t->bytes);
+	if (num_raw == NULL) {
+		assert(false);
+	}
+
+	PyObject *c = parsenumber(num_raw);
+
+	if (c == NULL) {
+		assert(false);
+	}
+
+	return _PyAST_Constant(c);
+}
+
+static expr_ty
+_set_name_context(Parser *p, expr_ty e, expr_context_ty ctx) {
+	return _PyAST_Name(e->v.Name.id, ctx, p->arena);
+}
+
+expr_ty
+_PyPegen_set_expr_context(Parser *p, expr_ty expr, expr_context_ty ctx) {
+	assert(expr != NULL);
+
+	expr_ty new = NULL;
+	switch (expr->kind) {
+	case Name_kind:
+		new = _set_name_context(p, expr, ctx);
+		break;
+	default:
+		assert(false);
+	}
+	return new;
+}
+
+AugOperator *
+_PyPegen_augoperator(Parser *p, operator_ty kind) {
+	AugOperator *a = malloc(sizeof(AugOperator));
+	if (!a) {
+		return NULL;
+	}
+	a->kind = kind;
+	return a;
 }
 
 #endif

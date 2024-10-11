@@ -15,7 +15,12 @@ struct PyCodeObject {
   PyObject *co_name;
   PyObject *co_linetable;
   void *co_extra;
+
+  PyObject *co_freevars;
 };
 
 #define _Py_OPCODE(word) ((word) & 255)
 #define _Py_OPARG(word) ((word) >> 8)
+
+#define PyCode_GetNumFree(op) (PyTuple_GET_SIZE((op)->co_freevars))
+

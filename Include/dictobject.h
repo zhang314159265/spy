@@ -25,6 +25,7 @@ typedef struct {
 
 Py_ssize_t lookdict_split(PyDictObject *mp, PyObject *key,
     Py_hash_t hash, PyObject **value_addr);
+static int insertion_resize(PyDictObject *mp);
 
 // defined in cpy/Objects/dictobject.c
 static PyDictKeysObject empty_keys_struct = {
@@ -384,7 +385,9 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value) {
     /* Insert into new slot. */
     assert(old_value == NULL);
     if (mp->ma_keys->dk_usable <= 0) {
-      assert(false);
+      // Need to resize
+      if (insertion_resize(mp) < 0)
+        assert(false);
     }
     if (!PyUnicode_CheckExact(key) && mp->ma_keys->dk_lookup != lookdict) {
       mp->ma_keys->dk_lookup = lookdict;
@@ -776,4 +779,31 @@ PyDict_SetItemString(PyObject *v, const char *key, PyObject *item) {
   err = PyDict_SetItem(v, kv, item);
   Py_DECREF(kv);
   return err;
+}
+
+PyObject *
+_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key) {
+  Py_ssize_t ix;
+  Py_hash_t hash;
+  PyObject *value;
+
+  if (!PyUnicode_CheckExact(key) ||
+      (hash = ((PyASCIIObject *) key)->hash) == -1) {
+    hash = PyObject_Hash(key);
+    if (hash == -1)
+      return NULL;
+  }
+
+  // namespace 1: globals
+  ix = globals->ma_keys->dk_lookup(globals, key, hash, &value);
+  if (ix == DKIX_ERROR)
+    return NULL;
+  if(ix != DKIX_EMPTY && value != NULL)
+    return value;
+
+  // namespace 2: builtins
+  ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value);
+  if (ix < 0)
+    return NULL;
+  return value;
 }

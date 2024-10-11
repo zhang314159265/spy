@@ -7,25 +7,38 @@ typedef struct PyCodeObject PyCodeObject;
 #include "internal/pycore_tuple.h"
 #include "cpython/pyctype.h"
 
+#define PyCode_Check(op) Py_IS_TYPE(op, &PyCode_Type)
+
+#define CO_OPTIMIZED 0x0001
+#define CO_NEWLOCALS 0x0002
 #define CO_NOFREE 0x0040
+
+#define CO_MAXBLOCKS 20
 
 typedef uint16_t _Py_CODEUNIT;
 
 static void code_dealloc(PyCodeObject *co);
+static Py_hash_t code_hash(PyCodeObject *co);
 
 PyTypeObject PyCode_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "code",
   .tp_basicsize = sizeof(PyCodeObject),
   .tp_dealloc = (destructor) code_dealloc,
+  .tp_hash = (hashfunc) code_hash,
 };
+
+extern PyTypeObject PyLong_Type;
+#define PyLong_CheckExact(op) Py_IS_TYPE(op, &PyLong_Type)
 
 // defined in cpy/Objects/codeobject.c
 PyObject *
 _PyCode_ConstantKey(PyObject *op) {
 	PyObject *key;
 
-	if (op == Py_None || PyUnicode_CheckExact(op)) {
+	if (op == Py_None
+      || PyLong_CheckExact(op)
+      || PyUnicode_CheckExact(op) || PyCode_Check(op)) {
 		Py_INCREF(op);
 		key = op;
 	} else if (PyBytes_CheckExact(op)) {
@@ -121,10 +134,16 @@ intern_string_constants(PyObject *tuple, int *modified) {
 PyCodeObject *
 PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
     PyObject *code, PyObject *consts,
-    PyObject *names, PyObject *varnames, PyObject *name, int firstlineno,
+    PyObject *names, PyObject *varnames,
+    PyObject *freevars,
+    PyObject *name, int firstlineno,
     PyObject *linetable) {
   PyCodeObject *co;
   Py_ssize_t n_varnames;
+
+  if (freevars == NULL || !PyTuple_Check(freevars)) {
+    assert(false);
+  }
 
   // Ensure that strings are ready Unicode string
   if (PyUnicode_READY(name) < 0) {
@@ -137,6 +156,10 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
   if (intern_strings(varnames) < 0) {
     return NULL;
   }
+  if (intern_strings(freevars) < 0) {
+    return NULL;
+  }
+
   if (intern_string_constants(consts, NULL) < 0) {
     return NULL;
   }
@@ -164,6 +187,8 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
   co->co_names = names;
   Py_INCREF(varnames);
   co->co_varnames = varnames;
+  Py_INCREF(freevars);
+  co->co_freevars = freevars;
   Py_INCREF(name);
   co->co_name = name;
   co->co_firstlineno = firstlineno;
@@ -181,4 +206,16 @@ static void code_dealloc(PyCodeObject *co) {
   // Py_XDECREF(co->co_filename);
   Py_XDECREF(co->co_name);
   PyObject_Free(co);
+}
+
+static Py_hash_t code_hash(PyCodeObject *co) {
+  // TODO follow cpy
+  Py_hash_t h, h0, h1;
+  h0 = PyObject_Hash(co->co_name);
+  if (h0 == -1) return -1;
+  h1 = PyObject_Hash(co->co_code);
+  if (h1 == -1) return -1;
+  h = h0 ^ h1;
+  if (h == -1) h = -2;
+  return h;
 }

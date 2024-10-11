@@ -5,6 +5,12 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 # Scratch
 
+- TODO: make sure the ctx for the assigned name is 'store' rather than 'load'
+
+- goal
+  - cover most bytecode
+	- cover import
+
 - another tutor with 'for loop'
 
 - sys.stdout is defined by `init_sys_streams` 

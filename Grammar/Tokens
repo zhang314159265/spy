@@ -1,16 +1,41 @@
 ENDMARKER
 NAME
-DM_0
+NUMBER
 STRING
 NEWLINE
-DM_1
-DM_2
+INDENT
+DEDENT
 
 LPAR '('
 RPAR ')'
 
-# TODO order for COMMA is wrong
-COMMA ','
-# TODO order for SEMI is wrong
-SEMI ';'
+LSQB '['
+RSQB ']'
 
+COLON ':'
+COMMA ','
+SEMI ';'
+PLUS '+'
+MINUS '-'
+STAR '*'
+SLASH '/'
+VBAR '|'
+AMPER '&'
+LESS '<'
+GREATER '>'
+
+EQUAL '='
+DOT '.'
+PERCENT '@'
+LBRACE '{'
+RBRACE '}'
+EQEQUAL '=='
+NOTEQUAL '!='
+LESSEQUAL '<='
+GREATEREQUAL '>='
+TILDE '~'
+CIRCUMFLEX '^'
+LEFTSHIFT '<<'
+RIGHTSHIFT '>>'
+DOUBLESTAR '**'
+PLUSEQUAL '+='

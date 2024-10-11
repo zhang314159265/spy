@@ -161,3 +161,11 @@ PyTuple_GetItem(PyObject *op, Py_ssize_t i) {
 	}
 	return ((PyTupleObject *) op)->ob_item[i];
 }
+
+Py_ssize_t
+PyTuple_Size(PyObject *op) {
+	if (!PyTuple_Check(op)) {
+		assert(false);
+	} else
+		return Py_SIZE(op);
+}

@@ -7,7 +7,15 @@ typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args, s
 typedef struct {
   binaryfunc nb_or;
   binaryfunc nb_inplace_or;
+  binaryfunc nb_add;
+  binaryfunc nb_inplace_add;
+  binaryfunc nb_subtract;
+  binaryfunc nb_floor_divide;
 } PyNumberMethods;
+
+typedef struct {
+  ssizeobjargproc sq_ass_item;
+} PySequenceMethods;
 
 struct _typeobject {
 	PyObject_VAR_HEAD
@@ -43,6 +51,9 @@ struct _typeobject {
   ternaryfunc tp_call;
 
   Py_ssize_t tp_vectorcall_offset;
+
+  PySequenceMethods *tp_as_sequence;
+  vectorcallfunc tp_vectorcall;
 };
 
 // The *real* layout of a type object when allocated on the heap

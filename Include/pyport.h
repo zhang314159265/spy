@@ -19,4 +19,16 @@ typedef size_t Py_uhash_t;
 #define INT_MAX 2147483647
 #endif
 
+#define SIZEOF_LONG 8
+
+#ifndef LONG_MAX
+#if SIZEOF_LONG == 4
+#define LONG_MAX 0x7FFFFFFFL
+#elif SIZEOF_LONG == 8
+#define LONG_MAX 0x7FFFFFFFFFFFFFFFL
+#else
+#error "could not set LONG_MAX in pyport.h"
+#endif
+#endif
+
 #endif

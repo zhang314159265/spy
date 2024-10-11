@@ -7,6 +7,12 @@
     PyType_IsSubtype(Py_TYPE(ob), &PySet_Type) || \
     PyType_IsSubtype(Py_TYPE(ob), &PyFrozenSet_Type))
 
+#define PySet_Check(ob) \
+	(Py_IS_TYPE(ob, &PySet_Type) || \
+	PyType_IsSubtype(Py_TYPE(ob), &PySet_Type))
+
+#define PySet_GET_SIZE(so) (assert(PyAnySet_Check(so)), (((PySetObject *) (so))->used))
+
 // Object used as dummy key to fill deleted entries
 static PyObject _dummy_struct;
 #define dummy (&_dummy_struct)
@@ -23,6 +29,7 @@ typedef struct {
 	setentry *table;
 	setentry smalltable[PySet_MINSIZE];
 
+	Py_ssize_t fill; // Number active and dummy entries
   Py_ssize_t used; // number active entries
 
   Py_ssize_t mask;
@@ -114,6 +121,10 @@ PyTypeObject PyFrozenSet_Type = {
 static int
 set_merge(PySetObject *so, PyObject *otherset) {
   PySetObject *other;
+	PyObject *key;
+	Py_ssize_t i;
+	setentry *so_entry;
+	setentry *other_entry;
 
   assert(PyAnySet_Check(so));
   assert(PyAnySet_Check(otherset));
@@ -122,6 +133,29 @@ set_merge(PySetObject *so, PyObject *otherset) {
   if (other == so || other->used == 0)
     // a.update(a) or a.update(set()); nothing to do
     return 0;
+	
+	// printf("so used %ld, other used %ld\n", so->used, other->used);
+	if ((so->fill + other->used) * 5 >= so->mask * 3) {
+		assert(false);
+	}
+
+	so_entry = so->table;
+	other_entry = other->table;
+
+	if (so->fill == 0 && so->mask == other->mask && other->fill == other->used) {
+		for (i = 0; i <= other->mask; i++, so_entry++, other_entry++) {
+			key = other_entry->key;
+			if (key != NULL) {
+				assert(so_entry->key == NULL);
+				Py_INCREF(key);
+				so_entry->key = key;
+				so_entry->hash = other_entry->hash;
+			}
+		}
+		so->fill = other->fill;
+		so->used = other->used;
+		return 0;
+	}
   assert(false);
 }
 
@@ -155,13 +189,17 @@ make_new_set(PyTypeObject *type, PyObject *iterable) {
 		return NULL;
 	}
 
+	so->fill = 0;
   so->used = 0;
   so->mask = PySet_MINSIZE - 1;
 	so->table = so->smalltable;
   so->weakreflist = NULL;
 
 	if (iterable != NULL) {
-		assert(false);
+		if (set_update_internal(so, iterable)) {
+			Py_DECREF(so);
+			return NULL;
+		}
 	}
 
 	return (PyObject *) so;
@@ -268,4 +306,110 @@ static void setiter_dealloc(setiterobject *si) {
   _PyObject_GC_UNTRACK(si);
   Py_XDECREF(si->si_set);
   PyObject_GC_Del(si);
+}
+
+static int
+set_add_entry(PySetObject *so, PyObject *key, Py_hash_t hash) {
+	setentry *freeslot;
+	setentry *entry;
+
+	size_t perturb;
+	size_t mask;
+	size_t i;
+	int probes;
+
+	Py_INCREF(key);
+
+restart:
+
+	mask = so->mask;
+	i = (size_t) hash & mask;
+	freeslot = NULL;
+	perturb = hash;
+
+	while (1) {
+		entry = &so->table[i];
+		probes = (i + LINEAR_PROBES <= mask) ? LINEAR_PROBES : 0;
+		do {
+			if (entry->hash == 0 && entry->key == NULL)
+				goto found_unused_or_dummy;
+			if (entry->hash == hash) {
+				assert(false);
+			}
+			else if (entry->hash == -1) {
+				assert(false);
+			}
+			entry++;
+		} while (probes--);
+		perturb >>= PERTURB_SHIFT;
+		i = (i * 5 + 1 + perturb) & mask;
+	}
+found_unused_or_dummy:
+	if (freeslot == NULL)
+		goto found_unused;
+	assert(false);
+found_unused:
+	so->fill++;
+	so->used++;
+	entry->key = key;
+	entry->hash = hash;
+	if ((size_t) so->fill * 5 < mask * 3)
+		return 0;
+	assert(false);
+}
+
+static int
+set_add_key(PySetObject *so, PyObject *key) {
+	Py_hash_t hash;
+
+	if (!PyUnicode_CheckExact(key) ||
+		(hash = ((PyASCIIObject *) key)->hash) == -1) {
+		hash = PyObject_Hash(key);
+		if (hash == -1)
+			return -1;
+	}
+	return set_add_entry(so, key, hash);
+}
+
+int PySet_Add(PyObject *anyset, PyObject *key) {
+	if (!PySet_Check(anyset)) {
+		assert(false);
+	}
+	return set_add_key((PySetObject *) anyset, key);
+}
+
+#define DISCARD_NOTFOUND 0
+#define DISCARD_FOUND 1
+
+static int
+set_discard_entry(PySetObject *so, PyObject *key, Py_hash_t hash) {
+	setentry *entry;
+
+	entry = set_lookkey(so, key, hash);
+	if (entry == NULL)
+		return -1;
+	if (entry->key == NULL)
+		return DISCARD_NOTFOUND;
+	assert(false);
+}
+
+static int
+set_discard_key(PySetObject *so, PyObject *key) {
+	Py_hash_t hash;
+
+	if (!PyUnicode_CheckExact(key) ||
+			(hash = ((PyASCIIObject *) key)->hash) == -1) {
+		hash = PyObject_Hash(key);
+		if (hash == -1)
+			return -1;
+	}
+
+	return set_discard_entry(so, key, hash);
+}
+
+int PySet_Discard(PyObject *set, PyObject *key) {
+	if (!PySet_Check(set)) {
+		assert(false);
+	}
+	return set_discard_key((PySetObject *) set, key);
 }

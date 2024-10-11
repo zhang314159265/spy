@@ -22,6 +22,16 @@ struct _longobject {
 
 static Py_hash_t long_hash(PyLongObject *v);
 static PyObject *long_richcompare(PyObject *self, PyObject *other, int op);
+static PyObject *long_add(PyLongObject *a, PyLongObject *b);
+static PyObject *long_sub(PyLongObject *a, PyLongObject *b);
+static PyObject *long_div(PyObject *a, PyObject *b);
+
+static PyNumberMethods long_as_number = {
+  .nb_inplace_add = 0,
+  .nb_add = (binaryfunc) long_add,
+  .nb_subtract = (binaryfunc) long_sub,
+  .nb_floor_divide = long_div,
+};
 
 // defined in cpy/Objects/longobject.c
 PyTypeObject PyLong_Type = {
@@ -32,6 +42,7 @@ PyTypeObject PyLong_Type = {
   .tp_free = PyObject_Del,
   .tp_hash = (hashfunc) long_hash,
   .tp_richcompare = long_richcompare,
+  .tp_as_number = &long_as_number,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -111,4 +122,49 @@ static PyObject *long_richcompare(PyObject *self, PyObject *other, int op) {
   else
     result = long_compare((PyLongObject *) self, (PyLongObject *) other);
   Py_RETURN_RICHCOMPARE(result, 0, op);
+}
+
+#define MEDIUM_VALUE(x) (assert(-1 <= Py_SIZE(x) && Py_SIZE(x) <= 1), \
+  Py_SIZE(x) < 0 ? -(sdigit)(x)->ob_digit[0] : \
+  (Py_SIZE(x) == 0 ? (sdigit) 0 : \
+  (sdigit) (x)->ob_digit[0]))
+
+static PyObject *long_add(PyLongObject *a, PyLongObject *b) {
+  if (Py_ABS(Py_SIZE(a)) <= 1 && Py_ABS(Py_SIZE(b)) <= 1) {
+    return PyLong_FromLong(MEDIUM_VALUE(a) + MEDIUM_VALUE(b));
+  }
+  assert(false);
+}
+
+static PyObject *long_sub(PyLongObject *a, PyLongObject *b) {
+  if (Py_ABS(Py_SIZE(a)) <= 1 && Py_ABS(Py_SIZE(b)) <= 1) {
+    return PyLong_FromLong(MEDIUM_VALUE(a) - MEDIUM_VALUE(b));
+  }
+  assert(false);
+}
+
+static PyObject *
+fast_floor_div(PyLongObject *a, PyLongObject *b) {
+  sdigit left = a->ob_digit[0];
+  sdigit right = b->ob_digit[0];
+  sdigit div;
+
+  assert(Py_ABS(Py_SIZE(a)) == 1);
+  assert(Py_ABS(Py_SIZE(b)) == 1);
+
+  if (Py_SIZE(a) == Py_SIZE(b)) {
+    // 'a' and 'b' have the same sign
+    div = left / right;
+  } else {
+    assert(false);
+  }
+
+  return PyLong_FromLong(div);
+}
+
+static PyObject *long_div(PyObject *a, PyObject *b) {
+  if (Py_ABS(Py_SIZE(a)) == 1 && Py_ABS(Py_SIZE(b)) == 1) {
+    return fast_floor_div((PyLongObject *) a, (PyLongObject *) b);
+  }
+  assert(false);
 }

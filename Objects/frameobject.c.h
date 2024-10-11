@@ -11,6 +11,7 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *l
 	f->f_builtins = Py_NewRef(con->fc_builtins);
 	f->f_globals = Py_NewRef(con->fc_globals);
 	f->f_locals = Py_XNewRef(locals);
+	// printf("in _PyFrame_New_NoTrack name %s f_locals is %p\n", (char*) PyUnicode_DATA(((PyCodeObject *) (con->fc_code))->co_name), f->f_locals);
 	f->f_stackdepth = 0;
 	f->f_lasti = -1;
 	// f_valuestack is already initialized in frame_alloc

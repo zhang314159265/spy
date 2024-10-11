@@ -4,9 +4,22 @@
 #include "funcobject.h"
 #include "tupleobject.h"
 
+#define GETLOCAL(i) (fastlocals[i])
+
+#define SETLOCAL(i, value) do { PyObject *tmp = GETLOCAL(i); \
+		GETLOCAL(i) = value; \
+		Py_XDECREF(tmp); } while (0)
+
 /* Stack manipulation macros */
 
 #define STACK_LEVEL() ((int)(stack_pointer - f->f_valuestack))
+
+#define BASIC_STACKADJ(n) (stack_pointer += n)
+#define STACK_GROW(n) BASIC_STACKADJ(n)
+#define STACK_SHRINK(n) BASIC_STACKADJ(-n)
+
+#define JUMPTO(x) (next_instr = first_instr + (x))
+#define JUMPBY(x) (next_instr += (x))
 
 /* Code access macros */
 #define INSTR_OFFSET() ((int)(next_instr - first_instr))
@@ -16,6 +29,8 @@
 
 #define BASIC_POP() (*--stack_pointer)
 #define POP() BASIC_POP()
+#define TOP() (stack_pointer[-1])
+#define SET_TOP(v) (stack_pointer[-1] = (v))
 
 #define EXT_POP(STACK_POINTER) (*--(STACK_POINTER))
 
@@ -35,6 +50,9 @@
 
 #define PREDICT_ID(op) PRED_##op
 #define PREDICTED(op) PREDICT_ID(op):
+
+// make it no-op for now
+#define PREDICT(op)
 
 #if USE_COMPUTED_GOTOS
 #define TARGET(op) op: TARGET_##op
@@ -62,8 +80,20 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 	PyObject *kwdict = NULL;
 
 	// Copy all positional arguments into local variables
-	Py_ssize_t n = 0; // TODO follow cpy
-	assert(n == 0);
+	Py_ssize_t j, n;
+	#if 0
+	if (argcount > co->co_argcount) {
+		n = co->co_argcount;
+	} else 
+	#endif
+	{
+		n = argcount;
+	}
+	for (j = 0; j < n; j++) {
+		PyObject *x = args[j];
+		Py_INCREF(x);
+		SETLOCAL(j, x);
+	}
 
 	return f;
 }
@@ -101,6 +131,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
 	const _Py_CODEUNIT *next_instr;
 	int opcode;
 	int oparg;
+	PyObject **fastlocals;
 	const _Py_CODEUNIT *first_instr;
 	PyObject *retval = NULL;
 	PyCodeObject *co;
@@ -114,6 +145,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
 
 	names = co->co_names;
 	consts = co->co_consts;
+	fastlocals = f->f_localsplus;
 
 	first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
 	assert(f->f_lasti >= -1);
@@ -148,6 +180,54 @@ main_loop:
 		dispatch_opcode:
 
 		switch (opcode) {
+		case TARGET(JUMP_ABSOLUTE): {
+			// printf("JUMP_ABSOLUTE oparg is %d\n", oparg);
+			JUMPTO(oparg);
+			DISPATCH();
+		}
+		case TARGET(LOAD_FAST): {
+			PyObject *value = GETLOCAL(oparg);
+			if (value == NULL) {
+				printf("LOAD_FAST miss, oparg %d\n", oparg);
+				assert(false);
+			}
+			Py_INCREF(value);
+			PUSH(value);
+			DISPATCH();
+		}
+		case TARGET(FOR_ITER): {
+			// printf("FOR_ITER oparg is %d\n", oparg);
+			PREDICTED(FOR_ITER);
+			/* before: [iter]; after: [iter, iter()] *or* [] */
+			PyObject *iter = TOP();
+			PyObject *next = (*Py_TYPE(iter)->tp_iternext)(iter);
+			if (next != NULL) {
+				PUSH(next);
+				PREDICT(STORE_FAST);
+				// PREDICT(UNPACK_SEQUENCE);
+				DISPATCH();
+			}
+			if (_PyErr_Occurred(tstate)) {
+				assert(false);
+			}
+			// iterator ended normally
+			STACK_SHRINK(1);
+			Py_DECREF(iter);
+			JUMPBY(oparg);
+			DISPATCH();
+		}
+		case TARGET(GET_ITER): {
+			// before: [obj]; after [getiter(obj)]
+			PyObject *iterable = TOP();
+			PyObject *iter = PyObject_GetIter(iterable);
+			Py_DECREF(iterable);
+			SET_TOP(iter);
+			if (iter == NULL)
+				assert(false);
+			PREDICT(FOR_ITER);
+			PREDICT(CALL_FUNCTION);
+			DISPATCH();
+		}
 		case TARGET(LOAD_NAME): {
 			PyObject *name = GETITEM(names, oparg);
 			// printf("LOAD_NAME: name is %s\n", PyUnicode_1BYTE_DATA(name));
@@ -188,6 +268,59 @@ main_loop:
 			PUSH(v);
 			DISPATCH();
 		}
+		case TARGET(BINARY_ADD): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *sum;
+			if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+				assert(false);
+			} else {
+				sum = PyNumber_Add(left, right);
+				Py_DECREF(left);
+			}
+			Py_DECREF(right);
+			SET_TOP(sum);
+			if (sum == NULL)
+				assert(false);
+			DISPATCH();
+		}
+		case TARGET(INPLACE_ADD): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *sum;
+			if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
+				assert(false);
+			} else {
+				sum = PyNumber_InPlaceAdd(left, right);
+				Py_DECREF(left);
+			}
+			Py_DECREF(right);
+			SET_TOP(sum);
+			if (sum == NULL)
+				assert(false);
+			DISPATCH();
+		}
+
+		case TARGET(LOAD_GLOBAL): {
+			PyObject *name;
+			PyObject *v;
+			if (PyDict_CheckExact(f->f_globals)
+					&& PyDict_CheckExact(f->f_builtins)) {
+				name = GETITEM(names, oparg);
+				v = _PyDict_LoadGlobal((PyDictObject *) f->f_globals,
+						(PyDictObject *) f->f_builtins,
+						name);
+				if (v == NULL) {
+					printf("LOAD_GLOBAL miss symbol %s\n", (char *) PyUnicode_DATA(name));
+					assert(false);
+				}
+				Py_INCREF(v);
+			} else {
+				assert(false);
+			}
+			PUSH(v);
+			DISPATCH();
+		}
 		
 		case TARGET(LOAD_CONST): {
 			PREDICTED(LOAD_CONST);
@@ -225,6 +358,59 @@ main_loop:
 			goto exiting;
 		}
 
+		case TARGET(MAKE_FUNCTION): {
+			PyObject *qualname = POP();
+			PyObject *codeobj = POP();
+			PyFunctionObject *func = (PyFunctionObject *)
+					PyFunction_NewWithQualName(codeobj, f->f_globals, qualname);
+
+			Py_DECREF(codeobj);
+			Py_DECREF(qualname);
+			if (func == NULL) {
+				assert(false);
+			}
+
+			if (oparg & 0x08) {
+				assert(false);
+			}
+			if (oparg & 0x04) {
+				assert(false);
+			}
+			if (oparg & 0x02) {
+				assert(false);
+			}
+			if (oparg & 0x01) {
+				assert(false);
+			}
+
+			PUSH((PyObject *) func);
+			DISPATCH();
+		}
+		case TARGET(STORE_FAST): {
+			PREDICTED(STORE_FAST);
+			PyObject *value = POP();
+			SETLOCAL(oparg, value);
+			DISPATCH();
+		}
+		case TARGET(STORE_NAME): {
+			PyObject *name = GETITEM(names, oparg);
+			PyObject *v = POP();
+			PyObject *ns = f->f_locals;
+			int err;
+			if (ns == NULL) {
+				assert(false);
+			}
+			if (PyDict_CheckExact(ns)) {
+				err = PyDict_SetItem(ns, name, v);
+			} else {
+				assert(false);
+			}
+			Py_DECREF(v);
+			if (err != 0) {
+				assert(false);
+			}
+			DISPATCH();
+		}
 		default:
 			printf("Can not handle opcode %d\n", opcode);
 			assert(false);
@@ -296,7 +482,7 @@ PyObject *
 _PyEval_GetBuiltins(PyThreadState *tstate) {
 	PyFrameObject *frame = tstate->frame;
 	if (frame != NULL) {
-		assert(false);
+		return frame->f_builtins;
 	}
 	return tstate->interp->builtins;
 }

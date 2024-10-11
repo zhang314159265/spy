@@ -11,3 +11,4 @@
 
 #include "Python/sysmodule.c.h"
 #include "Objects/call.c.h"
+#include "Objects/typeobject.c.h"

@@ -1,11 +1,24 @@
 #pragma once
 
+int _Py_SwappedOp[] = {
+  Py_GT,
+  Py_GE,
+  Py_EQ,
+  Py_NE,
+  Py_LT,
+  Py_LE,
+};
+
 static PyObject *
 do_richcompare(PyThreadState *tstate, PyObject *v, PyObject *w, int op) {
 	richcmpfunc f;
 	PyObject *res;
+  int checked_reverse_op = 0;
 
-	if (!Py_IS_TYPE(v, Py_TYPE(w))) {
+	if (!Py_IS_TYPE(v, Py_TYPE(w)) &&
+      PyType_IsSubtype(Py_TYPE(w), Py_TYPE(v)) &&
+      (f = Py_TYPE(w)->tp_richcompare) != NULL) {
+    printf("v type %s, w type %s\n", Py_TYPE(v)->tp_name, Py_TYPE(w)->tp_name);
 		assert(false);
 	}
 	if ((f = Py_TYPE(v)->tp_richcompare) != NULL) {
@@ -15,8 +28,26 @@ do_richcompare(PyThreadState *tstate, PyObject *v, PyObject *w, int op) {
 		Py_DECREF(res);
 	}
 
-	printf("Fail to do richcompare for object of type %s\n", Py_TYPE(v)->tp_name);
-	assert(false);
+  if (!checked_reverse_op && (f = Py_TYPE(w)->tp_richcompare) != NULL) {
+    res = (*f)(w, v, _Py_SwappedOp[op]);
+    if (res != Py_NotImplemented)
+      return res;
+     Py_DECREF(res);
+  }
+
+  switch (op) {
+  case Py_EQ:
+    res = (v == w) ? Py_True : Py_False;
+    break;
+  case Py_NE:
+    assert(false);
+  default:
+	  printf("Fail to do richcompare for object of type %s\n", Py_TYPE(v)->tp_name);
+    assert(false);
+  }
+
+  Py_INCREF(res);
+  return res;
 }
 
 PyObject * PyObject_RichCompare(PyObject *v, PyObject *w, int op) {

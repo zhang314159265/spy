@@ -12,6 +12,8 @@
 #include "token.h"
 #include "cpython/fileobject.h"
 
+#define TABSIZE 8
+
 #define is_potential_identifier_start(c) (\
 		(c >= 'a' && c <= 'z') \
 		|| (c >= 'A' && c <= 'Z') \
@@ -25,6 +27,8 @@
 		|| c == '_' \
 		|| (c >= 128))
 
+#define MAXINDENT 100
+
 struct tok_state {
 	FILE *fp;
 	char *buf; /* Input buffer, or NULL; malloc'ed if fp != NULL */
@@ -34,6 +38,13 @@ struct tok_state {
 	const char *start; /* Start of current token if not NULL */
 	int done; /* E_OK normally, E_EOF at EOF, otherwise error code */
 	int lineno; /* Current line number */
+	int atbol; 
+
+	int indent;
+	int indstack[MAXINDENT];
+	int pendin;
+
+	int tabsize;
 };
 
 struct tok_state *
@@ -48,6 +59,13 @@ tok_new(void) {
 	tok->end = NULL;
 	tok->done = E_OK;
 	tok->lineno = 0;
+	tok->atbol = 1;
+
+	tok->indent = 0;
+	tok->indstack[0] = 0;
+	tok->pendin = 0;
+
+	tok->tabsize = TABSIZE;
 	return tok;
 }
 
@@ -157,12 +175,96 @@ void tok_backup(struct tok_state *tok, int c) {
 	}
 }
 
+static int
+tok_decimal_tail(struct tok_state *tok) {
+	int c;
+
+	while (1) {
+		do {
+			c = tok_nextc(tok);
+		} while (isdigit(c));
+		if (c != '_') {
+			break;
+		}
+		c = tok_nextc(tok);
+		if (!isdigit(c)) {
+			assert(false);
+		}
+	}
+	return c;
+}
+
+static int
+verify_end_of_number(struct tok_state *tok, int c, const char *kind) {
+	// not implemented yet
+	return 1;
+}
+
 int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 	int c;
+	int blankline;
 
 	*p_start = *p_end = NULL;
 
+ nextline:
+ 	blankline = 0;
+
+	if (tok->atbol) {
+		int col = 0;
+		tok->atbol = 0;
+		for (;;) {
+			c = tok_nextc(tok);
+			if (c == ' ') {
+				col++;
+			} else if (c == '\t') {
+				col = (col / tok->tabsize + 1) * tok->tabsize;
+			} else {
+				break;
+			}
+		}
+		tok_backup(tok, c);
+		if (c == '#' || c == '\n') {
+			blankline = 1; /* ignore completely */
+		}
+
+		if (!blankline) {
+			if (col == tok->indstack[tok->indent]) { 
+				// no change
+			} else if (col > tok->indstack[tok->indent]) {
+				// Indent -- always one
+				if (tok->indent + 1 >= MAXINDENT) {
+					assert(false);
+				}
+				tok->pendin++;
+				tok->indstack[++tok->indent] = col;
+			} else {
+				// Dedent -- any number
+				while (tok->indent > 0 &&
+						col < tok->indstack[tok->indent]) {
+					tok->pendin--;
+					tok->indent--;
+				}
+				if (col != tok->indstack[tok->indent]) {
+					assert(false);
+				}
+			}
+		}
+	}
+
+	tok->start = tok->cur;
+
+	// Return pending indents/dedents
+	if (tok->pendin != 0) {
+		if (tok->pendin < 0 ) {
+			tok->pendin++;
+			return DEDENT;
+		} else {
+			tok->pendin--;
+			return INDENT;
+		}
+	}
  again:
+ 	tok->start = NULL;
 	// Skip spaces
 	do {
 		c = tok_nextc(tok);
@@ -173,7 +275,9 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// skip comment, unless it's a type comment
 	if (c == '#') {
-		assert(false);
+		while (c != EOF && c != '\n') {
+			c = tok_nextc(tok);
+		}
 	}
 
 	if (c == EOF) {
@@ -193,6 +297,10 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// newline
 	if (c == '\n') {
+		tok->atbol = 1;
+		if (blankline) {
+			goto nextline;
+		}
 		return NEWLINE;
 	}
 
@@ -203,7 +311,71 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// Number
 	if (isdigit(c)) {
-		assert(false && "digit");
+		if (c == '0') {
+			/* Hex, octal or binary -- maybe. */
+			c = tok_nextc(tok);
+			if (c == 'x' || c == 'X') {
+				assert(false);
+			} else if (c == 'o' || c == 'O') {
+				assert(false);
+			} else if (c == 'b' || c == 'B') {
+				assert(false);
+			} else {
+				int nonzero = 0;
+				while (1) {
+					if (c == '_') {
+						c = tok_nextc(tok);
+						if (!isdigit(c)) {
+							assert(false);
+						}
+					}
+					if (c != '0') {
+						break;
+					}
+					c = tok_nextc(tok);
+				}
+				char *zeros_end = tok->cur;
+				if (isdigit(c)) {
+					nonzero = 1;
+					c = tok_decimal_tail(tok);
+					if (c == 0) {
+						assert(false);
+					}
+				}
+				if (c == '.') {
+					assert(false);
+				} else if (c == 'e' || c == 'E') {
+					assert(false);
+				} else if (c == 'j' || c == 'J') {
+					assert(false);
+				} else if (nonzero) {
+					assert(false);
+				}
+			}
+		} else {
+			c = tok_decimal_tail(tok);
+			if (c == 0) {
+				assert(false);
+			}
+			{
+				// accept floatign point numbers
+				if (c == '.') {
+					assert(false);
+				}
+				if (c == 'e' || c == 'E') {
+					assert(false);
+				}
+				if (c == 'j' || c == 'J') {
+					assert(false);
+				} else if (!verify_end_of_number(tok, c, "decimal")) {
+					assert(false);
+				}
+			}
+		}
+		tok_backup(tok, c);
+		*p_start = tok->start;
+		*p_end = tok->cur;
+		return NUMBER;
 	}
 
 	// string
@@ -225,15 +397,33 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// Check for two-character token
 	{
+		int c2 = tok_nextc(tok);
+		int token = PyToken_TwoChars(c, c2);
+		if (token != OP) {
+			// TODO handle 3 character tokens
+			*p_start = tok->start;
+			*p_end = tok->cur;
+			return token;
+		}
+		tok_backup(tok, c2);
 	}
 
 	// Punctuation character
+	*p_start = tok->start;
+	*p_end = tok->cur;
 	return PyToken_OneChar(c);
 }
 
 int
 PyTokenizer_Get(struct tok_state *tok, const char **p_start, const char **p_end) {
 	int result = tok_get(tok, p_start, p_end);
+	#if 0
+	printf("PyTokenizer_Get got: %d ('%c') ", result, (char) result);
+	if (p_start) {
+		printf("%.*s", (int) (*p_end - *p_start), *p_start);
+	}
+	printf("\n");
+	#endif
 	return result;
 }
 

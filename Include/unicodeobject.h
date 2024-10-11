@@ -109,10 +109,12 @@ unicode_decode_utf8(const char *s, Py_ssize_t size,
 		}
 		_Py_RETURN_UNICODE_EMPTY();
 	}
+  #if 0
 	// ASCII is equivalent to the first 128 ordinals in Unicode
 	if (size == 1 && (unsigned char) s[0] < 128) {
 		assert(false);
 	}
+  #endif
 
 	const char *starts = s;
 	const char *end = s + size;

@@ -27,6 +27,12 @@ list_dealloc(PyListObject *op) {
 	Py_TYPE(op)->tp_free((PyObject *) op);
 }
 
+static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v);
+
+static PySequenceMethods list_as_sequence = {
+	.sq_ass_item = (ssizeobjargproc) list_ass_item,
+};
+
 // defined in cpy/Objects/listobject.c
 PyTypeObject PyList_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -35,6 +41,7 @@ PyTypeObject PyList_Type = {
   .tp_flags = Py_TPFLAGS_LIST_SUBCLASS,
 	.tp_dealloc = (destructor) list_dealloc,
 	.tp_free = PyObject_GC_Del,
+	.tp_as_sequence = &list_as_sequence,
 };
 
 // defined in cpy/Objects/listobject.c
@@ -66,7 +73,10 @@ list_resize(PyListObject *self, Py_ssize_t newsize) {
   Py_ssize_t allocated = self->allocated;
 
   if (allocated >= newsize && newsize >= (allocated >> 1)) {
-    assert(false);
+		// printf("allocated %ld, newsize %ld\n", allocated, newsize);
+		assert(self->ob_item != NULL || newsize == 0);
+		Py_SET_SIZE(self, newsize);
+		return 0;
   }
 
   new_allocated = ((size_t) newsize + (newsize >> 3) + 6) & ~(size_t) 3;
@@ -122,10 +132,16 @@ _list_clear(PyListObject *a) {
 
 static int
 list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v) {
+	PyObject *recycle_on_stack[8];
+	PyObject **recycle = recycle_on_stack;
+	PyObject **item = NULL;
   PyObject *v_as_SF = NULL; // PySequence_Fast(v)
   Py_ssize_t n; /* # of elements in replacement list */
   Py_ssize_t norig;
   Py_ssize_t d; // change in size
+	Py_ssize_t k;
+	size_t s;
+	int result = -1;
 #define b ((PyListObject *) v)
   if (v == NULL) {
     n = 0;
@@ -149,7 +165,37 @@ list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v) 
     Py_XDECREF(v_as_SF);
     return _list_clear(a);
   }
-  assert(false);
+	item = a->ob_item;
+	s = norig * sizeof(PyObject *);
+	if (s) {
+		if (s > sizeof(recycle_on_stack)) {
+			assert(false);
+		}
+		memcpy(recycle, &item[ilow], s);
+	}
+
+	if (d < 0) { /* Delete -d items */
+		Py_ssize_t tail;
+		tail = (Py_SIZE(a) - ihigh) * sizeof(PyObject *);
+		memmove(&item[ihigh + d], &item[ihigh], tail);
+		if (list_resize(a, Py_SIZE(a) + d) < 0) {
+			assert(false);
+		}
+		item = a->ob_item;
+	} else if (d > 0) { /* Insert d items */
+		assert(false);
+	}
+	for (k = 0; k < n; k++, ilow++) {
+		assert(false);
+	}
+	for (k = norig -1; k >= 0; --k)
+		Py_XDECREF(recycle[k]);
+	result = 0;
+Error:
+	if (recycle != recycle_on_stack)
+		PyMem_Free(recycle);
+	Py_XDECREF(v_as_SF);
+	return result;
 #undef b
 }
 
@@ -177,4 +223,10 @@ PyList_Size(PyObject *op) {
 		assert(false);
 	} else
 		return Py_SIZE(op);
+}
+
+static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v) {
+	if (v == NULL)
+		return list_ass_slice(a, i, i + 1, v);
+	assert(false);
 }

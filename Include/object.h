@@ -44,6 +44,7 @@ typedef Py_hash_t (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc)(PyObject*, PyObject*, int);
 typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
 typedef int(*setattrofunc)(PyObject *, PyObject *, PyObject *);
+typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
 
 typedef struct {
 	PyObject ob_base;
@@ -87,12 +88,7 @@ void _Py_SET_REFCNT(PyObject *ob, Py_ssize_t refcnt) {
 #include "cpython/object.h"
 
 // defined in cpy/Objects/typeobject.c
-PyTypeObject PyType_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  .tp_name = "type",
-  .tp_basicsize = sizeof(PyHeapTypeObject),
-  .tp_flags = Py_TPFLAGS_TYPE_SUBCLASS,
-};
+extern PyTypeObject PyType_Type;
 
 void _Py_INCREF(PyObject *op) {
 	op->ob_refcnt++;
@@ -189,12 +185,7 @@ PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems) {
 
 // Generic type check
 // defined in cpy/Objects/typeobject.c
-int PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b) {
-  PyObject *mro;
-
-  mro = a->tp_mro;
-  assert(false);
-}
+int PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b);
 
 PyTypeObject _PyNotImplemented_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)

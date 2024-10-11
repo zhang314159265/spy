@@ -16,6 +16,8 @@ typedef struct _longobject PyLongObject;
 #define PyLong_Check(op) \
   PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_LONG_SUBCLASS)
 
+#define PyLong_CheckExact(op) Py_IS_TYPE(op, &PyLong_Type)
+
 #include "longintrepr.h"
 
 long
@@ -146,4 +148,16 @@ PyLong_FromSsize_t(Py_ssize_t ival) {
     return get_small_int((sdigit) ival);
   }
   assert(false);
+}
+
+long PyOS_strtol(const char *str, char **ptr, int base) {
+	return strtol(str, ptr, base);
+}
+
+static inline PyObject *_PyLong_GetZero(void) {
+	return __PyLong_GetSmallInt_internal(0);
+}
+
+static inline PyObject *_PyLong_GetOne(void) {
+	return __PyLong_GetSmallInt_internal(1);
 }

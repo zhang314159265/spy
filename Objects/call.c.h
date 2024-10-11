@@ -14,3 +14,23 @@ _Py_CheckFunctionResult(PyThreadState *tstate, PyObject *callable,
 	}
 	return result;
 }
+
+PyObject *_PyFunction_Vectorcall(PyObject *func, PyObject *const *stack, size_t nargsf, PyObject *kwnames) {
+	assert(PyFunction_Check(func));
+	PyFrameConstructor *f = PyFunction_AS_FRAME_CONSTRUCTOR(func);
+	Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+	// printf("nargs %ld\n", nargs);
+	assert(nargs >= 0);
+	PyThreadState *tstate = _PyThreadState_GET();
+	assert(nargs == 0 || stack != NULL);
+	if (((PyCodeObject *)f->fc_code)->co_flags & CO_OPTIMIZED) {
+		return _PyEval_Vector(tstate, f, NULL, stack, nargs, kwnames);
+	} else {
+		assert(false);
+	}
+}
+
+
+PyObject *PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *kwargs) {
+	assert(false);
+}

@@ -21,8 +21,11 @@
 
 #define DEF_BOUND (DEF_LOCAL | DEF_PARAM | DEF_IMPORT)
 
+#define LOCAL 1
+#define GLOBAL_EXPLICIT 2
 #define GLOBAL_IMPLICIT 3
 #define FREE 4
+#define CELL 5
 
 // defined in cpy/Python/symtable.c
 // Return dummy values for now
@@ -72,6 +75,7 @@ typedef struct _symtable_entry {
   PyObject *ste_children; // list of child blocks
 
   unsigned ste_comp_iter_target : 1; /* true if visiting comprehension target */
+	unsigned ste_returns_value : 1; // true if namespace uses return with an argument
   _Py_block_ty ste_type; // module, class or function
 } PySTEntryObject;
 
@@ -85,11 +89,14 @@ struct symtable {
                           to symbol table entries */
 };
 
+static void ste_dealloc(PySTEntryObject *ste);
+
 PyTypeObject PySTEntry_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "symtable entry",
   .tp_basicsize = sizeof(PySTEntryObject),
-  .tp_flags = 0 // TODO cpy use Py_TPFLAGS_DEFAULT
+  .tp_flags = 0, // TODO cpy use Py_TPFLAGS_DEFAULT
+	.tp_dealloc = (destructor) ste_dealloc,
 };
 
 #define PySTEntry_Check(op) Py_IS_TYPE(op, &PySTEntry_Type)
@@ -127,6 +134,9 @@ ste_new(struct symtable *st, _Py_block_ty block, void *key) {
 
   ste->ste_table = st;
   ste->ste_id = k; /* ste owns reference to k */
+
+	ste->ste_returns_value = 0;
+
   ste->ste_symbols = PyDict_New();
   ste->ste_varnames = PyList_New(0);
   ste->ste_comp_iter_target = 0;
@@ -154,7 +164,15 @@ int symtable_enter_block(struct symtable *st, _Py_block_ty block, void *ast) {
     Py_DECREF(ste);
     return 0;
   }
+	prev = st->st_cur;
+	Py_DECREF(ste);
   st->st_cur = ste;
+
+	if (prev) {
+		if (PyList_Append(prev->ste_children, (PyObject *) ste) < 0) {
+			return 0;
+		}
+	}
   return 1;
 }
 
@@ -190,6 +208,7 @@ analyze_name(PySTEntryObject *ste, PyObject *scopes, PyObject *name, long flags,
     PyObject *bound, PyObject *local, PyObject *free,
     PyObject *global)
 {
+	printf("analyze_name %s\n", (char*) PyUnicode_DATA((PyUnicodeObject*) name));
   if (flags & DEF_GLOBAL) {
     assert(false);
   }
@@ -197,7 +216,12 @@ analyze_name(PySTEntryObject *ste, PyObject *scopes, PyObject *name, long flags,
     assert(false);
   }
   if (flags & DEF_BOUND) {
-    assert(false);
+		SET_SCOPE(scopes, name, LOCAL);
+		if (PySet_Add(local, name) < 0)
+			return 0;
+		if (PySet_Discard(global, name) < 0)
+			return 0;
+		return 1;
   }
   if (bound && PySet_Contains(bound, name)) {
     assert(false);
@@ -256,6 +280,45 @@ update_symbols(PyObject *symbols, PyObject *scopes,
   Py_DECREF(v_free);
   return 1;
 }
+static int
+analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
+    PyObject *global);
+
+static int
+analyze_child_block(PySTEntryObject *entry, PyObject *bound, PyObject *free,
+		PyObject *global, PyObject *child_free) {
+	PyObject *temp_bound = NULL, *temp_global = NULL, *temp_free = NULL;
+	PyObject *temp;
+
+	temp_bound = PySet_New(bound);
+	if (!temp_bound)
+		assert(false);
+	temp_free = PySet_New(free);
+	if (!temp_free)
+		assert(false);
+	temp_global = PySet_New(global);
+	if (!temp_global)
+		assert(false);
+	
+	if (!analyze_block(entry, temp_bound, temp_free, temp_global))
+		assert(false);
+	temp = PyNumber_InPlaceOr(child_free, temp_free);
+	if (!temp)
+		assert(false);
+	Py_DECREF(temp);
+	Py_DECREF(temp_bound);
+	Py_DECREF(temp_free);
+	Py_DECREF(temp_global);
+	return 1;
+}
+
+static int
+analyze_cells(PyObject *scopes, PyObject *free) {
+	if (PySet_GET_SIZE(free) == 0) {
+		return 1;
+	}
+	assert(false);
+}
 
 static int
 analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
@@ -298,11 +361,18 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
   if (ste->ste_type != ClassBlock) {
     // Add function locals to bound set
     if (ste->ste_type == FunctionBlock) {
-      assert(false);
+			temp = PyNumber_InPlaceOr(newbound, local);
+			if (!temp) {
+				assert(false);
+			}
+			Py_DECREF(temp);
     }
     // Pass down previously bound symbols
     if (bound) {
-      assert(false);
+			temp = PyNumber_InPlaceOr(newbound, bound);
+			if (!temp)
+				assert(false);
+			Py_DECREF(temp);
     }
     // Pass down known globals
     temp = PyNumber_InPlaceOr(newglobal, global);
@@ -320,7 +390,12 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
     assert(false);
   }
   for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
-    assert(false);
+		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
+		PySTEntryObject *entry;
+		assert(c && PySTEntry_Check(c));
+		entry = (PySTEntryObject *) c;
+		if (!analyze_child_block(entry, newbound, newfree, newglobal, allfree))
+			assert(false);
   }
 
   temp = PyNumber_InPlaceOr(newfree, allfree);
@@ -329,7 +404,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
   }
   Py_DECREF(temp);
 
-  if (ste->ste_type == FunctionBlock) {
+  if (ste->ste_type == FunctionBlock && !analyze_cells(scopes, newfree)) {
     assert(false);
   }
   else if (ste->ste_type == ClassBlock) {
@@ -413,7 +488,8 @@ symtable_add_def_helper(struct symtable *st, PyObject *name, int flag, struct _s
   }
   Py_DECREF(o);
   if (flag & DEF_PARAM) {
-    assert(false);
+		if (PyList_Append(ste->ste_varnames, mangled) < 0)
+			assert(false);
   } else if (flag & DEF_GLOBAL) {
     assert(false);
   }
@@ -446,6 +522,10 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
   case Constant_kind:
     // nothing to do here
     break;
+	case BinOp_kind:
+		VISIT(st, expr, e->v.BinOp.left);
+		VISIT(st, expr, e->v.BinOp.right);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);
@@ -460,11 +540,66 @@ symtable_visit_keyword(struct symtable *st, keyword_ty k) {
 }
 
 static int
+symtable_visit_params(struct symtable *st, asdl_arg_seq *args) {
+	int i;
+
+	if (!args)
+		return -1;
+	
+	for (i = 0; i < asdl_seq_LEN(args); i++) {
+		arg_ty arg = (arg_ty) asdl_seq_GET(args, i);
+		// printf("arg name '%s'\n", (char *) PyUnicode_DATA(arg->arg));
+		if (!symtable_add_def(st, arg->arg, DEF_PARAM, LOCATION(arg)))
+			return 0;
+	}
+	return 1;
+}
+
+static int
+symtable_visit_arguments(struct symtable *st, arguments_ty a) {
+	if (a->args && !symtable_visit_params(st, a->args))
+		return 0;
+	return 1;
+}
+
+static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s) {
   switch (s->kind) {
+	case FunctionDef_kind:
+		if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL, LOCATION(s)))
+			VISIT_QUIT(st, 0);
+		if (!symtable_enter_block(st, FunctionBlock, (void *) s))
+			VISIT_QUIT(st, 0);
+		VISIT(st, arguments, s->v.FunctionDef.args);
+		VISIT_SEQ(st, stmt, s->v.FunctionDef.body);
+		if (!symtable_exit_block(st))
+			VISIT_QUIT(st, 0);
+		break;
   case Expr_kind:
     VISIT(st, expr, s->v.Expr.value);
     break;
+	case Assign_kind:
+		VISIT_SEQ(st, expr, s->v.Assign.targets);
+		VISIT(st, expr, s->v.Assign.value);
+		break;
+	case AugAssign_kind:
+		VISIT(st, expr, s->v.AugAssign.target);
+		VISIT(st, expr, s->v.AugAssign.value);
+		break;
+	case Return_kind:
+		if (s->v.Return.value) {
+			VISIT(st, expr, s->v.Return.value);
+			st->st_cur->ste_returns_value = 1;
+		}
+		break;
+	case For_kind:
+		VISIT(st, expr, s->v.For.target);
+		VISIT(st, expr, s->v.For.iter);
+		VISIT_SEQ(st, stmt, s->v.For.body);
+		if (s->v.For.orelse) {
+			assert(false);
+		}
+		break;
   default:
     assert(false);
   }
@@ -553,4 +688,15 @@ _PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 {
   long symbol = _PyST_GetSymbol(ste, name);
   return (symbol >> SCOPE_OFFSET) & SCOPE_MASK;
+}
+
+static void ste_dealloc(PySTEntryObject *ste) {
+	ste->ste_table = NULL;
+	Py_XDECREF(ste->ste_id);
+	// Py_XDECREF(ste->ste_name);
+	Py_XDECREF(ste->ste_symbols);
+	Py_XDECREF(ste->ste_varnames);
+	Py_XDECREF(ste->ste_children);
+	// Py_XDECREF(ste->ste_directives);
+	PyObject_Free(ste);
 }
