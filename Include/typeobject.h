@@ -208,6 +208,16 @@ type_ready_inherit(PyTypeObject *type) {
 	return 0;
 }
 
+static int type_add_methods(PyTypeObject *type);
+
+static int
+type_ready_fill_dict(PyTypeObject *type) {
+	if (type_add_methods(type) < 0) {
+		return -1;
+	}
+	return 0;
+}
+
 static int
 type_ready(PyTypeObject *type) {
   if (type_ready_set_dict(type) < 0) {
@@ -219,6 +229,9 @@ type_ready(PyTypeObject *type) {
   if (type_ready_mro(type) < 0) {
     return -1;
   }
+	if (type_ready_fill_dict(type) < 0) {
+		return -1;
+	}
 	if (type_ready_inherit(type) < 0) {
 		return -1;
 	}
@@ -372,8 +385,58 @@ int PyType_Ready(PyTypeObject *type);
 PyObject *PyTuple_Pack(Py_ssize_t, ...);
 PyObject *PyTuple_New(Py_ssize_t size);
 
+static PyObject *
+find_name_in_mro(PyTypeObject *type, PyObject *name, int *error) {
+	Py_ssize_t i, n;
+	PyObject *mro, *res, *base, *dict;
+	Py_hash_t hash;
+
+	if (!PyUnicode_CheckExact(name) ||
+			(hash = ((PyASCIIObject *) name)->hash) == -1) {
+	  hash = PyObject_Hash(name);
+		if (hash == -1) {
+			*error = -1;
+			return NULL;
+		}
+	}
+
+	mro = type->tp_mro;
+
+	if (mro == NULL) {
+		assert(false);
+	}
+
+	res = NULL;
+	Py_INCREF(mro);
+	assert(PyTuple_Check(mro));
+	n = PyTuple_GET_SIZE(mro);
+	for (i = 0; i < n; i++) {
+		base = PyTuple_GET_ITEM(mro, i);
+		assert(PyType_Check(base));
+		dict = ((PyTypeObject *) base)->tp_dict;
+		assert(dict && PyDict_Check(dict));
+		res = _PyDict_GetItem_KnownHash(dict, name, hash);
+		if (res != NULL)
+			break;
+		if (PyErr_Occurred()) {
+			*error = -1;
+			goto done;
+		}
+	}
+	*error = 0;
+done:
+	Py_DECREF(mro);
+	return res;
+}
+
 PyObject *
 _PyType_Lookup(PyTypeObject *type, PyObject *name) {
-	// TODO follow cpy
-	return NULL;
+	PyObject *res;
+	int error;
+
+	res = find_name_in_mro(type, name, &error);
+	if (error) {
+		assert(false);
+	}
+	return res;
 }

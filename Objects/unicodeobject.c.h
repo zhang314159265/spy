@@ -1,6 +1,8 @@
 #pragma once
 
 #include "internal/pycore_atomic_funcs.h"
+#include "methodobject.h"
+#include "Objects/stringlib/unicode_format.h"
 
 PyObject * _PyUnicode_FromId(_Py_Identifier *id)
 {
@@ -52,3 +54,103 @@ PyObject * _PyUnicode_FromId(_Py_Identifier *id)
 
 	return obj;
 }
+
+PyDoc_STRVAR(format__doc__, "");
+
+static PyMethodDef unicode_methods[] = {
+	{"format", (PyCFunction)(void(*)(void)) do_string_format, METH_VARARGS | METH_KEYWORDS, format__doc__},
+  {NULL, NULL},
+};
+
+// defined in cpy/Objects/unicodeobject.c
+PyTypeObject PyUnicode_Type = {
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
+	.tp_name = "str",
+  .tp_basicsize = sizeof(PyUnicodeObject),
+	.tp_flags = Py_TPFLAGS_UNICODE_SUBCLASS,
+	.tp_hash = (hashfunc) unicode_hash,
+	.tp_dealloc = (destructor) unicode_dealloc,
+  .tp_richcompare = PyUnicode_RichCompare,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_methods = unicode_methods,
+};
+
+Py_UCS4
+_PyUnicode_FindMaxChar(PyObject *unicode, Py_ssize_t start, Py_ssize_t end) {
+	// TODO follow cpy
+	return 127;
+}
+
+static int
+_copy_characters(PyObject *to, Py_ssize_t to_start,
+		PyObject *from, Py_ssize_t from_start,
+		Py_ssize_t how_many, int check_maxchar) {
+	unsigned int from_kind, to_kind;
+	const void *from_data;
+	void *to_data;
+
+	if (how_many == 0)
+		return 0;
+
+	from_kind = PyUnicode_KIND(from);
+	from_data = PyUnicode_DATA(from);
+	to_kind = PyUnicode_KIND(to);
+	to_data = PyUnicode_DATA(to);
+
+	if (from_kind == to_kind) {
+		if (check_maxchar) {
+			assert(false);
+		}
+		memcpy((char *) to_data + to_kind * to_start,
+			(const char *) from_data + from_kind * from_start,
+			to_kind * how_many);
+	} else {
+		assert(false);
+	}
+
+	return 0;
+}
+
+void 
+_PyUnicode_FastCopyCharacters(
+		PyObject *to, Py_ssize_t to_start,
+		PyObject *from, Py_ssize_t from_start, Py_ssize_t how_many) {
+	(void)_copy_characters(to, to_start, from, from_start, how_many, 0);
+}
+
+int
+_PyUnicodeWriter_WriteSubstring(_PyUnicodeWriter *writer, PyObject *str,
+		Py_ssize_t start, Py_ssize_t end) {
+	Py_UCS4 maxchar;
+	Py_ssize_t len;
+
+	if (PyUnicode_READY(str) == -1)
+		return -1;
+	
+	assert(0 <= start);
+	assert(end <= PyUnicode_GET_LENGTH(str));
+	assert(start <= end);
+
+	if (end == 0)
+		return 0;
+	
+	if (start == 0 && end == PyUnicode_GET_LENGTH(str))
+		assert(false);
+	
+	if (PyUnicode_MAX_CHAR_VALUE(str) > writer->maxchar)
+		maxchar = _PyUnicode_FindMaxChar(str, start, end);
+	else
+		maxchar = writer->maxchar;
+	
+	len = end - start;
+
+	if (_PyUnicodeWriter_Prepare(writer, len, maxchar) < 0)
+		return -1;
+	_PyUnicode_FastCopyCharacters(writer->buffer, writer->pos,
+			str, start, len);
+
+	writer->pos += len;
+	return 0;
+}
+
+

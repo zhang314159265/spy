@@ -40,6 +40,13 @@ PyObject *PyTuple_Pack(Py_ssize_t n, ...) {
 static Py_hash_t tuplehash(PyTupleObject *v);
 static PyObject *tuplerichcompare(PyObject *v, PyObject *w, int op);
 static void tupledealloc(PyTupleObject *op);
+static Py_ssize_t tuplelength(PyTupleObject *a) { return Py_SIZE(a); }
+static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i);
+
+static PySequenceMethods tuple_as_sequence = {
+	.sq_length = (lenfunc) tuplelength,
+	.sq_item = (ssizeargfunc) tupleitem,
+};
 
 PyTypeObject PyTuple_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -51,6 +58,7 @@ PyTypeObject PyTuple_Type = {
 	.tp_richcompare = tuplerichcompare,
 	.tp_dealloc = (destructor) tupledealloc,
 	.tp_free = PyObject_GC_Del,
+	.tp_as_sequence = &tuple_as_sequence,
 };
 
 static PyTupleObject *
@@ -168,4 +176,12 @@ PyTuple_Size(PyObject *op) {
 		assert(false);
 	} else
 		return Py_SIZE(op);
+}
+
+static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i) {
+	if (i < 0 || i >= Py_SIZE(a)) {
+		assert(false);
+	}
+	Py_INCREF(a->ob_item[i]);
+	return a->ob_item[i];
 }

@@ -161,3 +161,147 @@ static inline PyObject *_PyLong_GetZero(void) {
 static inline PyObject *_PyLong_GetOne(void) {
 	return __PyLong_GetSmallInt_internal(1);
 }
+
+int _PyLong_FormatAdvancedWriter(_PyUnicodeWriter *writer,
+		PyObject *obj,
+		PyObject *format_spec,
+		Py_ssize_t start, Py_ssize_t end);
+
+static int
+long_to_decimal_string_internal(PyObject *aa,
+		PyObject **p_output,
+		_PyUnicodeWriter *writer,
+		_PyBytesWriter *bytes_writer,
+		char **bytes_str) {
+	PyLongObject *scratch, *a;
+	PyObject *str = NULL;
+	Py_ssize_t size, strlen, size_a, i, j;
+	digit *pout, *pin, rem, tenpow;
+	int negative;
+	int d;
+	enum PyUnicode_Kind kind;
+
+	a = (PyLongObject *) aa;
+	if (a == NULL || !PyLong_Check(a)) {
+		assert(false);
+	}
+	size_a = Py_ABS(Py_SIZE(a));
+	negative = Py_SIZE(a) < 0;
+
+	// quick and dirty upper bound for the number of digits
+	// required to express a in base _PyLong_DECIMAL_BASE
+	d = (33 * _PyLong_DECIMAL_SHIFT) /
+		(10 * PyLong_SHIFT - 33 * _PyLong_DECIMAL_SHIFT);
+	size = 1 + size_a + size_a / d;
+	scratch = _PyLong_New(size);
+	if (scratch == NULL)
+		return -1;
+
+	// convert array of base _PyLong_BASE digits in pin to an array
+	// of base _PyLong_DECIMAL_BASE digits in pout.
+	pin = a->ob_digit;
+	pout = scratch->ob_digit;
+	size = 0;
+
+	for (i = size_a; --i >= 0; ) {
+		digit hi = pin[i];
+		for (j = 0; j < size; j++) {
+			assert(false);
+		}
+		while (hi) {
+			pout[size++] = hi % _PyLong_DECIMAL_BASE;
+			hi /= _PyLong_DECIMAL_BASE;
+		}
+	}
+
+	if (size == 0)
+		pout[size++] = 0;
+	
+	// calculate exact length of output string, and allocate
+	strlen = negative + 1 + (size - 1) * _PyLong_DECIMAL_SHIFT;
+	tenpow = 10;
+	rem = pout[size - 1];
+	while (rem >= tenpow) {
+		tenpow *= 10;
+		strlen++;
+	}
+
+	if (writer) {
+		if (_PyUnicodeWriter_Prepare(writer, strlen, '9') == -1) {
+			assert(false);
+		}
+		kind = writer->kind;
+	} else if (bytes_writer) {
+		assert(false);
+	} else {
+		assert(false);
+	}
+
+#define WRITE_DIGITS(p) \
+	do { \
+		for (i = 0; i < size - 1; i++) { \
+			rem = pout[i]; \
+			for (j = 0; j < _PyLong_DECIMAL_SHIFT; j++) { \
+				*--p = '0' + rem % 10; \
+				rem /= 10; \
+			} \
+		} \
+		rem = pout[i]; \
+		do { \
+			*--p = '0' + rem % 10; \
+			rem /= 10; \
+		} while (rem != 0); \
+		\
+		if (negative) \
+			*--p = '-'; \
+	} while (0)
+
+#define WRITE_UNICODE_DIGITS(TYPE) \
+	do { \
+		if (writer) \
+			p = (TYPE*) PyUnicode_DATA(writer->buffer) + writer->pos + strlen; \
+		else \
+			p = (TYPE*) PyUnicode_DATA(str) + strlen; \
+		\
+		WRITE_DIGITS(p); \
+		\
+		if (writer) \
+			assert(p == ((TYPE *) PyUnicode_DATA(writer->buffer) + writer->pos)); 	else \
+				assert(p == (TYPE *) PyUnicode_DATA(str)); \
+	} while (0)
+
+	// fill the string right-to-left
+	if (bytes_writer) {
+		assert(false);
+	} else if (kind == PyUnicode_1BYTE_KIND) {
+		Py_UCS1 *p;
+		WRITE_UNICODE_DIGITS(Py_UCS1);
+	} else if (kind == PyUnicode_2BYTE_KIND) {
+		assert(false);
+	} else {
+		assert(false);
+	}
+
+#undef WRITE_DIGITS
+#undef WRITE_UNICODE_DIGITS
+
+	Py_DECREF(scratch);
+	if (writer) {
+		writer->pos += strlen;
+	} else if (bytes_writer) {
+		(*bytes_str) += strlen;
+	} else {
+		assert(false);
+	}
+	return 0;
+}
+
+int
+_PyLong_FormatWriter(_PyUnicodeWriter *writer,
+		PyObject *obj,
+		int base, int alternate) {
+	if (base == 10)
+		return long_to_decimal_string_internal(obj, NULL, writer, NULL, NULL);
+	else
+		assert(false);
+}

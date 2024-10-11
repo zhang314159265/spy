@@ -306,7 +306,17 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 
 	// period or number starting with period? */
 	if (c == '.') {
-		assert(false && ".");
+		c = tok_nextc(tok);
+		if (isdigit(c)) {
+			assert(false);
+		} else if (c == '.') {
+			assert(false);
+		} else {
+			tok_backup(tok, c);
+		}
+		*p_start = tok->start;
+		*p_end = tok->cur;
+		return DOT;
 	}
 
 	// Number

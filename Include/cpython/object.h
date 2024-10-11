@@ -15,6 +15,8 @@ typedef struct {
 
 typedef struct {
   ssizeobjargproc sq_ass_item;
+  lenfunc sq_length;
+  ssizeargfunc sq_item;
 } PySequenceMethods;
 
 struct _typeobject {
@@ -54,6 +56,10 @@ struct _typeobject {
 
   PySequenceMethods *tp_as_sequence;
   vectorcallfunc tp_vectorcall;
+
+  getattrofunc tp_getattro;
+  getattrfunc tp_getattr;
+  struct PyMethodDef *tp_methods;
 };
 
 // The *real* layout of a type object when allocated on the heap

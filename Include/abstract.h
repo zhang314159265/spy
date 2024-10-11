@@ -181,9 +181,9 @@ _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
 	vectorcallfunc func;
 	PyObject *res;
 
-	// printf("name %s\n", ((PyTypeObject *) callable)->tp_name);
 	func = PyVectorcall_Function(callable);
 	if (func == NULL) {
+		// printf("tp_name %s, no vector call\n", ((PyTypeObject *) Py_TYPE(callable))->tp_name);
 		assert(false);
 	}
 	res = func(callable, args, nargsf, kwnames);
@@ -283,4 +283,23 @@ BINARY_FUNC(PyNumber_Subtract, nb_subtract, "-")
 PyObject *
 PyNumber_FloorDivide(PyObject *v, PyObject *w) {
 	return binary_op(v, w, NB_SLOT(nb_floor_divide), "//");
+}
+
+PyObject *
+PySequence_GetItem(PyObject *s, Py_ssize_t i) {
+	if (s == NULL) {
+		assert(false);
+	}
+
+	printf("PySequence_GetItem got type %s\n", Py_TYPE(s)->tp_name);
+	PySequenceMethods *m = Py_TYPE(s)->tp_as_sequence;
+	if (m && m->sq_item) {
+		if (i < 0) {
+			assert(false);
+		}
+		PyObject *res = m->sq_item(s, i);
+		assert(res != NULL);
+		return res;
+	}
+	assert(false);
 }

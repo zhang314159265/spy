@@ -144,3 +144,25 @@ _PyAST_For(expr_ty target, expr_ty iter, asdl_stmt_seq *body, asdl_stmt_seq *ore
 	p->v.For.orelse = orelse;
 	return p;
 }
+
+expr_ty
+_PyAST_Attribute(expr_ty value, identifier attr, expr_context_ty ctx) {
+	expr_ty p;
+	if (!value) {
+		assert(false);
+	}
+	if (!attr) {
+		assert(false);
+	}
+	if (!ctx) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Attribute_kind;
+	p->v.Attribute.value = value;
+	p->v.Attribute.attr = attr;
+	p->v.Attribute.ctx = ctx;
+	return p;
+}

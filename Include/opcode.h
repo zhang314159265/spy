@@ -16,6 +16,7 @@
 #define DELETE_GLOBAL 98
 #define LOAD_CONST 100
 #define LOAD_NAME 101
+#define LOAD_ATTR 106
 #define JUMP_FORWARD 110
 #define JUMP_IF_FALSE_OR_POP 111
 #define JUMP_IF_TRUE_OR_POP 112
@@ -34,5 +35,7 @@
 #define MAKE_FUNCTION 132
 #define SETUP_WITH 143
 #define SETUP_ASYNC_WITH 154
+#define LOAD_METHOD 160
+#define CALL_METHOD 161
 
 #define HAS_ARG(op) ((op) >= HAVE_ARGUMENT)

@@ -4,7 +4,10 @@
 typedef uint32_t digit;
 typedef int32_t sdigit; // signed variant of digit
 #define PyLong_SHIFT 30
+#define _PyLong_DECIMAL_SHIFT 9
+#define _PyLong_DECIMAL_BASE ((digit) 1000000000)
 #elif PYLONG_BITS_IN_DIGIT == 15
+#error PYLONG_BITS_IN_DIGIT == 15 not supported
 typedef unsigned short digit;
 typedef short sdigit;
 #define PyLong_SHIFT 15

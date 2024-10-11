@@ -1,6 +1,7 @@
 #include <objimpl.h>
 #include "internal/pycore_object.h"
 // #include "boolobject.h"
+// #include "methodobject.h"
 
 #define PyUnicode_GET_LENGTH(op) \
 	(assert(PyUnicode_Check(op)), \
@@ -74,6 +75,7 @@ typedef struct {
 
 typedef struct {
 	PyASCIIObject _base;
+  char *utf8;
 } PyCompactUnicodeObject;
 
 typedef struct {
@@ -83,17 +85,6 @@ typedef struct {
 static Py_hash_t unicode_hash(PyObject *self);
 static void unicode_dealloc(PyObject *unicode);
 PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op);
-
-// defined in cpy/Objects/unicodeobject.c
-PyTypeObject PyUnicode_Type = {
-	PyVarObject_HEAD_INIT(&PyType_Type, 0)
-	.tp_name = "str",
-  .tp_basicsize = sizeof(PyUnicodeObject),
-	.tp_flags = Py_TPFLAGS_UNICODE_SUBCLASS,
-	.tp_hash = (hashfunc) unicode_hash,
-	.tp_dealloc = (destructor) unicode_dealloc,
-  .tp_richcompare = PyUnicode_RichCompare,
-};
 
 enum PyUnicode_Kind {
 	// string contains only wstr byte characters. This is only possible
@@ -106,6 +97,8 @@ enum PyUnicode_Kind {
 	PyUnicode_2BYTE_KIND = 2,
 	PyUnicode_4BYTE_KIND = 4,
 };
+
+extern PyTypeObject PyUnicode_Type;
 
 PyObject *
 PyUnicode_New(

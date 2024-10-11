@@ -92,7 +92,9 @@ target_with_star_atom[expr_ty] (memo):
 star_atom[expr_ty]:
 	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
 
-primary[expr_ty]: a=primary '(' b=[arguments] ')' {
+primary[expr_ty]:
+	| a=primary '.' b=NAME { _PyAST_Attribute(a, b->v.Name.id, Load) }
+	| a=primary '(' b=[arguments] ')' {
 		_PyAST_Call(a,
 			(b) ? ((expr_ty) b)->v.Call.args : NULL,
 			(b) ? ((expr_ty) b)->v.Call.keywords : NULL) }

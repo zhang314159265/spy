@@ -12,3 +12,4 @@
 #include "Python/sysmodule.c.h"
 #include "Objects/call.c.h"
 #include "Objects/typeobject.c.h"
+#include "Python/formatter_unicode.c.h"

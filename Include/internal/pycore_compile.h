@@ -5,6 +5,8 @@
 #include "pycapsule.h"
 #include "Python/wordcode_helpers.h"
 
+#define STACK_USE_GUIDELINE 30
+
 // defined in cpy/Python/compile.c
 PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
   assert(privateobj == NULL); // TODO: support non-null privateobj
@@ -47,6 +49,11 @@ PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
     return 0; \
   } \
   Py_DECREF((O)); \
+}
+
+#define ADDOP_NAME(C, OP, O, TYPE) { \
+  if (!compiler_addop_name((C), (OP), (C)->u->u_ ## TYPE, (O))) \
+    return 0; \
 }
 
 enum {
@@ -177,6 +184,7 @@ compiler_init(struct compiler *c) {
 	return 1;
 }
 
+// defined in cpy/Python/ast_opt.c
 int
 astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
 	switch (node_->kind) {
@@ -188,6 +196,7 @@ astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
 		// CALL_SEQ(astfold_keyword, keyword, node_->v.Call.keywords);
 		break;
 	case Constant_kind:
+  case Attribute_kind:
 		break;
 	default:
 		fprintf(stderr, "expr kind %d\n", node_->kind);
@@ -241,6 +250,19 @@ _PyAST_Optimize(mod_ty mod, PyArena *arena, _PyASTOptimizeState *state) {
 }
 
 static Py_ssize_t compiler_add_o(PyObject *dict, PyObject *o);
+
+static int
+compiler_addop_name(struct compiler *c, int opcode, PyObject *dict,
+    PyObject *o) {
+  Py_ssize_t arg;
+
+  PyObject *mangled = o; // TODO follow cpy
+  arg = compiler_add_o(dict, mangled);
+  Py_DECREF(mangled);
+  if (arg < 0) 
+    return 0;
+  return compiler_addop_i(c, opcode, arg);
+}
 
 static int
 compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
@@ -480,8 +502,42 @@ compiler_call_helper(struct compiler *c,
 	assert(false);
 }
 
+// Return 1 if the method call was optimized, -1 if not and 0 on error
+static int
+maybe_optimize_method_call(struct compiler *c, expr_ty e) {
+  Py_ssize_t argsl, i;
+  expr_ty meth = e->v.Call.func;
+  asdl_expr_seq *args = e->v.Call.args;
+
+  if (meth->kind != Attribute_kind || meth->v.Attribute.ctx != Load ||
+      asdl_seq_LEN(e->v.Call.keywords)) {
+    return -1;
+  }
+  argsl = asdl_seq_LEN(args);
+  if (argsl >= STACK_USE_GUIDELINE) {
+    return -1;
+  }
+  for (i = 0; i < argsl; i++) {
+    expr_ty elt = asdl_seq_GET(args, i);
+    if (elt->kind == Starred_kind) {
+      return -1;
+    }
+  }
+
+  // optimize the code
+  VISIT(c, expr, meth->v.Attribute.value);
+  ADDOP_NAME(c, LOAD_METHOD, meth->v.Attribute.attr, names);
+  VISIT_SEQ(c, expr, e->v.Call.args);
+  ADDOP_I(c, CALL_METHOD, asdl_seq_LEN(e->v.Call.args));
+  return 1;
+}
+
 static int
 compiler_call(struct compiler *c, expr_ty e) {
+  int ret = maybe_optimize_method_call(c, e);
+  if (ret >= 0) {
+    return ret;
+  }
 	VISIT(c, expr, e->v.Call.func);
 	return compiler_call_helper(c, 0,
 			e->v.Call.args,
@@ -734,6 +790,18 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     VISIT(c, expr, e->v.BinOp.left);
     VISIT(c, expr, e->v.BinOp.right);
     ADDOP(c, binop(e->v.BinOp.op));
+    break;
+  case Attribute_kind:
+    VISIT(c, expr, e->v.Attribute.value);
+    switch (e->v.Attribute.ctx) {
+    case Load: 
+    {
+      ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
+      break;
+    }
+    default:
+      assert(false);
+    }
     break;
 	default:
 		assert(false);

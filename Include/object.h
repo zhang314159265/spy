@@ -19,6 +19,7 @@
 #define Py_TPFLAGS_READYING (1UL << 13)
 
 #define Py_TPFLAGS_HAVE_GC (1UL << 14)
+#define Py_TPFLAGS_METHOD_DESCRIPTOR (1UL << 17)
 #define Py_TPFLAGS_LONG_SUBCLASS (1UL << 24)
 #define Py_TPFLAGS_LIST_SUBCLASS (1UL << 25)
 #define Py_TPFLAGS_TUPLE_SUBCLASS (1UL << 26)
@@ -45,6 +46,10 @@ typedef PyObject *(*richcmpfunc)(PyObject*, PyObject*, int);
 typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
 typedef int(*setattrofunc)(PyObject *, PyObject *, PyObject *);
 typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
+typedef PyObject *(*getattrofunc)(PyObject *, PyObject *);
+typedef PyObject *(*getattrfunc)(PyObject *, char *);
+typedef Py_ssize_t (*lenfunc)(PyObject *);
+typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 
 typedef struct {
 	PyObject ob_base;
@@ -162,7 +167,7 @@ PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems) {
   if (_PyType_IS_GC(type)) {
     obj = _PyObject_GC_Malloc(size);
   } else {
-    assert(false);
+		obj = (PyObject *) PyObject_Malloc(size);
   }
   
   if (obj == NULL) {
@@ -297,5 +302,8 @@ PyCallable_Check(PyObject *x) {
 }
 
 #define Py_RETURN_NONE return Py_NewRef(Py_None)
+
+PyObject *PyObject_GenericGetAttr(PyObject *obj, PyObject *name);
+int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method);
 
 #endif

@@ -126,7 +126,7 @@ _PyObject_GetDictPtr(PyObject *obj) {
 
   dictoffset = tp->tp_dictoffset;
   if (dictoffset == 0) {
-    assert(false);
+    return NULL;
   }
   if (dictoffset < 0) {
     assert(false);
@@ -189,4 +189,89 @@ _PyObject_SetAttrId(PyObject *v, _Py_Identifier *name, PyObject *w)
     return -1;
   result = PyObject_SetAttr(v, oname, w);
   return result;
+}
+
+PyObject *PyObject_GetAttr(PyObject *v, PyObject *name) {
+  PyTypeObject *tp = Py_TYPE(v);
+  if (!PyUnicode_Check(name)) {
+    assert(false);
+  }
+
+  PyObject *result = NULL;
+  if (tp->tp_getattro != NULL) {
+    result = (*tp->tp_getattro)(v, name);
+  } else if (tp->tp_getattr != NULL) {
+    assert(false);
+  } else {
+    assert(false);
+  }
+  if (result == NULL) {
+    assert(false);
+  }
+  return result;
+}
+
+PyObject *
+_PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
+    PyObject *dict, int suppress)
+{
+  PyTypeObject *tp = Py_TYPE(obj);
+  PyObject *descr = NULL;
+
+  if (!PyUnicode_Check(name)) {
+    assert(false);
+  }
+  Py_INCREF(name);
+
+  if (tp->tp_dict == NULL) {
+    if (PyType_Ready(tp) < 0)
+      assert(false);
+  }
+
+  descr = _PyType_Lookup(tp, name);
+  assert(false);
+}
+
+PyObject *
+PyObject_GenericGetAttr(PyObject *obj, PyObject *name) {
+  return _PyObject_GenericGetAttrWithDict(obj, name, NULL, 0);
+}
+
+int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
+  PyTypeObject *tp = Py_TYPE(obj);
+  PyObject *descr;
+  PyObject **dictptr, *dict;
+  int meth_found = 0;
+
+  assert(*method == NULL);
+
+  if (Py_TYPE(obj)->tp_getattro != PyObject_GenericGetAttr
+      || !PyUnicode_Check(name)) {
+    assert(false);
+  }
+
+  if (tp->tp_dict == NULL && PyType_Ready(tp) < 0) {
+    return 0;
+  }
+
+  descr = _PyType_Lookup(tp, name);
+  if (descr != NULL) {
+    Py_INCREF(descr);
+    if (_PyType_HasFeature(Py_TYPE(descr), Py_TPFLAGS_METHOD_DESCRIPTOR)) {
+      meth_found = 1;
+    } else {
+      assert(false);
+    }
+  }
+
+  dictptr = _PyObject_GetDictPtr(obj);
+  if (dictptr != NULL && (dict = *dictptr) != NULL) {
+    assert(false);
+  }
+
+  if (meth_found) {
+    *method = descr;
+    return 1;
+  }
+  assert(false);
 }

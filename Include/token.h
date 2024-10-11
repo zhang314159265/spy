@@ -13,8 +13,10 @@
 #define LPAR 7
 #define RPAR 8
 #define COLON 11
+#define COMMA 12
 #define PLUS 14
 #define EQUAL 22
+#define DOT 23
 #define PLUSEQUAL 36
 #define OP 54
 #define TYPE_IGNORE 57
@@ -45,6 +47,7 @@ PyToken_OneChar(int c1) {
 	case ')': return RPAR;
 	case ':': return COLON;
 	case '=': return EQUAL;
+	case ',': return COMMA;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;

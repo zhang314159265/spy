@@ -89,6 +89,11 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_operator_ty(expr->v.BinOp.op, indent + 2);
 		dump_expr(expr->v.BinOp.right, indent + 2);
 		break;
+	case Attribute_kind:
+		fprintf(stderr, "Attribute %s:\n", (char *) PyUnicode_DATA(expr->v.Attribute.attr));
+		dump_expr(expr->v.Attribute.value, indent + 2);
+		dump_expr_context(expr->v.Attribute.ctx, indent + 2);
+		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

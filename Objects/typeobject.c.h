@@ -1,5 +1,7 @@
 #pragma once
 
+#include "descrobject.h"
+
 // Generic type check
 // defined in cpy/Objects/typeobject.c
 int PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b) {
@@ -35,5 +37,56 @@ PyTypeObject PyType_Type = {
 	.tp_call = (ternaryfunc) type_call,
 	.tp_vectorcall_offset = offsetof(PyTypeObject, tp_vectorcall),
 };
+
+static int type_add_method(PyTypeObject *type, PyMethodDef *meth) {
+	PyObject *descr;
+	int isdescr = 1;
+
+	if (meth->ml_flags & METH_CLASS) {
+		assert(false);
+	} else if (meth->ml_flags & METH_STATIC) {
+		assert(false);
+	} else {
+		descr = PyDescr_NewMethod(type, meth);
+	}
+	if (descr == NULL) {
+		return -1;
+	}
+
+	PyObject *name;
+	if (isdescr) {
+		name = PyDescr_NAME(descr);
+	} else {
+		assert(false);
+	}
+
+	int err;
+	if (!(meth->ml_flags & METH_COEXIST)) {
+		err = PyDict_SetDefault(type->tp_dict, name, descr) == NULL;
+	} else {
+		assert(false);
+	}
+	if (!isdescr) {
+		Py_DECREF(name);
+	}
+	Py_DECREF(descr);
+	if (err) {
+		return -1;
+	}
+	return 0;
+}
+
+static int type_add_methods(PyTypeObject *type) {
+	PyMethodDef *meth = type->tp_methods;
+	if (meth == NULL) {
+		return 0;
+	}
+	for (; meth->ml_name != NULL; meth++) {
+		if (type_add_method(type, meth) < 0) {
+			return -1;
+		}
+	}
+	return 0;
+}
 
 

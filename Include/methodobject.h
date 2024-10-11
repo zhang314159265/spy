@@ -1,6 +1,7 @@
 #pragma once
 
 typedef PyObject *(*PyCFunction)(PyObject *, PyObject *);
+typedef PyObject *(*PyCFunctionWithKeywords)(PyObject *, PyObject *, PyObject *);
 
 typedef PyObject *(*_PyCFunctionFastWithKeywords)(PyObject *,
 		PyObject *const *,
@@ -40,7 +41,9 @@ PyTypeObject PyCFunction_Type = {
 #define METH_KEYWORDS 0x0002
 #define METH_NOARGS 0x0004
 #define METH_O 0x0008
+#define METH_CLASS 0x0010
 #define METH_STATIC 0x0020
+#define METH_COEXIST 0x0040
 #define METH_METHOD 0x0200
 #define METH_FASTCALL 0x0080
 

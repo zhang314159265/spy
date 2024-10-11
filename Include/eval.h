@@ -4,6 +4,7 @@
 #include "funcobject.h"
 #include "tupleobject.h"
 
+PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define GETLOCAL(i) (fastlocals[i])
 
 #define SETLOCAL(i, value) do { PyObject *tmp = GETLOCAL(i); \
@@ -30,6 +31,7 @@
 #define BASIC_POP() (*--stack_pointer)
 #define POP() BASIC_POP()
 #define TOP() (stack_pointer[-1])
+#define PEEK(n) (stack_pointer[-(n)])
 #define SET_TOP(v) (stack_pointer[-1] = (v))
 
 #define EXT_POP(STACK_POINTER) (*--(STACK_POINTER))
@@ -180,6 +182,60 @@ main_loop:
 		dispatch_opcode:
 
 		switch (opcode) {
+		case TARGET(LOAD_METHOD): {
+			PyObject *name = GETITEM(names, oparg);
+			PyObject *obj = TOP();
+			PyObject *meth = NULL;
+
+			int meth_found = _PyObject_GetMethod(obj, name, &meth);
+
+			if (meth == NULL) {
+				assert(false);
+			}
+
+			if (meth_found) {
+				SET_TOP(meth);
+				PUSH(obj); // self
+			} else {
+				assert(false);
+			}
+			DISPATCH();
+		}
+		case TARGET(CALL_METHOD): {
+			PyObject **sp, *res, *meth;
+
+			sp = stack_pointer;
+
+			meth = PEEK(oparg + 2);
+			if (meth == NULL) {
+				assert(false);
+			} else {
+				res = call_function(tstate, &sp, oparg + 1, NULL);
+				stack_pointer = sp;
+			}
+
+			PUSH(res);
+			if (res == NULL) {
+				assert(false);
+			}
+			DISPATCH();
+		}
+		case TARGET(LOAD_ATTR): {
+			PyObject *name = GETITEM(names, oparg);
+			PyObject *owner = TOP();
+
+			PyTypeObject *type = Py_TYPE(owner);
+			PyObject *res;
+
+			// Slow path
+			res = PyObject_GetAttr(owner, name);
+			Py_DECREF(owner);
+			SET_TOP(res);
+			if (res == NULL) {
+				assert(false);
+			}
+			DISPATCH();
+		}
 		case TARGET(JUMP_ABSOLUTE): {
 			// printf("JUMP_ABSOLUTE oparg is %d\n", oparg);
 			JUMPTO(oparg);

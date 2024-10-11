@@ -526,6 +526,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 		VISIT(st, expr, e->v.BinOp.left);
 		VISIT(st, expr, e->v.BinOp.right);
 		break;
+	case Attribute_kind:
+		VISIT(st, expr, e->v.Attribute.value);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);

@@ -139,4 +139,7 @@ static Py_hash_t bytes_hash(PyBytesObject *a) {
 	return a->ob_shash;
 }
 
+typedef struct {
+} _PyBytesWriter;
+
 #endif

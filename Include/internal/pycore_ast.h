@@ -72,6 +72,7 @@ enum _expr_kind {
 	BinOp_kind = 3,
 	Call_kind=17,
 	Constant_kind=20,
+	Attribute_kind=21,
 	Starred_kind=23,
 	Name_kind=24,
 };
@@ -79,6 +80,12 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			expr_ty value;
+			identifier attr;
+			expr_context_ty ctx;
+		} Attribute;
+
 		struct {
 			expr_ty left;
 			operator_ty op;
