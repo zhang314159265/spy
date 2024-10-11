@@ -69,6 +69,9 @@ new_threadstate(PyInterpreterState *interp, int init) {
   tstate->interp = interp;
 
   tstate->frame = NULL;
+
+	tstate->curexc_type = NULL;
+
   if (init) {
     _PyThreadState_Init(tstate);
   }

@@ -6,6 +6,8 @@ else
 PREFIX :=
 endif
 
+TUTOR=tutor/print.py
+
 first: mine
 # first: pegen
 
@@ -21,4 +23,4 @@ pegen:
 CFLAGS := -IInclude -I.
 mine: # pegen
 	gcc -g main.c $(CFLAGS)
-	$(PREFIX) ./a.out tutor.py
+	$(PREFIX) ./a.out $(TUTOR)

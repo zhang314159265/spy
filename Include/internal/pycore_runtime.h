@@ -3,6 +3,8 @@
 #include "pycore_atomic.h"
 #include "pycore_initconfig.h"
 #include "cpython/initconfig.h"
+#include "pythread.h"
+
 typedef struct _is PyInterpreterState;
 
 /* GIL state */
@@ -10,6 +12,11 @@ struct _gilstate_runtime_state {
   // Assuming the current thread holds the GIL, this is the
   // PyThreadState for the current thread. */
   _Py_atomic_address tstate_current;
+};
+
+struct _Py_unicode_runtime_ids {
+	PyThread_type_lock lock;
+	Py_ssize_t next_index;
 };
 
 // Full Python runtime state
@@ -27,6 +34,8 @@ typedef struct pyruntimestate {
 	struct pyinterpreters {
 		PyInterpreterState *main;
 	} interpreters;
+
+	struct _Py_unicode_runtime_ids unicode_ids;
 } _PyRuntimeState;
 
 #define _PyRuntimeState_INIT \
@@ -34,7 +43,14 @@ typedef struct pyruntimestate {
 
 static PyStatus
 _PyRuntimeState_Init_impl(_PyRuntimeState *runtime) {
+	// Preserve next_index value if Py_Initialize()/Py_Finalize()
+	// is called multiple times.
+	Py_ssize_t unicode_next_index = runtime->unicode_ids.next_index;
   memset(runtime, 0, sizeof(*runtime));
+
+	runtime->unicode_ids.lock = PyThread_allocate_lock();
+	// if (runtime->unicode_ids.lock == NULL) { assert(false); }
+	runtime->unicode_ids.next_index = unicode_next_index;
   return _PyStatus_OK();
 }
 

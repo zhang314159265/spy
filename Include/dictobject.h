@@ -42,6 +42,8 @@ static PyDictKeysObject empty_keys_struct = {
 #define PyDict_Check(op) \
   PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_DICT_SUBCLASS)
 
+#define PyDict_CheckExact(op) Py_IS_TYPE(op, &PyDict_Type)
+
 #define DK_SIZE(dk) ((dk)->dk_size)
 
 #if SIZEOF_VOID_P > 4
@@ -698,4 +700,80 @@ PyDict_SetDefault(PyObject *d, PyObject *key, PyObject *defaultobj) {
   }
 
   return value;
+}
+
+PyObject *
+_PyDict_GetItem_KnownHash(PyObject *op, PyObject *key, Py_hash_t hash) {
+  Py_ssize_t ix;
+  PyDictObject *mp = (PyDictObject *) op;
+  PyObject *value;
+
+  if (!PyDict_Check(op)) {
+    assert(false);
+  }
+
+  ix = (mp->ma_keys->dk_lookup)(mp, key, hash, &value);
+  if (ix < 0) {
+    return NULL;
+  }
+  return value;
+}
+
+PyObject *
+_PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
+{
+  PyObject *kv;
+  kv = _PyUnicode_FromId(key);
+  if (kv == NULL)
+    return NULL;
+  Py_hash_t hash = ((PyASCIIObject *) kv)->hash;
+  assert(hash != -1);
+  return _PyDict_GetItem_KnownHash(dp, kv, hash);
+}
+
+int
+_PyDict_SetItemId(PyObject *v, struct _Py_Identifier *key, PyObject *item) {
+  PyObject *kv;
+  kv = _PyUnicode_FromId(key);
+  if (kv == NULL)
+    return -1;
+  return PyDict_SetItem(v, kv, item);
+}
+
+int
+_PyObjectDict_SetItem(PyTypeObject *tp, PyObject **dictptr,
+    PyObject *key, PyObject *value) {
+  PyObject *dict;
+  int res;
+
+  assert(dictptr != NULL);
+
+  if ((tp->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
+    assert(false);
+  } else {
+    dict = *dictptr;
+    if (dict == NULL) {
+      assert(false);
+    }
+    if (value == NULL) {
+      assert(false);
+    } else {
+      res = PyDict_SetItem(dict, key, value);
+    }
+  }
+  return res;
+}
+
+int
+PyDict_SetItemString(PyObject *v, const char *key, PyObject *item) {
+  PyObject *kv;
+  int err;
+  kv = PyUnicode_FromString(key);
+  if (kv == NULL)
+    return -1;
+  PyUnicode_InternInPlace(&kv);
+
+  err = PyDict_SetItem(v, kv, item);
+  Py_DECREF(kv);
+  return err;
 }

@@ -11,10 +11,13 @@ typedef struct PyCodeObject PyCodeObject;
 
 typedef uint16_t _Py_CODEUNIT;
 
+static void code_dealloc(PyCodeObject *co);
+
 PyTypeObject PyCode_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "code",
   .tp_basicsize = sizeof(PyCodeObject),
+  .tp_dealloc = (destructor) code_dealloc,
 };
 
 // defined in cpy/Objects/codeobject.c
@@ -168,4 +171,14 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
   co->co_linetable = linetable;
   co->co_extra = NULL;
   return co;
+}
+
+static void code_dealloc(PyCodeObject *co) {
+  Py_XDECREF(co->co_code);
+  Py_XDECREF(co->co_consts);
+  Py_XDECREF(co->co_names);
+  Py_XDECREF(co->co_varnames);
+  // Py_XDECREF(co->co_filename);
+  Py_XDECREF(co->co_name);
+  PyObject_Free(co);
 }

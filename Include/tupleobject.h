@@ -150,3 +150,14 @@ static void tupledealloc(PyTupleObject *op) {
 	}
 	Py_TYPE(op)->tp_free((PyObject *) op);
 }
+
+PyObject *
+PyTuple_GetItem(PyObject *op, Py_ssize_t i) {
+	if (!PyTuple_Check(op)) {
+		assert(false);
+	}
+	if (i < 0 || i >= Py_SIZE(op)) {
+		assert(false);
+	}
+	return ((PyTupleObject *) op)->ob_item[i];
+}

@@ -180,3 +180,31 @@ PyObject *PyUnicode_InternFromString(const char *cp) {
 	PyUnicode_InternInPlace(&s);
 	return s;
 }
+
+PyObject * _PyUnicode_FromId(_Py_Identifier *id);
+
+const char *
+PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *psize) {
+  assert(false);
+}
+
+const char *
+PyUnicode_AsUTF8(PyObject *unicode)
+{
+  return PyUnicode_AsUTF8AndSize(unicode, NULL);
+}
+
+int
+_PyUnicode_EqualToASCIIString(PyObject *unicode, const char *str) {
+  size_t len;
+  // assert(_PyUnicode_CHECK(unicode));
+
+  if (PyUnicode_READY(unicode) == -1) {
+    assert(false);
+  }
+  if (!PyUnicode_IS_ASCII(unicode))
+    return 0;
+  len = (size_t) PyUnicode_GET_LENGTH(unicode);
+  return strlen(str) == len &&
+      memcmp(PyUnicode_1BYTE_DATA(unicode), str, len) == 0;
+}

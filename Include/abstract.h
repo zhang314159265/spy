@@ -3,6 +3,8 @@
 #include "internal/pycore_object.h"
 #include "tupleobject.h"
 
+#define PY_VECTORCALL_ARGUMENTS_OFFSET ((size_t) 1 << (8 * sizeof(size_t) - 1))
+
 // Returns the result of bitwise or of o1 and o2, possibly in-place,
 // or NULL on failure.
 //
@@ -109,4 +111,55 @@ PyObject *PySequence_Tuple(PyObject *v) {
     return PyList_AsTuple(v);
   }
   assert(false);
+}
+
+static inline vectorcallfunc
+PyVectorcall_Function(PyObject *callable) {
+	PyTypeObject *tp;
+	Py_ssize_t offset;
+	vectorcallfunc ptr;
+
+	assert(callable != NULL);
+	tp = Py_TYPE(callable);
+	printf("PyVectorcall_Function got type %s\n", tp->tp_name);
+	if (!PyType_HasFeature(tp, Py_TPFLAGS_HAVE_VECTORCALL)) {
+		return NULL;
+	}
+	assert(PyCallable_Check(callable));
+	offset = tp->tp_vectorcall_offset;
+	assert(offset > 0);
+	memcpy(&ptr, (char *) callable + offset, sizeof(ptr));
+	return ptr;
+}
+
+
+PyObject *_Py_CheckFunctionResult(PyThreadState *tstate, PyObject *callabble, PyObject *result, const char *where);
+
+// defined in cpy/Include/cpython/abstract.h
+static inline PyObject *
+_PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
+		PyObject *const *args, size_t nargsf,
+		PyObject *kwnames) {
+	vectorcallfunc func;
+	PyObject *res;
+
+	func = PyVectorcall_Function(callable);
+	if (func == NULL) {
+		assert(false);
+	}
+	res = func(callable, args, nargsf, kwnames);
+	return _Py_CheckFunctionResult(tstate, callable, res, NULL);
+}
+
+static inline PyObject *
+PyObject_Vectorcall(PyObject *callable, PyObject *const *args,
+		size_t nargsf, PyObject *kwnames) {
+	PyThreadState *tstate = PyThreadState_Get();
+	return _PyObject_VectorcallTstate(tstate, callable,
+			args, nargsf, kwnames);
+}
+
+static inline Py_ssize_t
+PyVectorcall_NARGS(size_t n) {
+	return n & ~PY_VECTORCALL_ARGUMENTS_OFFSET;
 }

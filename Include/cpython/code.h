@@ -16,3 +16,6 @@ struct PyCodeObject {
   PyObject *co_linetable;
   void *co_extra;
 };
+
+#define _Py_OPCODE(word) ((word) & 255)
+#define _Py_OPARG(word) ((word) >> 8)

@@ -8,6 +8,9 @@ typedef struct _is PyInterpreterState;
 struct _ts {
   PyInterpreterState *interp;
 	PyFrameObject *frame;
+
+	/* The exception currently being raised */
+	PyObject *curexc_type;
 };
 
 typedef PyObject *(*_PyFrameEvalFunction)(PyThreadState *tstate, PyFrameObject *, int);

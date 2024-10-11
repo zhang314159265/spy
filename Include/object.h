@@ -10,6 +10,8 @@
 // Set if the type object is dynamically allocated
 #define Py_TPFLAGS_HEAPTYPE (1UL << 9)
 
+#define Py_TPFLAGS_HAVE_VECTORCALL (1UL << 11)
+
 // set if the type is 'ready' -- fully initialized
 #define Py_TPFLAGS_READY (1UL << 12)
 
@@ -33,12 +35,15 @@ typedef struct _object {
 } PyObject;
 
 typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
+typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*getiterfunc)(PyObject *);
 typedef PyObject *(*iternextfunc)(PyObject *);
 typedef void (*destructor)(PyObject *);
 typedef void (*freefunc)(void *);
 typedef Py_hash_t (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc)(PyObject*, PyObject*, int);
+typedef int (*setattrfunc)(PyObject *, char *, PyObject *);
+typedef int(*setattrofunc)(PyObject *, PyObject *, PyObject *);
 
 typedef struct {
 	PyObject ob_base;
@@ -282,5 +287,24 @@ static inline PyObject *_Py_XNewRef(PyObject *obj) {
 }
 
 #define Py_XNewRef(obj) _Py_XNewRef(_PyObject_CAST(obj))
+
+static inline int _PyObject_TypeCheck(PyObject *ob, PyTypeObject *type) {
+	return Py_IS_TYPE(ob, type) || PyType_IsSubtype(Py_TYPE(ob), type);
+}
+
+#define PyObject_TypeCheck(ob, type) _PyObject_TypeCheck(_PyObject_CAST(ob), type)
+
+int PyObject_SetAttrString(PyObject *v, const char *name, PyObject *w);
+
+int PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value);
+
+int
+PyCallable_Check(PyObject *x) {
+	if (x == NULL)
+		return 0;
+	return Py_TYPE(x)->tp_call != NULL;
+}
+
+#define Py_RETURN_NONE return Py_NewRef(Py_None)
 
 #endif

@@ -10,7 +10,9 @@ static int type_ready_mro(PyTypeObject *type);
 static void
 object_dealloc(PyObject *self)
 {
-	// printf("dealloc a object of type %s\n", Py_TYPE(self)->tp_name);
+	if (Py_TYPE(self)->tp_free == NULL) {
+		printf("dealloc a object of type %s with NULL tp_Free\n", Py_TYPE(self)->tp_name);
+	}
 	Py_TYPE(self)->tp_free(self);
 }
 
@@ -370,4 +372,8 @@ int PyType_Ready(PyTypeObject *type);
 PyObject *PyTuple_Pack(Py_ssize_t, ...);
 PyObject *PyTuple_New(Py_ssize_t size);
 
-
+PyObject *
+_PyType_Lookup(PyTypeObject *type, PyObject *name) {
+	// TODO follow cpy
+	return NULL;
+}

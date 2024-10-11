@@ -17,4 +17,9 @@
 #define _Py_SIZE_ROUND_UP(n, a) (((size_t)(n) + \
 		(size_t)((a) - 1)) & ~(size_t)((a) - 1))
 
+#define PyDoc_STRVAR(name, str) PyDoc_VAR(name) = PyDoc_STR(str)
+
+#define PyDoc_VAR(name) static const char name[]
+#define PyDoc_STR(str) str
+
 #endif

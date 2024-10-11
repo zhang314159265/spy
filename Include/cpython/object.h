@@ -2,6 +2,8 @@
 
 typedef PyObject *(*allocfunc)(PyTypeObject *, Py_ssize_t);
 
+typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames);
+
 typedef struct {
   binaryfunc nb_or;
   binaryfunc nb_inplace_or;
@@ -32,6 +34,15 @@ struct _typeobject {
   hashfunc tp_hash;
 
   richcmpfunc tp_richcompare;
+
+  setattrfunc tp_setattr;
+
+  setattrofunc tp_setattro;
+
+  Py_ssize_t tp_dictoffset;
+  ternaryfunc tp_call;
+
+  Py_ssize_t tp_vectorcall_offset;
 };
 
 // The *real* layout of a type object when allocated on the heap
@@ -43,3 +54,20 @@ typedef struct _heaptypeobject {
 PyObject *_PyObject_NextNotImplemented(PyObject *self) {
   assert(false);
 }
+
+typedef struct _Py_Identifier {
+  const char *string;
+  Py_ssize_t index;
+} _Py_Identifier;
+
+#define _Py_static_string_init(value) { .string = value, .index = -1}
+
+#define _Py_static_string(varname, value) static _Py_Identifier varname = _Py_static_string_init(value)
+#define _Py_IDENTIFIER(varname) _Py_static_string(PyId_##varname, #varname)
+
+#define Py_XSETREF(op, op2) \
+  do { \
+    PyObject *_py_tmp = _PyObject_CAST(op); \
+    (op) = (op2); \
+    Py_XDECREF(_py_tmp); \
+  } while (0)

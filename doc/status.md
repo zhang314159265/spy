@@ -5,6 +5,13 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 # Scratch
 
+- another tutor with 'for loop'
+
+- sys.stdout is defined by `init_sys_streams` 
+
+`init_interp_main`
+- `init_sys_streams`
+
 ## Read interprter initialization code
 - `pymain_init`
   - `Py_InitializeFromConfig`

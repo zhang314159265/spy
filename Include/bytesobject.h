@@ -27,6 +27,7 @@ PyTypeObject PyBytes_Type = {
   .tp_basicsize = PyBytesObject_SIZE,
 	.tp_flags = Py_TPFLAGS_BYTES_SUBCLASS,
 	.tp_hash = (hashfunc) bytes_hash,
+	.tp_free = PyObject_Del,
 };
 
 static PyObject *

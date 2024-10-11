@@ -8,6 +8,7 @@
 #include "pylifecycle.h"
 #include "typeobject.h"
 #include "tupleobject.h"
+#include "internal/pycore_pyerrors.h"
 
 #include "allc.h"
 
@@ -41,6 +42,7 @@ static PyStatus
 pycore_interp_init(PyThreadState *tstate) {
   PyInterpreterState *interp = tstate->interp;
   PyStatus status;
+	PyObject *sysmod = NULL;
 
   status = pycore_init_singletons(interp);
   if (_PyStatus_EXCEPTION(status)) {
@@ -49,6 +51,20 @@ pycore_interp_init(PyThreadState *tstate) {
 
 	status = pycore_init_types(interp);
 	if (_PyStatus_EXCEPTION(status)) {
+		assert(false);
+	}
+
+	status = _PySys_Create(tstate, &sysmod);
+	if (_PyStatus_EXCEPTION(status)) {
+		assert(false);
+	}
+
+	status = pycore_init_builtins(tstate);
+	if (_PyStatus_EXCEPTION(status)) {
+		assert(false);
+	}
+
+	if (init_importlib(tstate, sysmod) < 0) {
 		assert(false);
 	}
   return status;
@@ -78,7 +94,7 @@ void Py_InitializeFromConfig(void) {
   _PyRuntimeState *runtime = &_PyRuntime;
   PyThreadState *tstate = NULL;
   pyinit_core(runtime, &tstate);
-  // TODO: use tstate to do more initialization. Call pyinit_main etc
+	pyinit_main(tstate);
 }
 
 void pymain_init() {
