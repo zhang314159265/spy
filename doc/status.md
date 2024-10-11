@@ -5,11 +5,23 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 # Scratch
 
-- how does 'int op float' work?
+Quest 2:
+  - cover most bytecode <+++++++
+
+Quest 1:
+- cover import <+++++++++++
+
+Quest 3:
+- cover pickle ++++++++++
+
+Quest 4:
+- extension module ++++++++
+
+Quest 5:
+- closure
 
 - goal
-  - cover most bytecode
-	- cover import
+	- ? exception handling
 
 - sys.stdout is defined by `init_sys_streams` 
 
@@ -31,16 +43,9 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
     - call `_PyRuntime_Initialize` first
     - and then `Py_InitializeFromConfig` which calls `_PyGILState_SetTstate`
 
-- Next: build symbol table `_PySymtable_Build` <+++++
-- QUEST: generate bytecode.
 - QUEST: Use CPython peg-generator first. Once it works end-2-end for the toy example, write a generator myself.
 - QUEST: explore the parser <++++
   - entry Parser/parser.c: `_PyPegen_parse`
-- Quest 1: convert a file to a list of tokens
-
-- Dive into `print("hello")` and make spy support the same
-  - lexical analysis
-- support import
 
 # BELOW ARE OLD ################################################
 

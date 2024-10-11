@@ -533,6 +533,12 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 		VISIT(st, expr, e->v.Compare.left);
 		VISIT_SEQ(st, expr, e->v.Compare.comparators);
 		break;
+	case Tuple_kind:
+		VISIT_SEQ(st, expr, e->v.Tuple.elts);
+		break;
+	case List_kind:
+		VISIT_SEQ(st, expr, e->v.List.elts);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);

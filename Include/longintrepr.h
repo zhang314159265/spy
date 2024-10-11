@@ -3,6 +3,8 @@
 #if PYLONG_BITS_IN_DIGIT == 30
 typedef uint32_t digit;
 typedef int32_t sdigit; // signed variant of digit
+typedef uint64_t twodigits;
+typedef int64_t stwodigits;
 #define PyLong_SHIFT 30
 #define _PyLong_DECIMAL_SHIFT 9
 #define _PyLong_DECIMAL_BASE ((digit) 1000000000)
@@ -18,6 +20,8 @@ typedef short sdigit;
 #define PyLong_BASE ((digit) 1 << PyLong_SHIFT)
 #define PyLong_MASK ((digit) (PyLong_BASE - 1))
 
+#define FIVEARY_CUTOFF 8
+
 struct _longobject {
   PyObject_VAR_HEAD
   digit ob_digit[1];
@@ -30,6 +34,8 @@ static PyObject *long_sub(PyLongObject *a, PyLongObject *b);
 static PyObject *long_div(PyObject *a, PyObject *b);
 static PyObject *long_mod(PyObject *a, PyObject *b);
 static PyObject *long_true_divide(PyObject *v, PyObject *w);
+static PyObject *long_pow(PyObject *v, PyObject *w, PyObject *x);
+static PyObject *long_mul(PyLongObject *a, PyLongObject *b);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -38,6 +44,8 @@ static PyNumberMethods long_as_number = {
   .nb_floor_divide = long_div,
   .nb_remainder = long_mod,
   .nb_true_divide = long_true_divide,
+  .nb_power = long_pow,
+  .nb_multiply = (binaryfunc) long_mul,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -256,6 +264,22 @@ fast_mod(PyLongObject *a, PyLongObject *b) {
   return PyLong_FromLong(mod * (sdigit) Py_SIZE(b));
 }
 
+PyObject *
+PyLong_FromLongLong(long long ival);
+
+static PyObject *
+long_mul(PyLongObject *a, PyLongObject *b) {
+  PyLongObject *z;
+
+  CHECK_BINOP(a, b);
+
+  if (Py_ABS(Py_SIZE(a)) <= 1 && Py_ABS(Py_SIZE(b)) <= 1) {
+    stwodigits v = (stwodigits)(MEDIUM_VALUE(a)) * MEDIUM_VALUE(b);
+    return PyLong_FromLongLong((long long) v);
+  }
+  assert(false);
+}
+
 static PyObject *long_mod(PyObject *a, PyObject *b) {
   PyLongObject *mod;
 
@@ -273,4 +297,90 @@ static PyObject *long_mod(PyObject *a, PyObject *b) {
 static PyObject *long_true_divide(PyObject *v, PyObject *w) {
   CHECK_BINOP(v, w);
   assert(false);
+}
+
+static PyObject *long_pow(PyObject *v, PyObject *w, PyObject *x) {
+  PyLongObject *a, *b, *c;
+  int negativeOutput = 0;
+
+  PyLongObject *z = NULL;
+  Py_ssize_t i, j, k;
+  PyLongObject *temp = NULL;
+  
+  PyLongObject *table[32] = {0};
+
+  CHECK_BINOP(v, w);
+  a = (PyLongObject *) v; Py_INCREF(a);
+  b = (PyLongObject *) w; Py_INCREF(b);
+  if (PyLong_Check(x)) {
+    assert(false);
+  } else if (x == Py_None)
+    c = NULL;
+  else {
+    Py_DECREF(a);
+    Py_DECREF(b);
+    Py_RETURN_NOTIMPLEMENTED;
+  }
+
+  if (Py_SIZE(b) < 0 && c == NULL) {
+    assert(false);
+  }
+  if (c) {
+    assert(false);
+  }
+
+  z = (PyLongObject *) PyLong_FromLong(1L);
+  if (z == NULL)
+    assert(false);
+
+#define REDUCE(X) \
+  do { \
+    if (c != NULL) { \
+      assert(false); \
+    } \
+  } while(0)
+
+#define MULT(X, Y, result) \
+  do { \
+    temp = (PyLongObject *) long_mul(X, Y); \
+    if (temp == NULL) \
+      assert(false); \
+    Py_XDECREF(result); \
+    result = temp; \
+    temp = NULL; \
+    REDUCE(result); \
+  } while(0)
+
+  if (Py_SIZE(b) <= FIVEARY_CUTOFF) {
+    for (i = Py_SIZE(b) - 1; i >= 0; --i) {
+      digit bi = b->ob_digit[i];
+
+      for (j = (digit) 1 << (PyLong_SHIFT - 1); j != 0; j >>= 1) {
+        MULT(z, z, z);
+        if (bi & j)
+          MULT(z, a, z);
+      }
+    }
+  } else {
+    assert(false);
+  }
+
+  if (negativeOutput && (Py_SIZE(z) != 0)) {
+    assert(false);
+  }
+
+  goto Done;
+Error:
+  Py_CLEAR(z);
+Done:
+  if (Py_SIZE(b) > FIVEARY_CUTOFF) {
+    for (i = 0; i < 32; ++i) {
+      Py_XDECREF(table[i]);
+    }
+  }
+  Py_DECREF(a);
+  Py_DECREF(b);
+  Py_XDECREF(c);
+  Py_XDECREF(temp);
+  return (PyObject *) z;
 }

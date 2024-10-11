@@ -23,7 +23,7 @@ builtin_print(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 		} else if (PyLong_Check(args[i])) {
 			printf("%ld", PyLong_AsLong(args[i]));
 		} else {
-			assert(false);
+			printf("%s", PyUnicode_1BYTE_DATA(PyObject_Str(args[i])));
 		}
 	}
 	printf("\n");

@@ -28,6 +28,7 @@ list_dealloc(PyListObject *op) {
 }
 
 static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v);
+static PyObject *list_repr(PyListObject *v);
 
 static PySequenceMethods list_as_sequence = {
 	.sq_ass_item = (ssizeobjargproc) list_ass_item,
@@ -42,6 +43,7 @@ PyTypeObject PyList_Type = {
 	.tp_dealloc = (destructor) list_dealloc,
 	.tp_free = PyObject_GC_Del,
 	.tp_as_sequence = &list_as_sequence,
+	.tp_repr = (reprfunc) list_repr,
 };
 
 // defined in cpy/Objects/listobject.c
@@ -228,5 +230,12 @@ PyList_Size(PyObject *op) {
 static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v) {
 	if (v == NULL)
 		return list_ass_slice(a, i, i + 1, v);
+	assert(false);
+}
+
+static PyObject *list_repr(PyListObject *v) {
+	if (Py_SIZE(v) == 0) {
+		return PyUnicode_FromString("[]");
+	}
 	assert(false);
 }

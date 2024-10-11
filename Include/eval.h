@@ -201,8 +201,63 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BUILD_LIST): {
+			PyObject *list = PyList_New(oparg);
+			if (list == NULL)
+				assert(false);
+			while (--oparg >= 0) {
+				PyObject *item = POP();
+				PyList_SET_ITEM(list, oparg, item);
+			}
+			PUSH(list);
+			DISPATCH();
+		}
+		case TARGET(BUILD_TUPLE): {
+			PyObject *tup = PyTuple_New(oparg);
+			if (tup == NULL)
+				assert(false);
+			while (--oparg >= 0) {
+				PyObject *item = POP();
+				PyTuple_SET_ITEM(tup, oparg, item);
+			}
+			PUSH(tup);
+			DISPATCH();
+		}
+		case TARGET(BINARY_FLOOR_DIVIDE): {
+			PyObject *divisor = POP();
+			PyObject *dividend = TOP();
+			PyObject *quotient = PyNumber_FloorDivide(dividend, divisor);
+			Py_DECREF(dividend);
+			Py_DECREF(divisor);
+			SET_TOP(quotient);
+			if (quotient == NULL)
+				assert(false);
+			DISPATCH();
+		}
+		case TARGET(BINARY_MULTIPLY): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_Multiply(left, right);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				assert(false);
+			DISPATCH();
+		}
 		case JUMP_FORWARD: {
 			JUMPBY(oparg);
+			DISPATCH();
+		}
+		case TARGET(BINARY_POWER): {
+			PyObject *exp = POP();
+			PyObject *base = TOP();
+			PyObject *res = PyNumber_Power(base, exp, Py_None);
+			Py_DECREF(base);
+			Py_DECREF(exp);
+			SET_TOP(res);
+			if (res == NULL)
+				assert(false);
 			DISPATCH();
 		}
 		case TARGET(BINARY_SUBTRACT): {

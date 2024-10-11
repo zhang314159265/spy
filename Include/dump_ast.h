@@ -78,6 +78,12 @@ void dump_operator_ty(operator_ty op, int indent) {
 		fprintf(stderr, "%%\n"); break;
 	case Div:
 		fprintf(stderr, "/\n"); break;
+	case Pow:
+		fprintf(stderr, "**\n"); break;
+	case Mult:
+		fprintf(stderr, "*\n"); break;
+	case FloorDiv:
+		fprintf(stderr, "//\n"); break;
 	default:
 		assert(false);
 	}
@@ -131,6 +137,16 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr(expr->v.Compare.left, indent + 2);
 		dump_cmpop_seq(expr->v.Compare.ops, indent + 2);
 		dump_expr_seq(expr->v.Compare.comparators, indent + 2);
+		break;
+	case Tuple_kind:
+		fprintf(stderr, "Tuple:\n");
+		dump_expr_seq(expr->v.Tuple.elts, indent + 2);
+		dump_expr_context(expr->v.Tuple.ctx, indent + 2);
+		break;
+	case List_kind:
+		fprintf(stderr, "List:\n");
+		dump_expr_seq(expr->v.List.elts, indent + 2);
+		dump_expr_context(expr->v.List.ctx, indent + 2);
 		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);

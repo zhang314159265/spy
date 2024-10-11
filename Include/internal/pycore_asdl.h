@@ -46,8 +46,9 @@ typedef struct {
 	int typed_elements[1];
 } asdl_int_seq;
 
-GENERATE_ASDL_SEQ_CONSTRUCTOR(generic, void*);
-GENERATE_ASDL_SEQ_CONSTRUCTOR(int, int);
+GENERATE_ASDL_SEQ_CONSTRUCTOR(generic, void*)
+GENERATE_ASDL_SEQ_CONSTRUCTOR(int, int)
 GENERATE_ASDL_SEQ_CONSTRUCTOR(expr, expr_ty)
+GENERATE_ASDL_SEQ_CONSTRUCTOR(arg, arg_ty)
 
 #endif

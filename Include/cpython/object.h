@@ -14,6 +14,8 @@ typedef struct {
   binaryfunc nb_remainder;
   binaryfunc nb_true_divide;
   unaryfunc nb_absolute;
+  ternaryfunc nb_power;
+  binaryfunc nb_multiply;
 } PyNumberMethods;
 
 typedef struct {

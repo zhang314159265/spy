@@ -12,17 +12,22 @@
 #define DEDENT 6
 #define LPAR 7
 #define RPAR 8
+#define LSQB 9
+#define RSQB 10
 #define COLON 11
 #define COMMA 12
 #define PLUS 14
 #define MINUS 15
+#define STAR 16
 #define SLASH 17
 #define LESS 20
 #define EQUAL 22
 #define DOT 23
 #define PERCENT 24
 #define EQEQUAL 27
+#define DOUBLESTAR 35
 #define PLUSEQUAL 36
+#define DOUBLESLASH 47
 #define OP 54
 #define TYPE_IGNORE 57
 
@@ -57,6 +62,9 @@ PyToken_OneChar(int c1) {
 	case '/': return SLASH;
 	case '-': return MINUS;
 	case '<': return LESS;
+	case '*': return STAR;
+	case '[': return LSQB;
+	case ']': return RSQB;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;
@@ -72,6 +80,16 @@ int PyToken_TwoChars(int c1, int c2) {
 	case '=':
 		switch (c2) {
 		case '=': return EQEQUAL;
+		}
+		break;
+	case '*':
+		switch (c2) {
+		case '*': return DOUBLESTAR;
+		}
+		break;
+	case '/':
+		switch (c2) {
+		case '/': return DOUBLESLASH;
 		}
 		break;
 	}

@@ -208,3 +208,34 @@ _PyAST_Break() {
 	p->kind = Break_kind;
 	return p;
 }
+
+expr_ty
+_PyAST_Tuple(asdl_expr_seq *elts, expr_context_ty ctx) {
+	expr_ty p;
+	if (!ctx) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Tuple_kind;
+	p->v.Tuple.elts = elts;
+	// printf("tuple elts is %p\n", elts); assert(false);
+	p->v.Tuple.ctx = ctx;
+	return p;
+}
+
+expr_ty
+_PyAST_List(asdl_expr_seq *elts, expr_context_ty ctx) {
+	expr_ty p;
+	if (!ctx) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = List_kind;
+	p->v.List.elts = elts;
+	p->v.List.ctx = ctx;
+	return p;
+}

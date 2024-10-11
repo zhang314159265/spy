@@ -15,6 +15,9 @@ PyObject *PyNumber_InPlaceOr(PyObject *o1, PyObject *o2);
 #define NB_BINOP(nb_methods, slot) \
     (*(binaryfunc*) (&((char*) nb_methods)[slot]))
 
+#define NB_TERNOP(nb_methods, slot) \
+		(*(ternaryfunc*)(&((char*) nb_methods)[slot]))
+
 static PyObject *
 binary_op1(PyObject *v, PyObject *w, const int op_slot) {
 	// printf("binary_op1, %s v.s. %s\n", Py_TYPE(v)->tp_name, Py_TYPE(w)->tp_name);
@@ -337,3 +340,56 @@ PyNumber_Absolute(PyObject *o) {
 	}
 	assert(false);
 }
+
+static PyObject *
+ternary_op(PyObject *v,
+		PyObject *w,
+		PyObject *z,
+		const int op_slot,
+		const char *op_name) {
+	PyNumberMethods *mv = Py_TYPE(v)->tp_as_number;
+	PyNumberMethods *mw = Py_TYPE(w)->tp_as_number;
+
+	ternaryfunc slotv;
+	if (mv != NULL) {
+		slotv = NB_TERNOP(mv, op_slot);
+	} else {
+		slotv = NULL;
+	}
+
+	ternaryfunc slotw;
+	if (!Py_IS_TYPE(w, Py_TYPE(v)) && mw != NULL) {
+		assert(false);
+	} else {
+		slotw = NULL;
+	}
+
+	if (slotv) {
+		PyObject *x;
+		if (slotw && PyType_IsSubtype(Py_TYPE(w), Py_TYPE(v))) {
+			assert(false);
+		}
+		x = slotv(v, w, z);
+		assert(x != NULL);
+		if (x != Py_NotImplemented) {
+			return x;
+		}
+		Py_DECREF(x);
+	}
+	assert(false);
+}
+
+PyObject *
+PyNumber_Power(PyObject *v, PyObject *w, PyObject *z) {
+	return ternary_op(v, w, z, NB_SLOT(nb_power), "** or pow()");
+}
+
+PyObject *
+PyNumber_Multiply(PyObject *v, PyObject *w) {
+	PyObject *result = BINARY_OP1(v, w, NB_SLOT(nb_multiply), "*");
+	if (result == Py_NotImplemented) {
+		assert(false);
+	}
+	return result;
+}
+

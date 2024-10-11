@@ -319,3 +319,35 @@ double PyLong_AsDouble(PyObject *v) {
 	}
 	assert(false);
 }
+
+PyObject *
+PyLong_FromLongLong(long long ival) {
+	PyLongObject *v;
+	unsigned long long abs_ival;
+	unsigned long long t;
+	int ndigits = 0;
+	int negative = 0;
+
+	if (ival < 0) {
+		assert(false);
+	} else {
+		abs_ival = (unsigned long long) ival;
+	}
+
+	t = abs_ival;
+	while (t) {
+		++ndigits;
+		t >>= PyLong_SHIFT;
+	}
+	v = _PyLong_New(ndigits);
+	if (v != NULL) {
+		digit *p = v->ob_digit;
+		Py_SET_SIZE(v, negative ? -ndigits : ndigits);
+		t = abs_ival;
+		while (t) {
+			*p++ = (digit)(t & PyLong_MASK);
+			t >>= PyLong_SHIFT;
+		}
+	}
+	return (PyObject *) v;
+}

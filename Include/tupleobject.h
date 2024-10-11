@@ -42,6 +42,7 @@ static PyObject *tuplerichcompare(PyObject *v, PyObject *w, int op);
 static void tupledealloc(PyTupleObject *op);
 static Py_ssize_t tuplelength(PyTupleObject *a) { return Py_SIZE(a); }
 static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i);
+static PyObject *tuplerepr(PyTupleObject *v);
 
 static PySequenceMethods tuple_as_sequence = {
 	.sq_length = (lenfunc) tuplelength,
@@ -59,6 +60,7 @@ PyTypeObject PyTuple_Type = {
 	.tp_dealloc = (destructor) tupledealloc,
 	.tp_free = PyObject_GC_Del,
 	.tp_as_sequence = &tuple_as_sequence,
+	.tp_repr = (reprfunc) tuplerepr,
 };
 
 static PyTupleObject *
@@ -184,4 +186,14 @@ static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i) {
 	}
 	Py_INCREF(a->ob_item[i]);
 	return a->ob_item[i];
+}
+
+static PyObject *tuplerepr(PyTupleObject *v) {
+	Py_ssize_t n;
+
+	n = Py_SIZE(v);
+	if (n == 0) {
+		return PyUnicode_FromString("()");
+	}
+	assert(false);
 }

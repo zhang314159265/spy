@@ -12,13 +12,23 @@ typedef struct {
 	expr_ty typed_elements[1];
 } asdl_expr_seq;
 
+typedef struct _arg *arg_ty;
+
+typedef struct {
+	_ASDL_SEQ_HEAD
+	arg_ty typed_elements[1];
+} asdl_arg_seq;
+
 #include "internal/pycore_asdl.h"
 
 typedef enum _operator {
 	Add=1,
 	Sub=2,
+	Mult=3,
 	Div=5,
 	Mod=6,
+	Pow=7,
+	FloorDiv=13,
 } operator_ty;
 
 typedef enum _cmpop {
@@ -33,13 +43,6 @@ typedef struct _mod *mod_ty;
 typedef struct _stmt *stmt_ty;
 
 typedef struct _arguments *arguments_ty;
-
-typedef struct _arg *arg_ty;
-
-typedef struct {
-	_ASDL_SEQ_HEAD
-	arg_ty typed_elements[1];
-} asdl_arg_seq;
 
 struct _arg {
 	identifier arg;
@@ -90,11 +93,23 @@ enum _expr_kind {
 	Attribute_kind=21,
 	Starred_kind=23,
 	Name_kind=24,
+	List_kind=25,
+	Tuple_kind=26,
 };
 
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			asdl_expr_seq *elts;
+			expr_context_ty ctx;
+		} List;
+
+		struct {
+			asdl_expr_seq *elts;
+			expr_context_ty ctx;
+		} Tuple;
+
 		struct {
 			expr_ty left;
 			asdl_int_seq *ops;

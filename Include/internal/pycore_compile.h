@@ -787,6 +787,12 @@ binop(operator_ty op) {
     return BINARY_TRUE_DIVIDE;
   case Mod:
     return BINARY_MODULO;
+  case Pow:
+    return BINARY_POWER;
+  case Mult:
+    return BINARY_MULTIPLY;
+  case FloorDiv:
+    return BINARY_FLOOR_DIVIDE;
   default:
     assert(false);
   }
@@ -826,6 +832,65 @@ compiler_compare(struct compiler *c, expr_ty e) {
 }
 
 static int
+starunpack_helper(struct compiler *c, asdl_expr_seq *elts, int pushed,
+    int build, int add, int extend, int tuple) {
+  Py_ssize_t n = asdl_seq_LEN(elts);
+  if (n > 2) {
+    assert(false);
+  }
+
+  int big = n + pushed > STACK_USE_GUIDELINE;
+  int seen_star = 0;
+  for (Py_ssize_t i = 0; i < n; i++) {
+    expr_ty elt = asdl_seq_GET(elts, i);
+    if (elt->kind == Starred_kind) {
+      seen_star = 1;
+    }
+  }
+  if (!seen_star && !big) {
+    for (Py_ssize_t i = 0; i < n; i++) {
+      expr_ty elt = asdl_seq_GET(elts, i);
+      VISIT(c, expr, elt);
+    }
+    if (tuple) {
+      ADDOP_I(c, BUILD_TUPLE, n + pushed);
+    } else {
+      ADDOP_I(c, build, n + pushed);
+    }
+    return 1;
+  }
+  assert(false);
+}
+
+static int
+compiler_tuple(struct compiler *c, expr_ty e) {
+  asdl_expr_seq *elts = e->v.Tuple.elts;
+  if (e->v.Tuple.ctx == Store) {
+    assert(false);
+  } else if (e->v.Tuple.ctx == Load) {
+    return starunpack_helper(c, elts, 0, BUILD_LIST,
+        LIST_APPEND, LIST_EXTEND, 1);
+  } else {
+    assert(false);
+  }
+  return 1;
+}
+
+static int
+compiler_list(struct compiler *c, expr_ty e) {
+  asdl_expr_seq *elts = e->v.List.elts;
+  if (e->v.List.ctx == Store) {
+    assert(false);
+  } else if (e->v.List.ctx == Load) {
+    return starunpack_helper(c, elts, 0, BUILD_LIST,
+        LIST_APPEND, LIST_EXTEND, 0);
+  } else {
+    assert(false);
+  }
+  return 1;
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -855,6 +920,10 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     break;
   case Compare_kind:
     return compiler_compare(c, e);
+  case Tuple_kind:
+    return compiler_tuple(c, e);
+  case List_kind:
+    return compiler_list(c, e);
 	default:
 		assert(false);
 	}

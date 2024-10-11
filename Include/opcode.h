@@ -4,10 +4,13 @@
 
 #define POP_TOP 1
 #define DUP_TOP 4
+#define BINARY_POWER 19
+#define BINARY_MULTIPLY 20
 #define BINARY_MODULO 22
 #define BINARY_ADD 23
 #define BINARY_SUBTRACT 24
 #define BINARY_TRUE_DIVIDE 27
+#define BINARY_FLOOR_DIVIDE 28
 #define INPLACE_ADD 55
 #define GET_ITER 68
 #define RETURN_VALUE 83
@@ -19,6 +22,8 @@
 #define DELETE_GLOBAL 98
 #define LOAD_CONST 100
 #define LOAD_NAME 101
+#define BUILD_TUPLE 102
+#define BUILD_LIST 103
 #define LOAD_ATTR 106
 #define COMPARE_OP 107
 #define JUMP_FORWARD 110
@@ -38,8 +43,10 @@
 #define CALL_FUNCTION 131
 #define MAKE_FUNCTION 132
 #define SETUP_WITH 143
+#define LIST_APPEND 145
 #define SETUP_ASYNC_WITH 154
 #define LOAD_METHOD 160
 #define CALL_METHOD 161
+#define LIST_EXTEND 162
 
 #define HAS_ARG(op) ((op) >= HAVE_ARGUMENT)

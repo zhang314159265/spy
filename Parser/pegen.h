@@ -62,6 +62,7 @@ typedef struct {
 // Generated function in parse.c - function definition in python.gram
 void *_PyPegen_parse(Parser *);
 int _PyPegen_fill_token(Parser *p);
+asdl_seq *_PyPegen_singleton_seq(Parser *p, void *a);
 
 void *
 _PyPegen_run_parser(Parser *p) {
@@ -283,7 +284,7 @@ void *_PyPegen_string_token(Parser *p) {
 asdl_seq *_PyPegen_seq_insert_in_front(Parser *p, void *a, asdl_seq *seq) {
 	assert(a);
 	if (!seq) {
-		assert(false);
+		return _PyPegen_singleton_seq(p, a);
 	}
 	asdl_seq *new_seq = (asdl_seq*) _Py_asdl_generic_seq_new(asdl_seq_LEN(seq) + 1, p->arena);
 	if (!new_seq) {
@@ -602,6 +603,15 @@ _PyPegen_get_exprs(Parser *p, asdl_seq *seq) {
 		asdl_seq_SET(new_seq, i, pair->expr);
 	}
 	return new_seq;
+}
+
+arguments_ty
+_PyPegen_empty_arguments(Parser *p) {
+	asdl_arg_seq *posargs = _Py_asdl_arg_seq_new(0, p->arena);
+	if (!posargs) {
+		return NULL;
+	}
+	return _PyAST_arguments(posargs);
 }
 
 #endif

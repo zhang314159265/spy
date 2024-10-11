@@ -37,7 +37,7 @@ function_def[stmt_ty]:
 function_def_raw[stmt_ty]:
 	| 'def' n=NAME '(' params=[params] ')' ':' b=block {
 			_PyAST_FunctionDef(n->v.Name.id,
-				params, b, NULL, NULL)
+				(params) ? params : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, NULL, NULL)
 	}
 
 block[asdl_stmt_seq*] (memo):
@@ -105,11 +105,17 @@ sum[expr_ty]:
 	| term
 
 term[expr_ty]:
+	| a=term '*' b=factor { _PyAST_BinOp(a, Mult, b) }
 	| a=term '%' b=factor { _PyAST_BinOp(a, Mod, b) }
 	| a=term '/' b=factor { _PyAST_BinOp(a, Div, b) }
+	| a=term '//' b=factor { _PyAST_BinOp(a, FloorDiv, b) }
 	| factor
 
 factor[expr_ty] (memo):
+	| power
+
+power[expr_ty]:
+	| a=primary '**' b=factor { _PyAST_BinOp(a, Pow, b) }
 	| primary
 
 assignment[stmt_ty]:
@@ -155,8 +161,22 @@ atom[expr_ty]:
 	| 'True' { _PyAST_Constant(Py_True) }
 	| NUMBER
 	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
-	| &'(' group
+	| &'(' (tuple | group)
+	| &'[' list
+
+list[expr_ty]:
+	| '[' a=[star_named_expressions] ']' { _PyAST_List(a, Load) }
 
 group[expr_ty]:
 	| '(' a=named_expression ')' { a }
 
+tuple[expr_ty]:
+	| '(' a=[y=star_named_expression ',' z=[star_named_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
+		_PyAST_Tuple(a, Load)
+	}
+
+star_named_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=','.star_named_expression+ [','] { a}
+
+star_named_expression[expr_ty]:
+	| '*' a=bitwise_or { (assert(false), NULL) }
+	| named_expression
