@@ -9,11 +9,12 @@
 #include "pymem.h"
 #include "object.h"
 #include "bytesobject.h"
+#include "floatobject.h"
 #include "Parser/tokenizer.h"
 
 #include "Python/Python-ast.h"
 
-#if 0
+#if 1
 // trigger debug messages in Parser/parser.c
 #define Py_DEBUG
 #define Py_BUILD_CORE
@@ -454,6 +455,7 @@ static PyObject *
 parsenumber_raw(const char *s) {
 	const char *end;
 	long x;
+	double dx;
 	int imflag;
 
 	assert(s != NULL);
@@ -468,7 +470,13 @@ parsenumber_raw(const char *s) {
 	if (*end == '\0') {
 		return PyLong_FromLong(x);
 	}
-	assert(false);
+	if (imflag) {
+		assert(false);
+	}
+
+	dx = strtod(s, NULL);
+	// printf("parsenumber_raw got double value %lf\n", dx);
+	return PyFloat_FromDouble(dx);
 }
 
 static PyObject *

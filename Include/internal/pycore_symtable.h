@@ -613,6 +613,15 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
 		if (s->v.If.orelse)
 			VISIT_SEQ(st, stmt, s->v.If.orelse);
 		break;
+	case While_kind:
+		VISIT(st, expr, s->v.While.test);
+		VISIT_SEQ(st, stmt, s->v.While.body);
+		if (s->v.While.orelse)
+			VISIT_SEQ(st, stmt, s->v.While.orelse);
+		break;
+	case Break_kind:
+		/* nothing to do here */
+		break;
   default:
     assert(false);
   }

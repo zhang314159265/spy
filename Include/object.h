@@ -35,6 +35,7 @@ typedef struct _object {
 	PyTypeObject *ob_type;
 } PyObject;
 
+typedef PyObject *(*unaryfunc)(PyObject *);
 typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
 typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*getiterfunc)(PyObject *);
@@ -50,6 +51,7 @@ typedef PyObject *(*getattrofunc)(PyObject *, PyObject *);
 typedef PyObject *(*getattrfunc)(PyObject *, char *);
 typedef Py_ssize_t (*lenfunc)(PyObject *);
 typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
+typedef PyObject *(*reprfunc)(PyObject *);
 
 typedef struct {
 	PyObject ob_base;
@@ -309,5 +311,7 @@ int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method);
 int Py_Is(PyObject *x, PyObject *y) {
 	return x == y;
 }
+
+PyObject *PyObject_Str(PyObject *v);
 
 #endif

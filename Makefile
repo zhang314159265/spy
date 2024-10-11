@@ -6,8 +6,8 @@ else
 PREFIX :=
 endif
 
-TUTOR=tutor/sum.py
 TUTOR=tutor/sum_odd.py
+TUTOR=tutor/sqrt.py
 
 first: mine
 # first: pegen

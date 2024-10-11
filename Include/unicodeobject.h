@@ -433,3 +433,40 @@ _PyUnicodeWriter_PrepareInternal(_PyUnicodeWriter *writer,
   _PyUnicodeWriter_Update(writer);
   return 0;
 }
+
+PyObject *_PyUnicode_FromASCII(const char *buffer, Py_ssize_t size) {
+  const unsigned char *s = (const unsigned char *) buffer;
+  PyObject *unicode;
+  if (size == 1) {
+    assert(false);
+  }
+  unicode = PyUnicode_New(size, 127);
+  if (!unicode)
+    return NULL;
+  memcpy(PyUnicode_1BYTE_DATA(unicode), s, size);
+  return unicode;
+}
+
+void _PyUnicode_FastCopyCharacters(
+		PyObject *to, Py_ssize_t to_start,
+		PyObject *from, Py_ssize_t from_start, Py_ssize_t how_many);
+
+int _PyUnicodeWriter_WriteStr(_PyUnicodeWriter *writer, PyObject *str) {
+  Py_UCS4 maxchar;
+  Py_ssize_t len;
+
+  if (PyUnicode_READY(str) == -1)
+    return -1;
+  len = PyUnicode_GET_LENGTH(str);
+  if (len == 0)
+    return 0;
+
+  maxchar = PyUnicode_MAX_CHAR_VALUE(str);
+  if (maxchar > writer->maxchar || len > writer->size - writer->pos) {
+    assert(false);
+  }
+  _PyUnicode_FastCopyCharacters(writer->buffer, writer->pos,
+      str, 0, len);
+  writer->pos += len;
+  return 0;
+}

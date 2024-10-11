@@ -15,6 +15,9 @@
 #define COLON 11
 #define COMMA 12
 #define PLUS 14
+#define MINUS 15
+#define SLASH 17
+#define LESS 20
 #define EQUAL 22
 #define DOT 23
 #define PERCENT 24
@@ -51,6 +54,9 @@ PyToken_OneChar(int c1) {
 	case ':': return COLON;
 	case '=': return EQUAL;
 	case ',': return COMMA;
+	case '/': return SLASH;
+	case '-': return MINUS;
+	case '<': return LESS;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;

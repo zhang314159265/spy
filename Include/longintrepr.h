@@ -29,6 +29,7 @@ static PyObject *long_add(PyLongObject *a, PyLongObject *b);
 static PyObject *long_sub(PyLongObject *a, PyLongObject *b);
 static PyObject *long_div(PyObject *a, PyObject *b);
 static PyObject *long_mod(PyObject *a, PyObject *b);
+static PyObject *long_true_divide(PyObject *v, PyObject *w);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -36,6 +37,7 @@ static PyNumberMethods long_as_number = {
   .nb_subtract = (binaryfunc) long_sub,
   .nb_floor_divide = long_div,
   .nb_remainder = long_mod,
+  .nb_true_divide = long_true_divide,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -266,4 +268,9 @@ static PyObject *long_mod(PyObject *a, PyObject *b) {
     mod = NULL;
   }
   return (PyObject *) mod;
+}
+
+static PyObject *long_true_divide(PyObject *v, PyObject *w) {
+  CHECK_BINOP(v, w);
+  assert(false);
 }

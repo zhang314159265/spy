@@ -275,3 +275,34 @@ int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
   }
   assert(false);
 }
+
+PyObject *
+PyObject_Repr(PyObject *v) {
+  PyObject *res;
+  assert(v != NULL);
+  if (Py_TYPE(v)->tp_repr == NULL) {
+    assert(false);
+  }
+  res = (*Py_TYPE(v)->tp_repr)(v);
+
+  if (res == NULL) {
+    return NULL;
+  }
+  if (!PyUnicode_Check(res)) {
+    assert(false);
+  }
+  return res;
+}
+
+PyObject *PyObject_Str(PyObject *v) {
+  PyObject *res;
+  assert(v != NULL);
+
+  if (PyUnicode_CheckExact(v)) {
+    assert(false);
+  }
+  if (Py_TYPE(v)->tp_str == NULL) {
+    return PyObject_Repr(v);
+  }
+  assert(false);
+}

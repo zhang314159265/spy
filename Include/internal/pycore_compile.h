@@ -170,6 +170,7 @@ typedef struct {
 static basicblock *compiler_new_block(struct compiler *c);
 static int compiler_addop_i_line(struct compiler *c, int opcode, Py_ssize_t oparg, int lineno);
 static int compiler_addop_i(struct compiler *c, int opcode, Py_ssize_t oparg);
+static int compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond);
 static PyCodeObject *assemble(struct compiler *c, int addNone);
 
 
@@ -780,6 +781,10 @@ binop(operator_ty op) {
   switch (op) {
   case Add:
     return BINARY_ADD;
+  case Sub:
+    return BINARY_SUBTRACT;
+  case Div:
+    return BINARY_TRUE_DIVIDE;
   case Mod:
     return BINARY_MODULO;
   default:
@@ -792,6 +797,9 @@ static int compiler_addcompare(struct compiler *c, cmpop_ty op) {
   switch (op) {
   case Eq:
     cmp = Py_EQ;
+    break;
+  case Lt:
+    cmp = Py_LT;
     break;
   default:
     assert(false);
@@ -992,6 +1000,11 @@ compiler_unwind_fblock_stack(struct compiler *c, int preserve_tos, struct fblock
   if (c->u->u_nfblocks == 0) {
     return 1;
   }
+  struct fblockinfo *top = &c->u->u_fblock[c->u->u_nfblocks - 1];
+  if (loop != NULL && (top->fb_type == WHILE_LOOP || top->fb_type == FOR_LOOP)) {
+    *loop = top;
+    return 1;
+  }
   assert(false);
 }
 
@@ -1136,6 +1149,12 @@ compiler_for(struct compiler *c, stmt_ty s) {
 static int
 compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond) {
   switch (e->kind) {
+  case UnaryOp_kind:
+    assert(false);
+  case BoolOp_kind:
+    assert(false);
+  case IfExp_kind:
+    assert(false);
   case Compare_kind: {
     Py_ssize_t n = asdl_seq_LEN(e->v.Compare.ops) - 1;
     if (n > 0) {
@@ -1144,7 +1163,7 @@ compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond) {
     break;
   }
   default:
-    assert(false);
+    break;
   }
 
   VISIT(c, expr, e);
@@ -1178,6 +1197,68 @@ compiler_if(struct compiler *c, stmt_ty s) {
 }
 
 static int
+compiler_while(struct compiler *c, stmt_ty s) {
+  basicblock *loop, *body, *end, *anchor = NULL;
+  loop = compiler_new_block(c);
+  body = compiler_new_block(c);
+  anchor = compiler_new_block(c);
+  end = compiler_new_block(c);
+  if (loop == NULL || body == NULL || anchor == NULL || end == NULL) {
+    return 0;
+  }
+  compiler_use_next_block(c, loop);
+  if (!compiler_push_fblock(c, WHILE_LOOP, loop, end, NULL)) {
+    return 0;
+  }
+  if (!compiler_jump_if(c, s->v.While.test, anchor, 0)) {
+    return 0;
+  }
+
+  compiler_use_next_block(c, body);
+  VISIT_SEQ(c, stmt, s->v.While.body);
+  if (!compiler_jump_if(c, s->v.While.test, body, 1)) {
+    return 0;
+  }
+
+  compiler_pop_fblock(c, WHILE_LOOP, loop);
+
+  compiler_use_next_block(c, anchor);
+  if (s->v.While.orelse) {
+    assert(false);
+  }
+  compiler_use_next_block(c, end);
+
+  return 1;
+}
+
+static int compiler_unwind_fblock(struct compiler *c, struct fblockinfo *info, int preserve_tos) {
+  switch (info->fb_type) {
+  case WHILE_LOOP:
+    return 1;
+  default:
+    assert(false);
+  }
+  assert(false);
+}
+
+static int
+compiler_break(struct compiler *c) {
+  struct fblockinfo *loop = NULL;
+  if (!compiler_unwind_fblock_stack(c, 0, &loop)) {
+    return 0;
+  }
+  if (loop == NULL) {
+    assert(false && "break outside loop");
+  }
+  if (!compiler_unwind_fblock(c, loop, 0)) {
+    return 0;
+  }
+  ADDOP_JUMP(c, JUMP_ABSOLUTE, loop->fb_exit);
+  NEXT_BLOCK(c);
+  return 1;
+}
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
 
@@ -1207,6 +1288,10 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
     return compiler_for(c, s);
   case If_kind:
     return compiler_if(c, s);
+  case While_kind:
+    return compiler_while(c, s);
+  case Break_kind:
+    return compiler_break(c);
 	default:
 		assert(false);
 	}

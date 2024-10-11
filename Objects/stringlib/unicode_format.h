@@ -263,6 +263,8 @@ render_field(PyObject *fieldobj, SubString *format_spec, _PyUnicodeWriter *write
 	// call the formatter directly
 	if (PyLong_CheckExact(fieldobj)) {
 		formatter = _PyLong_FormatAdvancedWriter;
+	} else if (PyFloat_CheckExact(fieldobj)) {
+		formatter = _PyFloat_FormatAdvancedWriter;
 	} else {
 		assert(false);
 	}

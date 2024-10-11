@@ -201,6 +201,32 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case JUMP_FORWARD: {
+			JUMPBY(oparg);
+			DISPATCH();
+		}
+		case TARGET(BINARY_SUBTRACT): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *diff = PyNumber_Subtract(left, right);
+			Py_DECREF(right);
+			Py_DECREF(left);
+			SET_TOP(diff);
+			if (diff == NULL)
+				assert(false);
+			DISPATCH();
+		}
+		case TARGET(BINARY_TRUE_DIVIDE): {
+			PyObject *divisor = POP();
+			PyObject *dividend = TOP();
+			PyObject *quotient = PyNumber_TrueDivide(dividend, divisor);
+			Py_DECREF(dividend);
+			Py_DECREF(divisor);
+			SET_TOP(quotient);
+			if (quotient == NULL)
+				assert(false);
+			DISPATCH();
+		}
 		case TARGET(POP_JUMP_IF_FALSE): {
 			PyObject *cond = POP();
 			if (Py_IsTrue(cond)) {
@@ -208,6 +234,19 @@ main_loop:
 				DISPATCH();
 			}
 			if (Py_IsFalse(cond)) {
+				Py_DECREF(cond);
+				JUMPTO(oparg);
+				DISPATCH();
+			}
+			assert(false);
+		}
+		case TARGET(POP_JUMP_IF_TRUE): {
+			PyObject *cond = POP();
+			if (Py_IsFalse(cond)) {
+				Py_DECREF(cond);
+				DISPATCH();
+			}
+			if (Py_IsTrue(cond)) {
 				Py_DECREF(cond);
 				JUMPTO(oparg);
 				DISPATCH();

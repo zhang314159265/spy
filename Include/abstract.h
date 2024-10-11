@@ -17,6 +17,7 @@ PyObject *PyNumber_InPlaceOr(PyObject *o1, PyObject *o2);
 
 static PyObject *
 binary_op1(PyObject *v, PyObject *w, const int op_slot) {
+	// printf("binary_op1, %s v.s. %s\n", Py_TYPE(v)->tp_name, Py_TYPE(w)->tp_name);
 	binaryfunc slotv;
 	if (Py_TYPE(v)->tp_as_number != NULL) {
 		slotv = NB_BINOP(Py_TYPE(v)->tp_as_number, op_slot);
@@ -46,7 +47,15 @@ binary_op1(PyObject *v, PyObject *w, const int op_slot) {
 		}
 		Py_DECREF(x);
 	}
-	assert(false);
+	if (slotw) {
+		PyObject *x = slotw(v, w);
+		assert(x != NULL);
+		if (x != Py_NotImplemented) {
+			return x;
+		}
+		Py_DECREF(x);
+	}
+	Py_RETURN_NOTIMPLEMENTED;
 }
 
 static PyObject *
@@ -267,6 +276,7 @@ static PyObject *
 binary_op(PyObject *v, PyObject *w, const int op_slot, const char *op_name) {
 	PyObject *result = BINARY_OP1(v, w, op_slot, op_name);
 	if (result == Py_NotImplemented) {
+		printf("binary_op op name %s\n", op_name);
 		assert(false);
 	}
 	return result;
@@ -307,4 +317,23 @@ PySequence_GetItem(PyObject *s, Py_ssize_t i) {
 PyObject *
 PyNumber_Remainder(PyObject *v, PyObject *w) {
 	return binary_op(v, w, NB_SLOT(nb_remainder), "%");
+}
+
+PyObject *
+PyNumber_TrueDivide(PyObject *v, PyObject *w) {
+	return binary_op(v, w, NB_SLOT(nb_true_divide), "/");
+}
+
+PyObject *
+PyNumber_Absolute(PyObject *o) {
+	if (o == NULL) {
+		assert(false);
+	}
+	PyNumberMethods *m = Py_TYPE(o)->tp_as_number;
+	if (m && m->nb_absolute) {
+		PyObject *res = m->nb_absolute(o);
+		assert(res != NULL);
+		return res;
+	}
+	assert(false);
 }

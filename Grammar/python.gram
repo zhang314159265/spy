@@ -10,6 +10,10 @@ compound_stmt[stmt_ty]:
 	| &'def' function_def
 	| &'if' if_stmt
 	| &'for' for_stmt
+	| &'while' while_stmt
+
+while_stmt[stmt_ty]:
+	| 'while' a=named_expression ':' b=block c=[else_block] { _PyAST_While(a, b, c) }
 
 if_stmt[stmt_ty]:
 	| 'if' a=named_expression ':' b=block c=[else_block] {
@@ -61,6 +65,7 @@ simple_stmt[stmt_ty] (memo):
 	| assignment
 	| &'return' return_stmt
 	| e=primary { _PyAST_Expr(e) }
+	| 'break' { _PyAST_Break() }
 
 return_stmt[stmt_ty]:
 	| 'return' a=[star_expressions] { _PyAST_Return(a) }
@@ -85,18 +90,23 @@ comparison[expr_ty]:
 
 compare_op_bitwise_or_pair[CmpopExprPair*]:
 	| eq_bitwise_or
+	| lt_bitwise_or
 
 eq_bitwise_or[CmpopExprPair*]: '==' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Eq, a) }
+
+lt_bitwise_or[CmpopExprPair*]: '<' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Lt, a) }
 
 bitwise_or[expr_ty]:
 	| sum
 
 sum[expr_ty]:
 	| a=sum '+' b=term { _PyAST_BinOp(a, Add, b) }
+	| a=sum '-' b=term { _PyAST_BinOp(a, Sub, b) }
 	| term
 
 term[expr_ty]:
 	| a=term '%' b=factor { _PyAST_BinOp(a, Mod, b) }
+	| a=term '/' b=factor { _PyAST_BinOp(a, Div, b) }
 	| factor
 
 factor[expr_ty] (memo):
@@ -142,5 +152,11 @@ arguments[expr_ty]: a[asdl_expr_seq*]=','.expression+ {
 
 atom[expr_ty]:
 	| NAME
+	| 'True' { _PyAST_Constant(Py_True) }
 	| NUMBER
 	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
+	| &'(' group
+
+group[expr_ty]:
+	| '(' a=named_expression ')' { a }
+

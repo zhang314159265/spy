@@ -12,6 +12,8 @@ typedef struct {
   binaryfunc nb_subtract;
   binaryfunc nb_floor_divide;
   binaryfunc nb_remainder;
+  binaryfunc nb_true_divide;
+  unaryfunc nb_absolute;
 } PyNumberMethods;
 
 typedef struct {
@@ -61,6 +63,9 @@ struct _typeobject {
   getattrofunc tp_getattro;
   getattrfunc tp_getattr;
   struct PyMethodDef *tp_methods;
+
+  reprfunc tp_repr;
+  reprfunc tp_str;
 };
 
 // The *real* layout of a type object when allocated on the heap

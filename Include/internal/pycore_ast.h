@@ -16,11 +16,14 @@ typedef struct {
 
 typedef enum _operator {
 	Add=1,
+	Sub=2,
+	Div=5,
 	Mod=6,
 } operator_ty;
 
 typedef enum _cmpop {
 	Eq=1,
+	Lt=3,
 } cmpop_ty;
 
 typedef enum _expr_context { Load=1, Store=2, Del=3} expr_context_ty;
@@ -77,7 +80,10 @@ struct _mod {
 };
 
 enum _expr_kind {
-	BinOp_kind = 3,
+	BoolOp_kind=1,
+	BinOp_kind=3,
+	UnaryOp_kind=4,
+	IfExp_kind=6,
 	Compare_kind=16,
 	Call_kind=17,
 	Constant_kind=20,
@@ -130,13 +136,20 @@ enum _stmt_kind {
 	Assign_kind = 6,
 	AugAssign_kind = 7,
 	For_kind = 9,
+	While_kind = 11,
 	If_kind = 12,
 	Expr_kind = 23,
+	Break_kind = 25,
 };
 
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+		struct {
+			expr_ty test;
+			asdl_stmt_seq *body;
+			asdl_stmt_seq *orelse;
+		} While;
 		struct {
 			expr_ty test;
 			asdl_stmt_seq *body;
@@ -230,6 +243,7 @@ _PyAST_Module(asdl_stmt_seq *body, asdl_type_ignore_seq *type_ignores,
 	return p;
 }
 
+// defined in cpy/Python/Python-ast.c
 expr_ty
 _PyAST_Constant(constant value) {
 	expr_ty p;
@@ -239,6 +253,22 @@ _PyAST_Constant(constant value) {
 	p->kind = Constant_kind;
 	p->v.Constant.value = value;
 	return p;
+}
+
+stmt_ty _PyAST_While(expr_ty test, asdl_stmt_seq *body, asdl_stmt_seq *orelse) {
+	stmt_ty p;
+	if (!test) {
+		assert(false);
+	}
+	p = (stmt_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = While_kind;
+	p->v.While.test = test;
+	p->v.While.body = body;
+	p->v.While.orelse = orelse;
+	return p;
+	assert(false);
 }
 
 #endif

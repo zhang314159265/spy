@@ -35,6 +35,9 @@ void dump_cmpop_seq(asdl_int_seq *cmpop_seq, int indent) {
 		case Eq:
 			fprintf(stderr, "==\n");
 			break;
+		case Lt:
+			fprintf(stderr, "<\n");
+			break;
 		default:
 			assert(false);
 		}
@@ -69,8 +72,12 @@ void dump_operator_ty(operator_ty op, int indent) {
 	switch (op) {
 	case Add:
 		fprintf(stderr, "+\n"); break;
+	case Sub:
+		fprintf(stderr, "-\n"); break;
 	case Mod:
 		fprintf(stderr, "%%\n"); break;
+	case Div:
+		fprintf(stderr, "/\n"); break;
 	default:
 		assert(false);
 	}
@@ -90,17 +97,24 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr_seq(expr->v.Call.args, indent + 2);
 		dump_keyword_seq(expr->v.Call.keywords, indent + 2);
 		break;
-	case Constant_kind:
+	case Constant_kind: {
+		PyObject *o = expr->v.Constant.value;
 		fprintf(stderr, "Constant: ");
 		// only support string constant now
 		if (PyUnicode_CheckExact(expr->v.Constant.value)) {
 			fprintf(stderr, "'%s'\n", (char *) PyUnicode_DATA(expr->v.Constant.value));
 		} else if (PyLong_Check(expr->v.Constant.value)) {
 			fprintf(stderr, "%ld\n", PyLong_AsLong(expr->v.Constant.value));
+		} else if (Py_IsTrue(expr->v.Constant.value)) {
+			fprintf(stderr, "True\n");
+		} else if (PyFloat_CheckExact(expr->v.Constant.value)) {
+			fprintf(stderr, "%lf\n", ((PyFloatObject *) o)->ob_fval);
 		} else {
+			printf("Unhandled constant type %s\n", Py_TYPE(expr->v.Constant.value)->tp_name);
 			assert(false);
 		}
 		break;
+	}
 	case BinOp_kind:
 		fprintf(stderr, "BinOp:\n");
 		dump_expr(expr->v.BinOp.left, indent + 2);
@@ -175,7 +189,17 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		dump_stmt_seq(stmt->v.If.body, indent + 2);
 		dump_stmt_seq(stmt->v.If.orelse, indent + 2);
 		break;
+	case While_kind:
+		fprintf(stderr, "While:\n");
+		dump_expr(stmt->v.While.test, indent + 2);
+		dump_stmt_seq(stmt->v.While.body, indent + 2);
+		dump_stmt_seq(stmt->v.While.orelse, indent + 2);
+		break;
+	case Break_kind:
+		fprintf(stderr, "Break\n");
+		break;
 	default:
+		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);
 		assert(false && "dump_stmt");
 	}
 }

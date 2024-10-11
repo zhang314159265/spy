@@ -4,6 +4,8 @@
 #include "modsupport.h"
 #include "rangeobject.h"
 
+#include "Python/clinic/bltinmodule.c.h"
+
 PyDoc_STRVAR(print_doc,
 "print...");
 
@@ -50,8 +52,11 @@ builtin_print(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 	#endif
 }
 
+static PyObject *builtin_abs(PyObject *module, PyObject *x);
+
 static PyMethodDef builtin_methods[] = {
 	{"print", (PyCFunction)(void(*)(void))builtin_print, METH_FASTCALL | METH_KEYWORDS, print_doc },
+	BUILTIN_ABS_METHODDEF
 	{NULL, NULL},
 };
 
@@ -90,4 +95,9 @@ _PyBuiltin_Init(PyInterpreterState *interp)
 	return mod;
 #undef ADD_TO_ALL
 #undef SETBUILTIN
+}
+
+static PyObject *
+builtin_abs(PyObject *module, PyObject *x) {
+	return PyNumber_Absolute(x);
 }

@@ -38,3 +38,9 @@ _Py_HashPointer(const void *p) {
 	}
 	return x;
 }
+
+Py_hash_t
+_Py_HashDouble(PyObject *inst, double v) {
+	// TODO follow cpy
+	return _Py_HashBytes(&v, sizeof(double));
+}

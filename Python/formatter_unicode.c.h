@@ -13,3 +13,24 @@ int _PyLong_FormatAdvancedWriter(_PyUnicodeWriter *writer,
 	}
 	assert(false);
 }
+
+static int
+format_obj(PyObject *obj, _PyUnicodeWriter *writer) {
+	PyObject *str;
+	int err;
+
+	str = PyObject_Str(obj);
+	if (str == NULL)
+		return -1;
+
+	err = _PyUnicodeWriter_WriteStr(writer, str);
+	Py_DECREF(str);
+	return err;
+}
+
+int _PyFloat_FormatAdvancedWriter(_PyUnicodeWriter *writer,
+		PyObject *obj, PyObject *format_spec, Py_ssize_t start, Py_ssize_t end) {
+	if (start == end)
+		return format_obj(obj, writer);
+	assert(false);
+}

@@ -75,6 +75,22 @@ cfunction_vectorcall_FASTCALL_KEYWORDS(
 	return result;
 }
 
+static PyObject *
+cfunction_vectorcall_O(
+		PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+	PyThreadState *tstate = _PyThreadState_GET();
+	Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+	if (nargs != 1) {
+		assert(false);
+	}
+	PyCFunction meth = (PyCFunction) cfunction_enter_call(tstate, func);
+	if (meth == NULL) {
+		return NULL;
+	}
+	PyObject *result = meth(PyCFunction_GET_SELF(func), args[0]);
+	return result;
+}
+
 PyObject *
 PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *cls) {
 	vectorcallfunc vectorcall;
@@ -83,6 +99,9 @@ PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *c
 			METH_O | METH_KEYWORDS | METH_METHOD)) {
 	case METH_FASTCALL | METH_KEYWORDS:
 		vectorcall = cfunction_vectorcall_FASTCALL_KEYWORDS;
+		break;
+	case METH_O:
+		vectorcall = cfunction_vectorcall_O;
 		break;
 	default:
 		assert(false);

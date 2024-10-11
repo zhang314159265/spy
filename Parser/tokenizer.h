@@ -368,12 +368,32 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 				assert(false);
 			}
 			{
-				// accept floatign point numbers
+				// accept floating point numbers
 				if (c == '.') {
-					assert(false);
+					c = tok_nextc(tok);
+				fraction:
+					if (isdigit(c)) {
+						c = tok_decimal_tail(tok);
+						if (c == 0) {
+							assert(false);
+						}
+					}
 				}
 				if (c == 'e' || c == 'E') {
-					assert(false);
+				exponent:
+					c = tok_nextc(tok);
+					if (c == '+' || c == '-') {
+						c = tok_nextc(tok);
+						if (!isdigit(c)) {
+							assert(false);
+						}
+					} else if (!isdigit(c)) {
+						assert(false);
+					}
+					c = tok_decimal_tail(tok);
+					if (c == 0) {
+						assert(false);
+					}
 				}
 				if (c == 'j' || c == 'J') {
 					assert(false);
@@ -427,7 +447,7 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 int
 PyTokenizer_Get(struct tok_state *tok, const char **p_start, const char **p_end) {
 	int result = tok_get(tok, p_start, p_end);
-	#if 0
+	#if 1
 	printf("PyTokenizer_Get got: %d ('%c') ", result, (char) result);
 	if (p_start) {
 		printf("%.*s", (int) (*p_end - *p_start), *p_start);

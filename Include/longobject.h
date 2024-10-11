@@ -305,3 +305,17 @@ _PyLong_FormatWriter(_PyUnicodeWriter *writer,
 	else
 		assert(false);
 }
+
+double PyLong_AsDouble(PyObject *v) {
+	if (v == NULL) {
+		assert(false);
+	}
+
+	if (!PyLong_Check(v)) {
+		assert(false);
+	}
+	if (Py_ABS(Py_SIZE(v)) <= 1) {
+		return (double) MEDIUM_VALUE((PyLongObject *) v);
+	}
+	assert(false);
+}

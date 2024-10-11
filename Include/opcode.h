@@ -6,6 +6,8 @@
 #define DUP_TOP 4
 #define BINARY_MODULO 22
 #define BINARY_ADD 23
+#define BINARY_SUBTRACT 24
+#define BINARY_TRUE_DIVIDE 27
 #define INPLACE_ADD 55
 #define GET_ITER 68
 #define RETURN_VALUE 83

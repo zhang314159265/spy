@@ -198,3 +198,13 @@ _PyAST_If(expr_ty test, asdl_stmt_seq *body, asdl_stmt_seq *orelse) {
 	p->v.If.orelse = orelse;
 	return p;
 }
+
+stmt_ty
+_PyAST_Break() {
+	stmt_ty p;
+	p = (stmt_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Break_kind;
+	return p;
+}
