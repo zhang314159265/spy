@@ -6,8 +6,8 @@ else
 PREFIX :=
 endif
 
-# TUTOR=tutor/print.py
 TUTOR=tutor/sum.py
+TUTOR=tutor/sum_odd.py
 
 first: mine
 # first: pegen
@@ -22,6 +22,6 @@ pegen:
 	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python.exe -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
 CFLAGS := -IInclude -I.
-mine: # pegen
+mine: pegen
 	gcc -g main.c $(CFLAGS)
 	$(PREFIX) ./a.out $(TUTOR)

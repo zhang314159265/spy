@@ -28,12 +28,14 @@ static PyObject *long_richcompare(PyObject *self, PyObject *other, int op);
 static PyObject *long_add(PyLongObject *a, PyLongObject *b);
 static PyObject *long_sub(PyLongObject *a, PyLongObject *b);
 static PyObject *long_div(PyObject *a, PyObject *b);
+static PyObject *long_mod(PyObject *a, PyObject *b);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
   .nb_add = (binaryfunc) long_add,
   .nb_subtract = (binaryfunc) long_sub,
   .nb_floor_divide = long_div,
+  .nb_remainder = long_mod,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -170,4 +172,98 @@ static PyObject *long_div(PyObject *a, PyObject *b) {
     return fast_floor_div((PyLongObject *) a, (PyLongObject *) b);
   }
   assert(false);
+}
+
+static PyObject *
+long_long(PyObject *v) {
+  if (PyLong_CheckExact(v))
+    Py_INCREF(v);
+  else
+    assert(false);
+  return v;
+}
+
+static inline PyObject *_PyLong_GetZero(void);
+
+static int
+long_divrem(PyLongObject *a, PyLongObject *b, PyLongObject **pdiv, PyLongObject **prem) {
+  Py_ssize_t size_a = Py_ABS(Py_SIZE(a)), size_b = Py_ABS(Py_SIZE(b));
+
+  if (size_b == 0) {
+    // div by 0
+    assert(false);
+  }
+
+  if (size_a < size_b ||
+      (size_a == size_b &&
+        a->ob_digit[size_a - 1] < b->ob_digit[size_b - 1])) {
+    // |a| < |b|
+    *prem = (PyLongObject *) long_long((PyObject *) a);
+    if (*prem == NULL) {
+      return -1;
+    }
+    PyObject *zero = _PyLong_GetZero();
+    Py_INCREF(zero);
+    *pdiv = (PyLongObject *) zero;
+    return 0;
+  }
+  assert(false);
+}
+
+static int
+l_divmod(PyLongObject *v, PyLongObject *w,
+    PyLongObject **pdiv, PyLongObject **pmod) {
+  PyLongObject *div, *mod;
+  if (Py_ABS(Py_SIZE(v)) == 1 && Py_ABS(Py_SIZE(w)) == 1) {
+    assert(false);
+  }
+  if (long_divrem(v, w, &div, &mod) < 0)
+    return -1;
+  if ((Py_SIZE(mod) < 0 && Py_SIZE(w) > 0) ||
+      (Py_SIZE(mod) > 0 && Py_SIZE(w) < 0)) {
+    assert(false);
+  }
+  if (pdiv != NULL)
+    *pdiv = div;
+  else
+    Py_DECREF(div);
+
+  if (pmod != NULL)
+    *pmod = mod;
+  else
+    Py_DECREF(mod);
+
+  return 0;
+}
+
+static PyObject *
+fast_mod(PyLongObject *a, PyLongObject *b) {
+  sdigit left = a->ob_digit[0];
+  sdigit right = b->ob_digit[0];
+  sdigit mod;
+
+  assert(Py_ABS(Py_SIZE(a)) == 1);
+  assert(Py_ABS(Py_SIZE(b)) == 1);
+
+  if (Py_SIZE(a) == Py_SIZE(b)) {
+    mod = left % right;
+  } else {
+    assert(false);
+  }
+  
+  return PyLong_FromLong(mod * (sdigit) Py_SIZE(b));
+}
+
+static PyObject *long_mod(PyObject *a, PyObject *b) {
+  PyLongObject *mod;
+
+  // printf("abs size for mod: %d v.s. %d\n", Py_ABS(Py_SIZE(a)), Py_ABS(Py_SIZE(b)));
+  if (Py_ABS(Py_SIZE(a)) == 1 && Py_ABS(Py_SIZE(b)) == 1) {
+    return fast_mod((PyLongObject *) a, (PyLongObject *) b);
+  }
+
+  if (l_divmod((PyLongObject *) a, (PyLongObject *) b, NULL, &mod) < 0) {
+    mod = NULL;
+  }
+  return (PyObject *) mod;
 }

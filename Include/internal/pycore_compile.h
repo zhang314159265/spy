@@ -21,6 +21,11 @@ PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
     return 0; \
 }
 
+#define ADDOP_COMPARE(C, CMP) { \
+  if (!compiler_addcompare((C), (cmpop_ty) (CMP))) \
+    return 0; \
+}
+
 #define ADDOP_LOAD_CONST(C, O) { \
 	if (!compiler_addop_load_const((C), (O))) \
 		return 0; \
@@ -215,6 +220,11 @@ astfold_stmt(stmt_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
 	case Expr_kind:
 		CALL(astfold_expr, expr_ty, node_->v.Expr.value);
 		break;
+  case If_kind:
+    assert(false);
+  case For_kind:
+    // TODO follow cpy
+    break;
 	default:
 		fprintf(stderr, "stmt kind %d\n", node_->kind);
 		assert(false);
@@ -770,9 +780,41 @@ binop(operator_ty op) {
   switch (op) {
   case Add:
     return BINARY_ADD;
+  case Mod:
+    return BINARY_MODULO;
   default:
     assert(false);
   }
+}
+
+static int compiler_addcompare(struct compiler *c, cmpop_ty op) {
+  int cmp;
+  switch (op) {
+  case Eq:
+    cmp = Py_EQ;
+    break;
+  default:
+    assert(false);
+  }
+  ADDOP_I(c, COMPARE_OP, cmp);
+  return 1;
+}
+
+static int
+compiler_compare(struct compiler *c, expr_ty e) {
+  Py_ssize_t n;
+
+  VISIT(c, expr, e->v.Compare.left);
+  assert(asdl_seq_LEN(e->v.Compare.ops) > 0);
+  n = asdl_seq_LEN(e->v.Compare.ops) - 1;
+
+  if (n == 0) {
+    VISIT(c, expr, (expr_ty) asdl_seq_GET(e->v.Compare.comparators, 0));
+    ADDOP_COMPARE(c, asdl_seq_GET(e->v.Compare.ops, 0));
+  } else {
+    assert(false);
+  }
+  return 1;
 }
 
 static int
@@ -803,6 +845,8 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
       assert(false);
     }
     break;
+  case Compare_kind:
+    return compiler_compare(c, e);
 	default:
 		assert(false);
 	}
@@ -1090,6 +1134,50 @@ compiler_for(struct compiler *c, stmt_ty s) {
 }
 
 static int
+compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond) {
+  switch (e->kind) {
+  case Compare_kind: {
+    Py_ssize_t n = asdl_seq_LEN(e->v.Compare.ops) - 1;
+    if (n > 0) {
+      assert(false);
+    }
+    break;
+  }
+  default:
+    assert(false);
+  }
+
+  VISIT(c, expr, e);
+  ADDOP_JUMP(c, cond ? POP_JUMP_IF_TRUE : POP_JUMP_IF_FALSE, next);
+  NEXT_BLOCK(c);
+  return 1;
+}
+
+static int
+compiler_if(struct compiler *c, stmt_ty s) {
+  basicblock *end, *next;
+  assert(s->kind == If_kind);
+  end = compiler_new_block(c);
+  if (end == NULL) {
+    return 0;
+  }
+  if (asdl_seq_LEN(s->v.If.orelse)) {
+    assert(false);
+  } else {
+    next = end;
+  }
+  if (!compiler_jump_if(c, s->v.If.test, next, 0)) {
+    return 0;
+  }
+  VISIT_SEQ(c, stmt, s->v.If.body);
+  if (asdl_seq_LEN(s->v.If.orelse)) {
+    assert(false);
+  }
+  compiler_use_next_block(c, end);
+  return 1;
+}
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
 
@@ -1117,6 +1205,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
     return compiler_return(c, s);
   case For_kind:
     return compiler_for(c, s);
+  case If_kind:
+    return compiler_if(c, s);
 	default:
 		assert(false);
 	}

@@ -201,6 +201,47 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(POP_JUMP_IF_FALSE): {
+			PyObject *cond = POP();
+			if (Py_IsTrue(cond)) {
+				Py_DECREF(cond);
+				DISPATCH();
+			}
+			if (Py_IsFalse(cond)) {
+				Py_DECREF(cond);
+				JUMPTO(oparg);
+				DISPATCH();
+			}
+			assert(false);
+		}
+		case TARGET(COMPARE_OP): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyObject_RichCompare(left, right, oparg);
+			SET_TOP(res);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			if (res == NULL)
+				assert(false);
+			DISPATCH();
+		}
+		case TARGET(BINARY_MODULO): {
+			PyObject *divisor = POP();
+			PyObject *dividend = TOP();
+			PyObject *res;
+			if (PyUnicode_CheckExact(dividend) && (
+				!PyUnicode_Check(divisor) || PyUnicode_CheckExact(divisor))) {
+				assert(false);
+			} else {
+				res = PyNumber_Remainder(dividend, divisor);
+			}
+			Py_DECREF(divisor);
+			Py_DECREF(dividend);
+			SET_TOP(res);
+			if (res == NULL)
+				assert(false);
+			DISPATCH();
+		}
 		case TARGET(CALL_METHOD): {
 			PyObject **sp, *res, *meth;
 

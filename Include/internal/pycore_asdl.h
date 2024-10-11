@@ -10,10 +10,6 @@ typedef PyObject *string;
 typedef PyObject *object;
 typedef PyObject *constant;
 
-#define _ASDL_SEQ_HEAD \
-	Py_ssize_t size; \
-	void **elements;
-
 typedef struct {
 	_ASDL_SEQ_HEAD
 } asdl_seq;
@@ -38,12 +34,20 @@ asdl_ ## NAME ## _seq *_Py_asdl_ ## NAME ## _seq_new(Py_ssize_t size, PyArena *a
 	return seq; \
 }
 
-GENERATE_ASDL_SEQ_CONSTRUCTOR(generic, void*);
-
 #define asdl_seq_SET_UNTYPED(S, I, V) (S)->elements[I] = (V)
 
 #define asdl_seq_LEN(S) ((S) == NULL ? 0 : (S)->size)
 #define asdl_seq_GET_UNTYPED(S, I) (S)->elements[(I)]
 #define asdl_seq_GET(S, I) (S)->typed_elements[(I)]
+#define asdl_seq_SET(S, I, V) (S)->typed_elements[I] = (V)
+
+typedef struct {
+	_ASDL_SEQ_HEAD
+	int typed_elements[1];
+} asdl_int_seq;
+
+GENERATE_ASDL_SEQ_CONSTRUCTOR(generic, void*);
+GENERATE_ASDL_SEQ_CONSTRUCTOR(int, int);
+GENERATE_ASDL_SEQ_CONSTRUCTOR(expr, expr_ty)
 
 #endif

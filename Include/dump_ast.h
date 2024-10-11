@@ -25,6 +25,22 @@ void dump_expr_seq(asdl_expr_seq *expr_seq, int indent) {
 	}
 }
 
+void dump_cmpop_seq(asdl_int_seq *cmpop_seq, int indent) {
+	int l = asdl_seq_LEN(cmpop_seq);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "cmpop seq %d/%d: ", i + 1, l);
+		int cmpop = (int) (long) asdl_seq_GET_UNTYPED(cmpop_seq, i);
+		switch (cmpop) {
+		case Eq:
+			fprintf(stderr, "==\n");
+			break;
+		default:
+			assert(false);
+		}
+	}
+}
+
 void dump_identifier(identifier id, int indent) {
 	assert(PyUnicode_Check(id));
 	assert(PyUnicode_KIND(id) == PyUnicode_1BYTE_KIND);
@@ -53,6 +69,8 @@ void dump_operator_ty(operator_ty op, int indent) {
 	switch (op) {
 	case Add:
 		fprintf(stderr, "+\n"); break;
+	case Mod:
+		fprintf(stderr, "%%\n"); break;
 	default:
 		assert(false);
 	}
@@ -93,6 +111,12 @@ void dump_expr(expr_ty expr, int indent) {
 		fprintf(stderr, "Attribute %s:\n", (char *) PyUnicode_DATA(expr->v.Attribute.attr));
 		dump_expr(expr->v.Attribute.value, indent + 2);
 		dump_expr_context(expr->v.Attribute.ctx, indent + 2);
+		break;
+	case Compare_kind:
+		fprintf(stderr, "Compare:\n");
+		dump_expr(expr->v.Compare.left, indent + 2);
+		dump_cmpop_seq(expr->v.Compare.ops, indent + 2);
+		dump_expr_seq(expr->v.Compare.comparators, indent + 2);
 		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
@@ -144,6 +168,12 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		dump_expr(stmt->v.For.iter, indent + 2);
 		dump_stmt_seq(stmt->v.For.body, indent + 2);
 		assert(!stmt->v.For.orelse);
+		break;
+	case If_kind:
+		fprintf(stderr, "If:\n");
+		dump_expr(stmt->v.If.test, indent + 2);
+		dump_stmt_seq(stmt->v.If.body, indent + 2);
+		dump_stmt_seq(stmt->v.If.orelse, indent + 2);
 		break;
 	default:
 		assert(false && "dump_stmt");

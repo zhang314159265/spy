@@ -17,6 +17,8 @@
 #define PLUS 14
 #define EQUAL 22
 #define DOT 23
+#define PERCENT 24
+#define EQEQUAL 27
 #define PLUSEQUAL 36
 #define OP 54
 #define TYPE_IGNORE 57
@@ -42,6 +44,7 @@ const char *_get_token_name(int tok) {
 int
 PyToken_OneChar(int c1) {
 	switch (c1) {
+	case '%': return PERCENT;
 	case '+': return PLUS;
 	case '(': return LPAR;
 	case ')': return RPAR;
@@ -58,6 +61,11 @@ int PyToken_TwoChars(int c1, int c2) {
 	case '+':
 		switch (c2) {
 		case '=': return PLUSEQUAL;
+		}
+		break;
+	case '=':
+		switch (c2) {
+		case '=': return EQEQUAL;
 		}
 		break;
 	}

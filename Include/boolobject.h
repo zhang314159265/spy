@@ -38,3 +38,6 @@ PyObject *PyBool_FromLong(long ok) {
   Py_INCREF(result);
   return result;
 }
+
+#define Py_IsTrue(x) Py_Is((x), Py_True)
+#define Py_IsFalse(x) Py_Is((x), Py_False)

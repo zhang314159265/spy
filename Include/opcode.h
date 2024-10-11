@@ -4,6 +4,7 @@
 
 #define POP_TOP 1
 #define DUP_TOP 4
+#define BINARY_MODULO 22
 #define BINARY_ADD 23
 #define INPLACE_ADD 55
 #define GET_ITER 68
@@ -17,6 +18,7 @@
 #define LOAD_CONST 100
 #define LOAD_NAME 101
 #define LOAD_ATTR 106
+#define COMPARE_OP 107
 #define JUMP_FORWARD 110
 #define JUMP_IF_FALSE_OR_POP 111
 #define JUMP_IF_TRUE_OR_POP 112

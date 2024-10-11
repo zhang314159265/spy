@@ -306,4 +306,8 @@ PyCallable_Check(PyObject *x) {
 PyObject *PyObject_GenericGetAttr(PyObject *obj, PyObject *name);
 int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method);
 
+int Py_Is(PyObject *x, PyObject *y) {
+	return x == y;
+}
+
 #endif

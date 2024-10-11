@@ -529,6 +529,10 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 	case Attribute_kind:
 		VISIT(st, expr, e->v.Attribute.value);
 		break;
+	case Compare_kind:
+		VISIT(st, expr, e->v.Compare.left);
+		VISIT_SEQ(st, expr, e->v.Compare.comparators);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);
@@ -602,6 +606,12 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
 		if (s->v.For.orelse) {
 			assert(false);
 		}
+		break;
+	case If_kind:
+		VISIT(st, expr, s->v.If.test);
+		VISIT_SEQ(st, stmt, s->v.If.body);
+		if (s->v.If.orelse)
+			VISIT_SEQ(st, stmt, s->v.If.orelse);
 		break;
   default:
     assert(false);

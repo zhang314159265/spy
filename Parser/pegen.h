@@ -532,4 +532,68 @@ _PyPegen_augoperator(Parser *p, operator_ty kind) {
 	return a;
 }
 
+Token *
+_PyPegen_expect_forced_token(Parser *p, int type, const char *expected) {
+	assert(false);
+}
+
+typedef struct {
+	cmpop_ty cmpop;
+	expr_ty expr;
+} CmpopExprPair;
+
+CmpopExprPair *
+_PyPegen_cmpop_expr_pair(Parser *p, cmpop_ty cmpop, expr_ty expr) {
+	assert(expr != NULL);
+	CmpopExprPair *a = malloc(sizeof(CmpopExprPair));
+	if (!a) {
+		return NULL;
+	}
+	a->cmpop = cmpop;
+	a->expr = expr;
+	return a;
+}
+
+void *
+CHECK_CALL(Parser *p, void *result) {
+	if (result == NULL) {
+		assert(false);
+	}
+	return result;
+}
+
+#define CHECK(type, result) ((type) CHECK_CALL(p, result))
+
+asdl_int_seq *
+_PyPegen_get_cmpops(Parser *p, asdl_seq *seq) {
+	Py_ssize_t len = asdl_seq_LEN(seq);
+	assert(len > 0);
+
+	asdl_int_seq *new_seq = _Py_asdl_int_seq_new(len, p->arena);
+	if (!new_seq) {
+		return NULL;
+	}
+	for (Py_ssize_t i = 0; i < len; i++) {
+		CmpopExprPair *pair = asdl_seq_GET_UNTYPED(seq, i);
+		asdl_seq_SET(new_seq, i, pair->cmpop);
+	}
+	return new_seq;
+}
+
+asdl_expr_seq *
+_PyPegen_get_exprs(Parser *p, asdl_seq *seq) {
+	Py_ssize_t len = asdl_seq_LEN(seq);
+	assert(len > 0);
+
+	asdl_expr_seq *new_seq = _Py_asdl_expr_seq_new(len, p->arena);
+	if (!new_seq) {
+		return NULL;
+	}
+	for (Py_ssize_t i = 0; i < len; i++) {
+		CmpopExprPair *pair = asdl_seq_GET_UNTYPED(seq, i);
+		asdl_seq_SET(new_seq, i, pair->expr);
+	}
+	return new_seq;
+}
+
 #endif

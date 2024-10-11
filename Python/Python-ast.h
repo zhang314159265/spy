@@ -166,3 +166,35 @@ _PyAST_Attribute(expr_ty value, identifier attr, expr_context_ty ctx) {
 	p->v.Attribute.ctx = ctx;
 	return p;
 }
+
+expr_ty
+_PyAST_Compare(expr_ty left, asdl_int_seq *ops, asdl_expr_seq *comparators) {
+	expr_ty p;
+	if (!left) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Compare_kind;
+	p->v.Compare.left = left;
+	p->v.Compare.ops = ops;
+	p->v.Compare.comparators = comparators;
+	return p;
+}
+
+stmt_ty
+_PyAST_If(expr_ty test, asdl_stmt_seq *body, asdl_stmt_seq *orelse) {
+	stmt_ty p;
+	if (!test) {
+		assert(false);
+	}
+	p = (stmt_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = If_kind;
+	p->v.If.test = test;
+	p->v.If.body = body;
+	p->v.If.orelse = orelse;
+	return p;
+}

@@ -303,3 +303,8 @@ PySequence_GetItem(PyObject *s, Py_ssize_t i) {
 	}
 	assert(false);
 }
+
+PyObject *
+PyNumber_Remainder(PyObject *v, PyObject *w) {
+	return binary_op(v, w, NB_SLOT(nb_remainder), "%");
+}

@@ -8,7 +8,19 @@ statement[asdl_stmt_seq*]: a=compound_stmt { (asdl_stmt_seq*) _PyPegen_singleton
 
 compound_stmt[stmt_ty]:
 	| &'def' function_def
+	| &'if' if_stmt
 	| &'for' for_stmt
+
+if_stmt[stmt_ty]:
+	| 'if' a=named_expression ':' b=block c=[else_block] {
+		_PyAST_If(a, b, c)
+	}
+
+else_block[asdl_stmt_seq*]:
+	| 'else' &&':' b=block {b}
+
+named_expression[expr_ty]:
+	| expression !':='
 
 for_stmt[stmt_ty]:
 	| 'for' t=star_targets 'in' ~ ex=star_expressions ':' b=block {
@@ -60,10 +72,34 @@ star_expression[expr_ty] (memo):
 	| expression
 
 # TODO follow cpy
-expression[expr_ty] (memo): sum
+expression[expr_ty] (memo): comparison
+
+comparison[expr_ty]:
+	| a=bitwise_or b=compare_op_bitwise_or_pair+ {
+		_PyAST_Compare(
+			a,
+			CHECK(asdl_int_seq*, _PyPegen_get_cmpops(p, b)),
+			CHECK(asdl_expr_seq*, _PyPegen_get_exprs(p, b)))
+	}
+	| bitwise_or
+
+compare_op_bitwise_or_pair[CmpopExprPair*]:
+	| eq_bitwise_or
+
+eq_bitwise_or[CmpopExprPair*]: '==' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Eq, a) }
+
+bitwise_or[expr_ty]:
+	| sum
 
 sum[expr_ty]:
-	| a=sum '+' b=primary { _PyAST_BinOp(a, Add, b) }
+	| a=sum '+' b=term { _PyAST_BinOp(a, Add, b) }
+	| term
+
+term[expr_ty]:
+	| a=term '%' b=factor { _PyAST_BinOp(a, Mod, b) }
+	| factor
+
+factor[expr_ty] (memo):
 	| primary
 
 assignment[stmt_ty]:

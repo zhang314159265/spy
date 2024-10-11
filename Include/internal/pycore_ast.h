@@ -2,17 +2,30 @@
 #ifndef Py_INTERNAL_AST_H
 #define Py_INTERNAL_AST_H
 
+#define _ASDL_SEQ_HEAD \
+	Py_ssize_t size; \
+	void **elements;
+
+typedef struct _expr *expr_ty;
+typedef struct {
+	_ASDL_SEQ_HEAD
+	expr_ty typed_elements[1];
+} asdl_expr_seq;
+
 #include "internal/pycore_asdl.h"
 
 typedef enum _operator {
 	Add=1,
+	Mod=6,
 } operator_ty;
+
+typedef enum _cmpop {
+	Eq=1,
+} cmpop_ty;
 
 typedef enum _expr_context { Load=1, Store=2, Del=3} expr_context_ty;
 
 typedef struct _mod *mod_ty;
-
-typedef struct _expr *expr_ty;
 
 typedef struct _stmt *stmt_ty;
 
@@ -32,11 +45,6 @@ struct _arg {
 struct _arguments {
 	asdl_arg_seq *args;
 };
-
-typedef struct {
-	_ASDL_SEQ_HEAD
-	expr_ty typed_elements[1];
-} asdl_expr_seq;
 
 typedef struct {
 	_ASDL_SEQ_HEAD
@@ -70,6 +78,7 @@ struct _mod {
 
 enum _expr_kind {
 	BinOp_kind = 3,
+	Compare_kind=16,
 	Call_kind=17,
 	Constant_kind=20,
 	Attribute_kind=21,
@@ -80,6 +89,12 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			expr_ty left;
+			asdl_int_seq *ops;
+			asdl_expr_seq *comparators;
+		} Compare;
+
 		struct {
 			expr_ty value;
 			identifier attr;
@@ -115,12 +130,18 @@ enum _stmt_kind {
 	Assign_kind = 6,
 	AugAssign_kind = 7,
 	For_kind = 9,
+	If_kind = 12,
 	Expr_kind = 23,
 };
 
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+		struct {
+			expr_ty test;
+			asdl_stmt_seq *body;
+			asdl_stmt_seq *orelse;
+		} If;
 		struct {
 			expr_ty target;
 			expr_ty iter;

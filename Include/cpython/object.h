@@ -11,6 +11,7 @@ typedef struct {
   binaryfunc nb_inplace_add;
   binaryfunc nb_subtract;
   binaryfunc nb_floor_divide;
+  binaryfunc nb_remainder;
 } PyNumberMethods;
 
 typedef struct {
