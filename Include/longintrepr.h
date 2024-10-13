@@ -38,6 +38,7 @@ static PyObject *long_pow(PyObject *v, PyObject *w, PyObject *x);
 static PyObject *long_mul(PyLongObject *a, PyLongObject *b);
 static PyObject *long_to_decimal_string(PyObject *aa);
 static PyObject *long_and(PyObject *a, PyObject *b);
+static PyObject *long_or(PyObject *a, PyObject *b);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -49,6 +50,7 @@ static PyNumberMethods long_as_number = {
   .nb_power = long_pow,
   .nb_multiply = (binaryfunc) long_mul,
 	.nb_and = long_and,
+  .nb_or = long_or,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -455,6 +457,10 @@ long_bitwise(PyLongObject *a,
 		negz = nega & negb;
 		size_z = negb ? size_a : size_b;
 		break;
+  case '|':
+    negz = nega | negb;
+    size_z = negb ? size_b : size_a;
+    break;
 	default:
 		assert(false);
 	}
@@ -471,6 +477,11 @@ long_bitwise(PyLongObject *a,
 			z->ob_digit[i] = a->ob_digit[i] & b->ob_digit[i];
 		}
 		break;
+  case '|':
+    for (i = 0; i < size_b; ++i) {
+			z->ob_digit[i] = a->ob_digit[i] | b->ob_digit[i];
+    }
+    break;
 	default:
 		assert(false);
 	}
@@ -495,4 +506,11 @@ static PyObject *long_and(PyObject *a, PyObject *b) {
 	CHECK_BINOP(a, b);
 	c = long_bitwise((PyLongObject *)a, '&', (PyLongObject*) b);
 	return c;
+}
+
+static PyObject *long_or(PyObject *a, PyObject *b) {
+  PyObject *c;
+  CHECK_BINOP(a, b);
+  c = long_bitwise((PyLongObject *) a, '|', (PyLongObject *) b);
+  return c;
 }

@@ -46,9 +46,10 @@
 # 
 # test_build_set()
 
-def test_binary_and():
+def test_bitwise_ops():
 	x = 3
 	y = 2
 	print(x & y)
+	print(x | y)
 
-test_binary_and()
+test_bitwise_ops()

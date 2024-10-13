@@ -97,6 +97,10 @@ eq_bitwise_or[CmpopExprPair*]: '==' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, E
 lt_bitwise_or[CmpopExprPair*]: '<' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Lt, a) }
 
 bitwise_or[expr_ty]:
+	| a=bitwise_or '|' b=bitwise_xor { _PyAST_BinOp(a, BitOr, b) }
+	| bitwise_xor
+
+bitwise_xor[expr_ty]:
 	| bitwise_and
 
 bitwise_and[expr_ty]:

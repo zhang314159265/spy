@@ -795,6 +795,8 @@ binop(operator_ty op) {
     return BINARY_FLOOR_DIVIDE;
 	case BitAnd:
 		return BINARY_AND;
+  case BitOr:
+    return BINARY_OR;
   default:
     assert(false);
   }
