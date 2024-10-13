@@ -5,6 +5,10 @@ typedef PyObject *(*allocfunc)(PyTypeObject *, Py_ssize_t);
 typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames);
 
 typedef struct {
+  objobjargproc mp_ass_subscript;
+} PyMappingMethods;
+
+typedef struct {
   binaryfunc nb_or;
   binaryfunc nb_inplace_or;
   binaryfunc nb_add;
@@ -36,6 +40,7 @@ struct _typeobject {
 
   PyObject *tp_mro; // method resolution order
   PyNumberMethods *tp_as_number;
+  PyMappingMethods *tp_as_mapping;
 
   struct _typeobject *tp_base;
 

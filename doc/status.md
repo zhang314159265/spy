@@ -7,8 +7,9 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 Quest 2:
   - cover most bytecode <+++++++
+		- other 'subscr' ops
 		- dict ops <===
-		  - `BUILD_MAP`
+			- search dict or map
 	  - set ops
 
 Quest 1:

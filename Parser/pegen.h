@@ -646,4 +646,12 @@ _PyPegen_get_values(Parser *p, asdl_seq *seq) {
 	}
 	return new_seq;
 }
+
+int
+_PyPegen_lookahead(int positive, void *(func)(Parser *), Parser *p) {
+	int mark = p->mark;
+	void *res = (void *) func(p);
+	p->mark = mark;
+	return (res != NULL) == positive;
+}
 #endif

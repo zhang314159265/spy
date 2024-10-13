@@ -269,3 +269,25 @@ _PyAST_Dict(asdl_expr_seq *keys, asdl_expr_seq *values) {
 	p->v.Dict.values = values;
 	return p;
 }
+
+expr_ty
+_PyAST_Subscript(expr_ty value, expr_ty slice, expr_context_ty ctx) {
+	expr_ty p;
+	if (!value) {
+		assert(false);
+	}
+	if (!slice) {
+		assert(false);
+	}
+	if (!ctx) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Subscript_kind;
+	p->v.Subscript.value = value;
+	p->v.Subscript.slice = slice;
+	p->v.Subscript.ctx = ctx;
+	return p;
+}

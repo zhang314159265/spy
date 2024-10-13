@@ -158,6 +158,12 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr_seq(expr->v.Dict.keys, indent + 2);
 		dump_expr_seq(expr->v.Dict.values, indent + 2);
 		break;
+	case Subscript_kind:
+		fprintf(stderr, "Subscript:\n");
+		dump_expr(expr->v.Subscript.value, indent + 2);
+		dump_expr(expr->v.Subscript.slice, indent + 2);
+		dump_expr_context(expr->v.Subscript.ctx, indent + 2);
+		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

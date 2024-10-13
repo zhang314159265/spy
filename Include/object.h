@@ -52,6 +52,7 @@ typedef PyObject *(*getattrfunc)(PyObject *, char *);
 typedef Py_ssize_t (*lenfunc)(PyObject *);
 typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 typedef PyObject *(*reprfunc)(PyObject *);
+typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 
 typedef struct {
 	PyObject ob_base;

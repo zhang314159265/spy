@@ -139,7 +139,17 @@ star_target[expr_ty] (memo):
 	| target_with_star_atom
 
 target_with_star_atom[expr_ty] (memo):
+	| a=t_primary '.' b=NAME !t_lookahead { (assert(false), NULL) }
+	| a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
 	| star_atom
+
+slices[expr_ty]:
+	| NUMBER
+
+t_primary[expr_ty]:
+	| a=atom &t_lookahead { a}
+
+t_lookahead: '(' | '[' | '.'
 
 star_atom[expr_ty]:
 	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }

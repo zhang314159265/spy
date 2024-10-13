@@ -65,6 +65,11 @@ static PyDictKeysObject empty_keys_struct = {
 
 static void dict_dealloc(PyDictObject *mp);
 static PyObject *dict_repr(PyDictObject *mp);
+static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w);
+
+static PyMappingMethods dict_as_mapping = {
+  .mp_ass_subscript = (objobjargproc) dict_ass_sub,
+};
 
 PyTypeObject PyDict_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -74,6 +79,7 @@ PyTypeObject PyDict_Type = {
   .tp_dealloc = (destructor) dict_dealloc,
   .tp_free = PyObject_GC_Del,
   .tp_repr = (reprfunc) dict_repr,
+  .tp_as_mapping = &dict_as_mapping,
 };
 
 static inline Py_ssize_t
@@ -820,10 +826,71 @@ _PyDict_NewPresized(Py_ssize_t minused) {
 }
 
 static PyObject *dict_repr(PyDictObject *mp) {
+  Py_ssize_t i;
+  PyObject *key = NULL, *value = NULL;
+  _PyUnicodeWriter writer;
+  int first;
+
   if (mp->ma_used == 0) {
     return PyUnicode_FromString("{}");
   }
-  assert(false);
+
+  _PyUnicodeWriter_Init(&writer);
+  writer.overallocate = 1;
+  writer.min_length = 1 + 4 + (2 + 4) * (mp->ma_used - 1) + 1;
+
+  if (_PyUnicodeWriter_WriteChar(&writer, '{') < 0)
+    assert(false);
+  i = 0;
+  first = 1;
+  while (PyDict_Next((PyObject *) mp, &i, &key, &value)) {
+    PyObject *s;
+    int res;
+
+    Py_INCREF(key);
+    Py_INCREF(value);
+
+    if (!first) {
+      assert(false);
+    }
+    first = 0;
+
+    s = PyObject_Repr(key);
+    if (s == NULL)
+      assert(false);
+    res = _PyUnicodeWriter_WriteStr(&writer, s);
+    Py_DECREF(s);
+    if (res < 0)
+      assert(false);
+
+    if (_PyUnicodeWriter_WriteASCIIString(&writer, ": ", 2) < 0)
+      assert(false);
+
+    s = PyObject_Repr(value);
+    if (s == NULL)
+      assert(false);
+
+    res = _PyUnicodeWriter_WriteStr(&writer, s);
+    Py_DECREF(s);
+    if (res < 0)
+      assert(false);
+    Py_CLEAR(key);
+    Py_CLEAR(value);
+  }
+
+  writer.overallocate = 0;
+  if (_PyUnicodeWriter_WriteChar(&writer, '}') < 0)
+    assert(false);
+
+  return _PyUnicodeWriter_Finish(&writer);
+}
+
+static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w) {
+  if (w == NULL) {
+    assert(false);
+  } else {
+    return PyDict_SetItem((PyObject *) mp, v, w);
+  }
 }
 
 

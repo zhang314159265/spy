@@ -935,6 +935,27 @@ compiler_dict(struct compiler *c, expr_ty e) {
 }
 
 static int
+compiler_subscript(struct compiler *c, expr_ty e) {
+  expr_context_ty ctx = e->v.Subscript.ctx;
+  int op = 0;
+
+  if (ctx == Load) {
+    assert(false);
+  }
+
+  switch (ctx) {
+  case Store: op = STORE_SUBSCR; break;
+  default:
+    assert(false);
+  }
+  assert(op);
+  VISIT(c, expr, e->v.Subscript.value);
+  VISIT(c, expr, e->v.Subscript.slice);
+  ADDOP(c, op);
+  return 1;
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -970,6 +991,8 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     return compiler_list(c, e);
   case Dict_kind:
     return compiler_dict(c, e);
+  case Subscript_kind:
+    return compiler_subscript(c, e);
 	default:
 		assert(false);
 	}

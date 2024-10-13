@@ -92,6 +92,7 @@ enum _expr_kind {
 	Call_kind=17,
 	Constant_kind=20,
 	Attribute_kind=21,
+	Subscript_kind=22,
 	Starred_kind=23,
 	Name_kind=24,
 	List_kind=25,
@@ -101,6 +102,12 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			expr_ty value;
+			expr_ty slice;
+			expr_context_ty ctx;
+		} Subscript;
+
 		struct {
 			asdl_expr_seq *keys;
 			asdl_expr_seq *values;

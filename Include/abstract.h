@@ -411,3 +411,17 @@ PyObject *PySequence_Fast(PyObject *v, const char *m) {
 #define PySequence_Fast_ITEMS(sf) \
 	(PyList_Check(sf) ? ((PyListObject *)(sf))->ob_item \
 		: ((PyTupleObject *)(sf))->ob_item)
+
+int PyObject_SetItem(PyObject *o, PyObject *key, PyObject *value) {
+	if (o == NULL || key == NULL || value == NULL) {
+		assert(false);
+	}
+
+	PyMappingMethods *m = Py_TYPE(o)->tp_as_mapping;
+	if (m && m->mp_ass_subscript) {
+		int res = m->mp_ass_subscript(o, key, value);
+		assert(res >= 0);
+		return res;
+	}
+	assert(false);
+}

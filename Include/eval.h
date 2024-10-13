@@ -31,6 +31,8 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define BASIC_POP() (*--stack_pointer)
 #define POP() BASIC_POP()
 #define TOP() (stack_pointer[-1])
+#define SECOND() (stack_pointer[-2])
+#define THIRD() (stack_pointer[-3])
 #define PEEK(n) (stack_pointer[-(n)])
 #define SET_TOP(v) (stack_pointer[-1] = (v))
 
@@ -199,6 +201,21 @@ main_loop:
 			} else {
 				assert(false);
 			}
+			DISPATCH();
+		}
+		case TARGET(STORE_SUBSCR): {
+			PyObject *sub = TOP();
+			PyObject *container = SECOND();
+			PyObject *v = THIRD();
+			int err;
+			STACK_SHRINK(3);
+			// container[sub] = v
+			err = PyObject_SetItem(container, sub, v);
+			Py_DECREF(v);
+			Py_DECREF(container);
+			Py_DECREF(sub);
+			if (err != 0)
+				goto error;
 			DISPATCH();
 		}
 		case TARGET(BUILD_MAP): {
