@@ -14,7 +14,7 @@
 
 #include "Python/Python-ast.h"
 
-#if 1
+#if 0
 // trigger debug messages in Parser/parser.c
 #define Py_DEBUG
 #define Py_BUILD_CORE

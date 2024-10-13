@@ -148,6 +148,11 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr_seq(expr->v.List.elts, indent + 2);
 		dump_expr_context(expr->v.List.ctx, indent + 2);
 		break;
+	case Starred_kind:
+		fprintf(stderr, "Starred:\n");
+		dump_expr(expr->v.Starred.value, indent + 2);
+		dump_expr_context(expr->v.Starred.ctx, indent + 2);
+		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

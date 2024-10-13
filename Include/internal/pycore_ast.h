@@ -101,6 +101,11 @@ struct _expr {
 	enum _expr_kind kind;
 	union {
 		struct {
+			expr_ty value;
+			expr_context_ty ctx;
+		} Starred;
+
+		struct {
 			asdl_expr_seq *elts;
 			expr_context_ty ctx;
 		} List;

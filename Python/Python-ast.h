@@ -239,3 +239,21 @@ _PyAST_List(asdl_expr_seq *elts, expr_context_ty ctx) {
 	p->v.List.ctx = ctx;
 	return p;
 }
+
+expr_ty
+_PyAST_Starred(expr_ty value, expr_context_ty ctx) {
+	expr_ty p;
+	if (!value) {
+		assert(false);
+	}
+	if (!ctx) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Starred_kind;
+	p->v.Starred.value = value;
+	p->v.Starred.ctx = ctx;
+	return p;
+}

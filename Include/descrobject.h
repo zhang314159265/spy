@@ -78,6 +78,22 @@ descr_new(PyTypeObject *descrtype, PyTypeObject *type, const char *name) {
 	return descr;
 }
 
+static PyObject *
+method_vectorcall_O(
+		PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+	PyThreadState *tstate = _PyThreadState_GET();
+	Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+	if (nargs != 2) {
+		assert(false);
+	}
+	PyCFunction meth = (PyCFunction) method_enter_call(tstate, func);
+	if (meth == NULL) {
+		return NULL;
+	}
+	PyObject *result = meth(args[0], args[1]);
+	return result;
+}
+
 PyObject *
 PyDescr_NewMethod(PyTypeObject *type, PyMethodDef *method) {
 	vectorcallfunc vectorcall;
@@ -85,6 +101,9 @@ PyDescr_NewMethod(PyTypeObject *type, PyMethodDef *method) {
 			METH_O | METH_KEYWORDS | METH_METHOD)) {
 	case METH_VARARGS | METH_KEYWORDS:
 		vectorcall = method_vectorcall_VARARGS_KEYWORDS;
+		break;
+	case METH_O:
+		vectorcall = method_vectorcall_O;
 		break;
 	default:
 		assert(false);

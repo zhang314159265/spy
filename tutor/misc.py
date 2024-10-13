@@ -27,7 +27,8 @@
 # test_build_tuple()
 
 def test_list_ops():
-	x = []
+	a = [2]
+	x = [*a, 3]
 	print(x)
 
 test_list_ops()

@@ -393,3 +393,21 @@ PyNumber_Multiply(PyObject *v, PyObject *w) {
 	return result;
 }
 
+PyObject *PySequence_Fast(PyObject *v, const char *m) {
+	if (v == NULL) {
+		assert(false);
+	}
+
+	if (PyList_CheckExact(v) || PyTuple_CheckExact(v)) {
+		Py_INCREF(v);
+		return v;
+	}
+	assert(false);
+}
+
+#define PySequence_Fast_GET_SIZE(o) \
+	(PyList_Check(o) ? PyList_GET_SIZE(o) : PyTuple_GET_SIZE(o))
+
+#define PySequence_Fast_ITEMS(sf) \
+	(PyList_Check(sf) ? ((PyListObject *)(sf))->ob_item \
+		: ((PyTupleObject *)(sf))->ob_item)

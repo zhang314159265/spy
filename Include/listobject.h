@@ -2,6 +2,9 @@
 
 #include "cpython/listobject.h"
 
+static PyObject *list_append(PyListObject *self, PyObject *object);
+#include "Objects/clinic/listobject.c.h"
+
 #define PyList_Check(op) \
   PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_LIST_SUBCLASS)
 
@@ -34,17 +37,7 @@ static PySequenceMethods list_as_sequence = {
 	.sq_ass_item = (ssizeobjargproc) list_ass_item,
 };
 
-// defined in cpy/Objects/listobject.c
-PyTypeObject PyList_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  .tp_name = "list",
-  .tp_basicsize = sizeof(PyListObject),
-  .tp_flags = Py_TPFLAGS_LIST_SUBCLASS,
-	.tp_dealloc = (destructor) list_dealloc,
-	.tp_free = PyObject_GC_Del,
-	.tp_as_sequence = &list_as_sequence,
-	.tp_repr = (reprfunc) list_repr,
-};
+extern PyTypeObject PyList_Type;
 
 // defined in cpy/Objects/listobject.c
 PyObject *PyList_New(Py_ssize_t size) {
@@ -234,8 +227,114 @@ static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v) {
 }
 
 static PyObject *list_repr(PyListObject *v) {
+	Py_ssize_t i;
+	PyObject *s;
+	_PyUnicodeWriter writer;
+
 	if (Py_SIZE(v) == 0) {
 		return PyUnicode_FromString("[]");
 	}
+
+	_PyUnicodeWriter_Init(&writer);
+	writer.overallocate = 1;
+	writer.min_length = 1 + 1 + (2 + 1) * (Py_SIZE(v) - 1) + 1;
+
+	if (_PyUnicodeWriter_WriteChar(&writer, '[') < 0)
+		assert(false);
+	for (i = 0; i < Py_SIZE(v); ++i) {
+		if (i > 0) {
+			if (_PyUnicodeWriter_WriteASCIIString(&writer, ", ", 2) < 0)
+				assert(false);
+		}
+
+		s = PyObject_Repr(v->ob_item[i]);
+		if (s == NULL)
+			assert(false);
+
+		if (_PyUnicodeWriter_WriteStr(&writer, s) < 0) {
+			assert(false);
+		}
+		Py_DECREF(s);
+	}
+
+	writer.overallocate = 0;
+	if (_PyUnicodeWriter_WriteChar(&writer, ']') < 0)
+		assert(false);
+	
+	return _PyUnicodeWriter_Finish(&writer);
+}
+
+static PyObject *list_append(PyListObject *self, PyObject *object) {
+	if (app1(self, object) == 0)
+		Py_RETURN_NONE;
+	return NULL;
+}
+
+static int
+list_preallocate_exact(PyListObject *self, Py_ssize_t size) {
+	assert(self->ob_item == NULL);
+	assert(size > 0);
+
+	size = (size + 1) & ~(size_t)1;
+	PyObject **items = PyMem_New(PyObject *, size);
+	if (items == NULL) {
+		assert(false);
+	}
+	self->ob_item = items;
+	self->allocated = size;
+	return 0;
+}
+
+PyObject *PySequence_Fast(PyObject *o, const char *m);
+
+// copied from abstract.h
+#define PySequence_Fast_GET_SIZE(o) \
+	(PyList_Check(o) ? PyList_GET_SIZE(o) : PyTuple_GET_SIZE(o))
+
+#define PySequence_Fast_ITEMS(sf) \
+	(PyList_Check(sf) ? ((PyListObject *)(sf))->ob_item \
+		: ((PyTupleObject *)(sf))->ob_item)
+
+static PyObject *
+list_extend(PyListObject *self, PyObject *iterable) {
+	Py_ssize_t m;  // size of self
+	Py_ssize_t n; // guess for size of iterable
+	Py_ssize_t i;
+
+	if (PyList_CheckExact(iterable) || PyTuple_CheckExact(iterable) ||
+				(PyObject *) self == iterable) {
+		PyObject **src, **dest;
+
+		iterable = PySequence_Fast(iterable, "argument must be iterable");
+		if (!iterable)
+			return NULL;
+		n = PySequence_Fast_GET_SIZE(iterable);
+		if (n == 0) {
+			assert(false);
+		}
+		m = Py_SIZE(self);
+		if (self->ob_item == NULL) {
+			if (list_preallocate_exact(self, n) < 0) {
+				return NULL;
+			}
+			Py_SET_SIZE(self, n);
+		} else if (list_resize(self, m + n) < 0) {
+			assert(false);
+		}
+		src = PySequence_Fast_ITEMS(iterable);
+		dest = self->ob_item + m;
+		for (i = 0; i < n; i++) {
+			PyObject *o = src[i];
+			Py_INCREF(o);
+			dest[i] = o;
+		}
+		Py_DECREF(iterable);
+		Py_RETURN_NONE;
+	}
 	assert(false);
+}
+
+PyObject *
+_PyList_Extend(PyListObject *self, PyObject *iterable) {
+	return list_extend(self, iterable);
 }

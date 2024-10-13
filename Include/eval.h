@@ -201,6 +201,27 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(LIST_EXTEND): {
+			PyObject *iterable = POP();
+			PyObject *list = PEEK(oparg);
+			PyObject *none_val = _PyList_Extend((PyListObject *) list, iterable);
+			if (none_val == NULL) {
+				assert(false);
+			}
+			Py_DECREF(none_val);
+			Py_DECREF(iterable);
+			DISPATCH();
+		}
+		case TARGET(LIST_APPEND): {
+			PyObject *v = POP();
+			PyObject *list = PEEK(oparg);
+			int err;
+			err = PyList_Append(list, v);
+			Py_DECREF(v);
+			if (err != 0)
+				assert(false);
+			DISPATCH();
+		}
 		case TARGET(BUILD_LIST): {
 			PyObject *list = PyList_New(oparg);
 			if (list == NULL)

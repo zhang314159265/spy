@@ -470,3 +470,46 @@ int _PyUnicodeWriter_WriteStr(_PyUnicodeWriter *writer, PyObject *str) {
   writer->pos += len;
   return 0;
 }
+
+static inline int
+_PyUnicodeWriter_WriteCharInline(_PyUnicodeWriter *writer, Py_UCS4 ch) {
+  if (_PyUnicodeWriter_Prepare(writer, 1, ch) < 0) {
+    return -1;
+  }
+  PyUnicode_WRITE(writer->kind, writer->data, writer->pos, ch);
+  writer->pos++;
+  return 0;
+}
+
+int _PyUnicodeWriter_WriteChar(_PyUnicodeWriter *writer, Py_UCS4 ch) {
+  return _PyUnicodeWriter_WriteCharInline(writer, ch);
+}
+
+int
+_PyUnicodeWriter_WriteASCIIString(_PyUnicodeWriter *writer,
+    const char *ascii, Py_ssize_t len) {
+  if (len == -1)
+    len = strlen(ascii);
+
+  if (writer->buffer == NULL && !writer->overallocate) {
+    assert(false);
+  }
+
+  if (_PyUnicodeWriter_Prepare(writer, len, 127) == -1)
+    return -1;
+
+  switch (writer->kind) {
+  case PyUnicode_1BYTE_KIND:
+  {
+    const Py_UCS1 *str = (const Py_UCS1 *) ascii;
+    Py_UCS1 *data = writer->data;
+    memcpy(data + writer->pos, str, len);
+    break;
+  }
+  default:
+    assert(false);
+  }
+
+  writer->pos += len;
+  return 0;
+}

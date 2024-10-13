@@ -178,5 +178,5 @@ tuple[expr_ty]:
 star_named_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=','.star_named_expression+ [','] { a}
 
 star_named_expression[expr_ty]:
-	| '*' a=bitwise_or { (assert(false), NULL) }
+	| '*' a=bitwise_or { _PyAST_Starred(a, Load) }
 	| named_expression

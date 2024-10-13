@@ -859,7 +859,31 @@ starunpack_helper(struct compiler *c, asdl_expr_seq *elts, int pushed,
     }
     return 1;
   }
-  assert(false);
+  int sequence_built = 0;
+  if (big) {
+    assert(false);
+  }
+  for (Py_ssize_t i = 0; i < n; i++) {
+    expr_ty elt = asdl_seq_GET(elts, i);
+    if (elt->kind == Starred_kind) {
+      if (sequence_built == 0) {
+        ADDOP_I(c, build, i + pushed);
+        sequence_built = 1;
+      }
+      VISIT(c, expr, elt->v.Starred.value);
+      ADDOP_I(c, extend, 1);
+    } else {
+      VISIT(c, expr, elt);
+      if (sequence_built) {
+        ADDOP_I(c, add, 1);
+      }
+    }
+  }
+  assert(sequence_built);
+  if (tuple) {
+    assert(false);
+  }
+  return 1;
 }
 
 static int

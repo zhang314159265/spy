@@ -313,5 +313,6 @@ int Py_Is(PyObject *x, PyObject *y) {
 }
 
 PyObject *PyObject_Str(PyObject *v);
+PyObject *PyObject_Repr(PyObject *v);
 
 #endif

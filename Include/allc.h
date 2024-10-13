@@ -15,3 +15,4 @@
 #include "Python/formatter_unicode.c.h"
 #include "Objects/codeobject.c.h"
 #include "Objects/floatobject.c.h"
+#include "Objects/listobject.c.h"

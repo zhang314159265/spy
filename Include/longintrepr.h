@@ -36,6 +36,7 @@ static PyObject *long_mod(PyObject *a, PyObject *b);
 static PyObject *long_true_divide(PyObject *v, PyObject *w);
 static PyObject *long_pow(PyObject *v, PyObject *w, PyObject *x);
 static PyObject *long_mul(PyLongObject *a, PyLongObject *b);
+static PyObject *long_to_decimal_string(PyObject *aa);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -58,6 +59,7 @@ PyTypeObject PyLong_Type = {
   .tp_hash = (hashfunc) long_hash,
   .tp_richcompare = long_richcompare,
   .tp_as_number = &long_as_number,
+  .tp_repr = long_to_decimal_string,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -383,4 +385,18 @@ Done:
   Py_XDECREF(c);
   Py_XDECREF(temp);
   return (PyObject *) z;
+}
+
+static int
+long_to_decimal_string_internal(PyObject *aa,
+		PyObject **p_output,
+		_PyUnicodeWriter *writer,
+		_PyBytesWriter *bytes_writer,
+		char **bytes_str);
+
+static PyObject *long_to_decimal_string(PyObject *aa) {
+  PyObject *v;
+  if (long_to_decimal_string_internal(aa, &v, NULL, NULL, NULL) == -1)
+    return NULL;
+  return v;
 }

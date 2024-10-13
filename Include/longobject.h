@@ -234,7 +234,12 @@ long_to_decimal_string_internal(PyObject *aa,
 	} else if (bytes_writer) {
 		assert(false);
 	} else {
-		assert(false);
+		str = PyUnicode_New(strlen, '9');
+		if (str == NULL) {
+			Py_DECREF(scratch);
+			return -1;
+		}
+		kind = PyUnicode_KIND(str);
 	}
 
 #define WRITE_DIGITS(p) \
@@ -291,7 +296,7 @@ long_to_decimal_string_internal(PyObject *aa,
 	} else if (bytes_writer) {
 		(*bytes_str) += strlen;
 	} else {
-		assert(false);
+		*p_output = (PyObject *) str;
 	}
 	return 0;
 }
