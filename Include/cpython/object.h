@@ -23,6 +23,8 @@ typedef struct {
   ternaryfunc nb_power;
   binaryfunc nb_multiply;
 	binaryfunc nb_and;
+  binaryfunc nb_lshift;
+  binaryfunc nb_rshift;
 } PyNumberMethods;
 
 typedef struct {

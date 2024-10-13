@@ -40,6 +40,8 @@ static PyObject *long_to_decimal_string(PyObject *aa);
 static PyObject *long_and(PyObject *a, PyObject *b);
 static PyObject *long_or(PyObject *a, PyObject *b);
 static PyObject *long_xor(PyObject *a, PyObject *b);
+static PyObject *long_lshift(PyObject *a, PyObject *b);
+static PyObject *long_rshift(PyObject *a, PyObject *b);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -53,6 +55,8 @@ static PyNumberMethods long_as_number = {
 	.nb_and = long_and,
   .nb_or = long_or,
   .nb_xor = long_xor,
+  .nb_lshift = long_lshift,
+  .nb_rshift = long_rshift,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -531,4 +535,136 @@ static PyObject *long_xor(PyObject *a, PyObject *b) {
   CHECK_BINOP(a, b);
   c = long_bitwise((PyLongObject *) a, '^', (PyLongObject *) b);
   return c;
+}
+
+Py_ssize_t
+PyLong_AsSsize_t(PyObject *vv) {
+  PyLongObject *v;
+  Py_ssize_t i;
+
+  if (vv == NULL) {
+    assert(false);
+  }
+  if (!PyLong_Check(vv)) {
+    assert(false);
+  }
+
+  v = (PyLongObject *) vv;
+  i = Py_SIZE(v);
+  switch (i) {
+  case -1: return -(sdigit)v->ob_digit[0];
+  case 0: return 0;
+  case 1: return v->ob_digit[0];
+  }
+  assert(false);
+}
+
+static int
+divmod_shift(PyObject *shiftby, Py_ssize_t *wordshift, digit *remshift) {
+  assert(PyLong_Check(shiftby));
+  assert(Py_SIZE(shiftby) >= 0);
+  Py_ssize_t lshiftby = PyLong_AsSsize_t((PyObject *) shiftby);
+  if (lshiftby >= 0) {
+    *wordshift = lshiftby / PyLong_SHIFT;
+    *remshift = lshiftby % PyLong_SHIFT;
+    return 0;
+  }
+  assert(false);
+}
+
+static PyObject *
+long_lshift1(PyLongObject *a, Py_ssize_t wordshift, digit remshift) {
+  PyLongObject *z = NULL;
+  Py_ssize_t oldsize, newsize, i, j;
+  twodigits accum;
+
+  oldsize = Py_ABS(Py_SIZE(a));
+  newsize = oldsize + wordshift;
+  if (remshift)
+    ++newsize;
+  z = _PyLong_New(newsize);
+  if (z == NULL)
+    return NULL;
+  if (Py_SIZE(a) < 0) {
+    assert(false);
+  }
+  for (i = 0; i < wordshift; i++)
+    z->ob_digit[i] = 0;
+  accum = 0;
+  for (i = wordshift, j = 0; j < oldsize; i++, j++) {
+    accum |= (twodigits) a->ob_digit[j] << remshift;
+    z->ob_digit[i] = (digit)(accum & PyLong_MASK);
+    accum >>= PyLong_SHIFT;
+  }
+  if (remshift) {
+    z->ob_digit[newsize - 1] = (digit) accum;
+  } else
+    assert(!accum);
+  z = long_normalize(z);
+  return (PyObject *) maybe_small_long(z);
+}
+
+static PyObject *long_lshift(PyObject *a, PyObject *b) {
+  Py_ssize_t wordshift;
+  digit remshift;
+
+  CHECK_BINOP(a, b);
+
+  if (Py_SIZE(b) < 0) {
+    assert(false);
+  }
+  if (Py_SIZE(a) == 0) {
+    return PyLong_FromLong(0);
+  }
+  if (divmod_shift(b, &wordshift, &remshift) < 0)
+    return NULL;
+  return long_lshift1((PyLongObject *) a, wordshift, remshift);
+}
+
+static PyObject *
+long_rshift1(PyLongObject *a, Py_ssize_t wordshift, digit remshift) {
+  PyLongObject *z = NULL;
+  Py_ssize_t newsize, hishift, i, j;
+  digit lomask, himask;
+
+  if (Py_SIZE(a) < 0) {
+    assert(false);
+  } else {
+    newsize = Py_SIZE(a) - wordshift;
+    if (newsize <= 0)
+      return PyLong_FromLong(0);
+    hishift = PyLong_SHIFT - remshift;
+    lomask = ((digit) 1 << hishift) - 1;
+    himask = PyLong_MASK ^ lomask;
+
+    z = _PyLong_New(newsize);
+    if (z == NULL)
+      return NULL;
+
+    for (i = 0, j = wordshift; i < newsize; i++, j++) {
+      z->ob_digit[i] = (a->ob_digit[j] >> remshift) & lomask;
+      if (i + 1 < newsize)
+        z->ob_digit[i] |= (a->ob_digit[j + 1] << hishift) & himask;
+    }
+
+    z = maybe_small_long(long_normalize(z));
+  }
+  return (PyObject *) z;
+}
+
+static PyObject *long_rshift(PyObject *a, PyObject *b) {
+  Py_ssize_t wordshift;
+  digit remshift;
+
+  CHECK_BINOP(a, b);
+
+  if (Py_SIZE(b) < 0) {
+    assert(false);
+  }
+  if (Py_SIZE(a) == 0) {
+    return PyLong_FromLong(0);
+  }
+  if (divmod_shift(b, &wordshift, &remshift) < 0)
+    return NULL;
+  return long_rshift1((PyLongObject *) a, wordshift, remshift);
 }

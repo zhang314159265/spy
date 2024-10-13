@@ -90,6 +90,10 @@ void dump_operator_ty(operator_ty op, int indent) {
 		fprintf(stderr, "|\n"); break;
 	case BitXor:
 		fprintf(stderr, "^\n"); break;
+	case LShift:
+		fprintf(stderr, "<<\n"); break;
+	case RShift:
+		fprintf(stderr, ">>\n"); break;
 	default:
 		assert(false);
 	}

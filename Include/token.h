@@ -30,6 +30,8 @@
 #define RBRACE 26
 #define EQEQUAL 27
 #define CIRCUMFLEX 32
+#define LEFTSHIFT 33
+#define RIGHTSHIFT 34
 #define DOUBLESTAR 35
 #define PLUSEQUAL 36
 #define DOUBLESLASH 47
@@ -100,6 +102,16 @@ int PyToken_TwoChars(int c1, int c2) {
 	case '/':
 		switch (c2) {
 		case '/': return DOUBLESLASH;
+		}
+		break;
+	case '<':
+		switch (c2) {
+		case '<': return LEFTSHIFT;
+		}
+		break;
+	case '>':
+		switch (c2) {
+		case '>': return RIGHTSHIFT;
 		}
 		break;
 	}

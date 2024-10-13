@@ -28,6 +28,8 @@ typedef enum _operator {
 	Div=5,
 	Mod=6,
 	Pow=7,
+	LShift=8,
+	RShift=9,
 	BitOr=10,
 	BitXor=11,
 	BitAnd=12,

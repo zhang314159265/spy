@@ -203,6 +203,28 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BINARY_LSHIFT): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_Lshift(left, right);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
+		case TARGET(BINARY_RSHIFT): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_Rshift(left, right);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
 		case TARGET(BINARY_XOR): {
 			PyObject *right = POP();
 			PyObject *left = TOP();

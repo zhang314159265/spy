@@ -799,6 +799,10 @@ binop(operator_ty op) {
     return BINARY_OR;
   case BitXor:
     return BINARY_XOR;
+  case LShift:
+    return BINARY_LSHIFT;
+  case RShift:
+    return BINARY_RSHIFT;
   default:
     assert(false);
   }

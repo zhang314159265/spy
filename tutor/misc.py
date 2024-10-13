@@ -46,11 +46,18 @@
 # 
 # test_build_set()
 
-def test_bitwise_ops():
-	x = 3
-	y = 2
-	print(x & y)
-	print(x | y)
-	print(x ^ y)
+# def test_bitwise_ops():
+# 	x = 3
+# 	y = 2
+# 	print(x & y)
+# 	print(x | y)
+# 	print(x ^ y)
+# 
+# test_bitwise_ops()
 
-test_bitwise_ops()
+def test_shift():
+	x = 2
+	print(x << 1)
+	print(x >> 1)
+
+test_shift()

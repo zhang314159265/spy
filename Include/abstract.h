@@ -295,6 +295,8 @@ BINARY_FUNC(PyNumber_Subtract, nb_subtract, "-")
 BINARY_FUNC(PyNumber_And, nb_and, "&")
 BINARY_FUNC(PyNumber_Or, nb_or, "|")
 BINARY_FUNC(PyNumber_Xor, nb_xor, "^")
+BINARY_FUNC(PyNumber_Lshift, nb_lshift, "<<")
+BINARY_FUNC(PyNumber_Rshift, nb_rshift, ">>")
 
 PyObject *
 PyNumber_FloorDivide(PyObject *v, PyObject *w) {
