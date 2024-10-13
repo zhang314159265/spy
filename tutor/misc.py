@@ -51,5 +51,6 @@ def test_bitwise_ops():
 	y = 2
 	print(x & y)
 	print(x | y)
+	print(x ^ y)
 
 test_bitwise_ops()

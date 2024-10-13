@@ -15,6 +15,7 @@
 #define INPLACE_ADD 55
 #define STORE_SUBSCR 60
 #define BINARY_AND 64
+#define BINARY_XOR 65
 #define BINARY_OR 66
 #define GET_ITER 68
 #define LIST_TO_TUPLE 82

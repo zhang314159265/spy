@@ -29,6 +29,7 @@
 #define LBRACE 25
 #define RBRACE 26
 #define EQEQUAL 27
+#define CIRCUMFLEX 32
 #define DOUBLESTAR 35
 #define PLUSEQUAL 36
 #define DOUBLESLASH 47
@@ -73,6 +74,7 @@ PyToken_OneChar(int c1) {
 	case '}': return RBRACE;
 	case '&': return AMPER;
 	case '|': return VBAR;
+	case '^': return CIRCUMFLEX;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;

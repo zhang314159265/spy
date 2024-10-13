@@ -101,6 +101,7 @@ bitwise_or[expr_ty]:
 	| bitwise_xor
 
 bitwise_xor[expr_ty]:
+	| a=bitwise_xor '^' b=bitwise_and { _PyAST_BinOp(a, BitXor, b) }
 	| bitwise_and
 
 bitwise_and[expr_ty]:

@@ -11,6 +11,7 @@ typedef struct {
 
 typedef struct {
   binaryfunc nb_or;
+  binaryfunc nb_xor;
   binaryfunc nb_inplace_or;
   binaryfunc nb_add;
   binaryfunc nb_inplace_add;

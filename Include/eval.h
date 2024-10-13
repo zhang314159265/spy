@@ -203,6 +203,17 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BINARY_XOR): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_Xor(left, right);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
 		case TARGET(BINARY_OR): {
 			PyObject *right = POP();
 			PyObject *left = TOP();

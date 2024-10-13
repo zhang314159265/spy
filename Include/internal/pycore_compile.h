@@ -797,6 +797,8 @@ binop(operator_ty op) {
 		return BINARY_AND;
   case BitOr:
     return BINARY_OR;
+  case BitXor:
+    return BINARY_XOR;
   default:
     assert(false);
   }
