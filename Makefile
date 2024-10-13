@@ -1,7 +1,13 @@
+ifeq ($(shell uname), Darwin)
+DBG_PREFIX := lldb --
+PYEXE := python.exe
+else
+DBG_PREFIX := gdb --args
+PYEXE := python
+endif
+
 ifeq ($(DBG), 1)
-# TODO use lldb or gdb according to the presence of the tools
-# PREFIX := lldb --
-PREFIX := gdb --args
+PREFIX := $(DBG_PREFIX)
 else
 PREFIX :=
 endif
@@ -16,10 +22,10 @@ PEGEN_FLAGS := -v
 
 # CPY_DBG_FLAGS := DBG_TOK_GET=1
 cpy:
-	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/python $(TUTOR)
+	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/$(PYEXE) $(TUTOR)
 
 pegen:
-	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/python -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
+	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/$(PYEXE) -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
 CFLAGS := -IInclude -I.
 mine: pegen
