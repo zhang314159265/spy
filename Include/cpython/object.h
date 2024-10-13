@@ -5,6 +5,7 @@ typedef PyObject *(*allocfunc)(PyTypeObject *, Py_ssize_t);
 typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames);
 
 typedef struct {
+  binaryfunc mp_subscript;
   objobjargproc mp_ass_subscript;
 } PyMappingMethods;
 

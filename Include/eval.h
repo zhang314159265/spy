@@ -203,6 +203,17 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BINARY_SUBSCR): {
+			PyObject *sub = POP();
+			PyObject *container = TOP();
+			PyObject *res = PyObject_GetItem(container, sub);
+			Py_DECREF(container);
+			Py_DECREF(sub);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
 		case TARGET(STORE_SUBSCR): {
 			PyObject *sub = TOP();
 			PyObject *container = SECOND();

@@ -939,11 +939,14 @@ compiler_subscript(struct compiler *c, expr_ty e) {
   expr_context_ty ctx = e->v.Subscript.ctx;
   int op = 0;
 
+  #if 0
   if (ctx == Load) {
     assert(false);
   }
+  #endif
 
   switch (ctx) {
+  case Load: op = BINARY_SUBSCR; break;
   case Store: op = STORE_SUBSCR; break;
   default:
     assert(false);

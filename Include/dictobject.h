@@ -66,8 +66,10 @@ static PyDictKeysObject empty_keys_struct = {
 static void dict_dealloc(PyDictObject *mp);
 static PyObject *dict_repr(PyDictObject *mp);
 static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w);
+static PyObject *dict_subscript(PyDictObject *mp, PyObject *key);
 
 static PyMappingMethods dict_as_mapping = {
+  .mp_subscript = (binaryfunc) dict_subscript,
   .mp_ass_subscript = (objobjargproc) dict_ass_sub,
 };
 
@@ -893,4 +895,24 @@ static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w) {
   }
 }
 
+static PyObject *dict_subscript(PyDictObject *mp, PyObject *key) {
+  Py_ssize_t ix;
+  Py_hash_t hash;
+  PyObject *value;
+
+  if (!PyUnicode_CheckExact(key) ||
+      (hash = ((PyASCIIObject *) key)->hash) == -1) {
+    hash = PyObject_Hash(key);
+    if (hash == -1)
+      return NULL;
+  }
+  ix = (mp->ma_keys->dk_lookup)(mp, key, hash, &value);
+  if (ix == DKIX_ERROR)
+    return NULL;
+  if (ix == DKIX_EMPTY || value == NULL) {
+    assert(false);
+  }
+  Py_INCREF(value);
+  return value;
+}
 

@@ -36,6 +36,6 @@
 def test_dict_ops():
 	x = {}
 	x[5] = 6
-	print(x)
+	print(x[5])
 
 test_dict_ops()

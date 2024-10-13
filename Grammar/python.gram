@@ -160,6 +160,7 @@ primary[expr_ty]:
 		_PyAST_Call(a,
 			(b) ? ((expr_ty) b)->v.Call.args : NULL,
 			(b) ? ((expr_ty) b)->v.Call.keywords : NULL) }
+	| a=primary '[' b=slices ']' { _PyAST_Subscript(a, b, Load) }
 	| atom
 
 arguments[expr_ty]: a[asdl_expr_seq*]=','.expression+ {
