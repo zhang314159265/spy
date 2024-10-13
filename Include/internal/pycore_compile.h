@@ -959,6 +959,12 @@ compiler_subscript(struct compiler *c, expr_ty e) {
 }
 
 static int
+compiler_set(struct compiler *c, expr_ty e) {
+  return starunpack_helper(c, e->v.Set.elts, 0, BUILD_SET,
+    SET_ADD, SET_UPDATE, 0);
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -996,6 +1002,8 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     return compiler_dict(c, e);
   case Subscript_kind:
     return compiler_subscript(c, e);
+  case Set_kind:
+    return compiler_set(c, e);
 	default:
 		assert(false);
 	}

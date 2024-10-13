@@ -27,6 +27,7 @@
 #define LOAD_NAME 101
 #define BUILD_TUPLE 102
 #define BUILD_LIST 103
+#define BUILD_SET 104
 #define BUILD_MAP 105
 #define LOAD_ATTR 106
 #define COMPARE_OP 107
@@ -48,9 +49,11 @@
 #define MAKE_FUNCTION 132
 #define SETUP_WITH 143
 #define LIST_APPEND 145
+#define SET_ADD 146
 #define SETUP_ASYNC_WITH 154
 #define LOAD_METHOD 160
 #define CALL_METHOD 161
 #define LIST_EXTEND 162
+#define SET_UPDATE 163
 
 #define HAS_ARG(op) ((op) >= HAVE_ARGUMENT)

@@ -88,6 +88,7 @@ enum _expr_kind {
 	UnaryOp_kind=4,
 	IfExp_kind=6,
 	Dict_kind=7,
+	Set_kind=8,
 	Compare_kind=16,
 	Call_kind=17,
 	Constant_kind=20,
@@ -102,6 +103,10 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			asdl_expr_seq *elts;
+		} Set;
+
 		struct {
 			expr_ty value;
 			expr_ty slice;

@@ -440,3 +440,31 @@ PyObject_GetItem(PyObject *o, PyObject *key) {
 	}
 	assert(false);
 }
+
+PyObject *
+PySequence_List(PyObject *v) {
+	PyObject *result;
+	PyObject *rv;
+
+	if (v == NULL) {
+		assert(false);
+	}
+
+	result = PyList_New(0);
+	if (result == NULL)
+		return NULL;
+	
+	rv = _PyList_Extend((PyListObject *) result, v);
+	if (rv == NULL) {
+		assert(false);
+	}
+	Py_DECREF(rv);
+	return result;
+}
+
+Py_ssize_t 
+PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue) {
+	// TODO follow cpy
+	return defaultvalue;
+	// assert(false);
+}

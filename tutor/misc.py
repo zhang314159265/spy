@@ -33,9 +33,15 @@
 # 
 # test_list_ops()
 
-def test_dict_ops():
-	x = {}
-	x[5] = 6
-	print(x[5])
+# def test_dict_ops():
+# 	x = {}
+# 	x[5] = 6
+# 	print(x[5])
+# 
+# test_dict_ops()
 
-test_dict_ops()
+def test_build_set():
+	x = {3}
+	print(x)
+
+test_build_set()

@@ -164,6 +164,10 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr(expr->v.Subscript.slice, indent + 2);
 		dump_expr_context(expr->v.Subscript.ctx, indent + 2);
 		break;
+	case Set_kind:
+		fprintf(stderr, "Set:\n");
+		dump_expr_seq(expr->v.Set.elts, indent + 2);
+		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

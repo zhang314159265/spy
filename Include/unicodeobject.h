@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdarg.h>
 
 typedef uint32_t Py_UCS4;
 typedef uint16_t Py_UCS2;
@@ -450,9 +451,11 @@ _PyUnicodeWriter_PrepareInternal(_PyUnicodeWriter *writer,
 PyObject *_PyUnicode_FromASCII(const char *buffer, Py_ssize_t size) {
   const unsigned char *s = (const unsigned char *) buffer;
   PyObject *unicode;
+  #if 0
   if (size == 1) {
     assert(false);
   }
+  #endif
   unicode = PyUnicode_New(size, 127);
   if (!unicode)
     return NULL;
@@ -529,4 +532,167 @@ _PyUnicodeWriter_WriteASCIIString(_PyUnicodeWriter *writer,
 
   writer->pos += len;
   return 0;
+}
+
+PyObject *
+PyUnicode_Substring(PyObject *self, Py_ssize_t start, Py_ssize_t end) {
+  const unsigned char *data;
+  Py_ssize_t length;
+
+  if (PyUnicode_READY(self) == -1)
+    return NULL;
+
+  length = PyUnicode_GET_LENGTH(self);
+  end = Py_MIN(end, length);
+
+  if (start == 0 && end == length) {
+    assert(false);
+  }
+
+  if (start < 0 || end < 0) {
+    assert(false);
+  }
+
+  if (start >= length || end < start) {
+    assert(false);
+  }
+
+  length = end - start;
+  if (PyUnicode_IS_ASCII(self)) {
+    data = PyUnicode_1BYTE_DATA(self);
+    return _PyUnicode_FromASCII((const char *) (data + start), length);
+  } else {
+    assert(false);
+  }
+}
+
+static int
+unicode_fromformat_write_str(_PyUnicodeWriter *writer, PyObject *str,
+    Py_ssize_t width, Py_ssize_t precision) {
+  Py_ssize_t length;
+
+  if (PyUnicode_READY(str) == -1)
+    return -1;
+
+  length = PyUnicode_GET_LENGTH(str);
+  if ((precision == -1 || precision >= length) && width <= length) {
+    return _PyUnicodeWriter_WriteStr(writer, str);
+  }
+  assert(false);
+}
+
+static const char*
+unicode_fromformat_arg(_PyUnicodeWriter *writer,
+    const char *f, va_list *vargs)
+{
+  const char *p;
+  int zeropad;
+  Py_ssize_t width;
+  Py_ssize_t precision;
+  int longflag;
+  int longlongflag;
+  int size_tflag;
+
+  p = f;
+  f++;
+  zeropad = 0;
+  if (*p == '0') {
+    zeropad = 1;
+    f++;
+  }
+
+  width = -1;
+  if (isdigit((unsigned) *f)) {
+    assert(false);
+  }
+  precision = -1;
+  if (*f == '.') {
+    assert(false);
+  }
+  if (*f == '\0') {
+    assert(false);
+  }
+  longflag = 0;
+  longlongflag = 0;
+  size_tflag = 0;
+  if (*f == 'l') {
+    assert(false);
+  }
+  else if (*f == 'z' && (f[1] == 'd' || f[1] == 'u' || f[1] == 'i')) {
+    size_tflag = 1;
+    ++f;
+  }
+
+  if (f[1] == '\0')
+    writer->overallocate = 0;
+
+  switch (*f) {
+  case 'U': {
+    PyObject *obj = va_arg(*vargs, PyObject *);
+    assert(obj && _PyUnicode_CHECK(obj));
+
+    if (unicode_fromformat_write_str(writer, obj, width, precision) == -1)
+      return NULL;
+    break;
+  }
+  default:
+    assert(false);
+  }
+  f++;
+  return f;
+}
+
+PyObject *
+PyUnicode_FromFormatV(const char *format, va_list vargs) {
+  va_list vargs2;
+  const char *f;
+  _PyUnicodeWriter writer;
+
+  _PyUnicodeWriter_Init(&writer);
+  writer.min_length = strlen(format) + 100;
+  writer.overallocate = 1;
+
+  va_copy(vargs2, vargs);
+
+  for (f = format; *f; ) {
+    if (*f == '%') {
+      f = unicode_fromformat_arg(&writer, f, &vargs2);
+      if (f == NULL)
+        assert(false);
+    } else {
+      const char *p;
+      Py_ssize_t len;
+
+      p = f;
+      do {
+        if ((unsigned char) *p > 127) {
+          assert(false);
+        }
+        p++;
+      } while (*p != '\0' && *p != '%');
+      len = p - f;
+
+      if (*p == '\0')
+        writer.overallocate = 0;
+
+      if (_PyUnicodeWriter_WriteASCIIString(&writer, f, len) < 0)
+        assert(false);
+
+      f = p;
+    }
+  }
+  va_end(vargs2);
+  return _PyUnicodeWriter_Finish(&writer);
+}
+
+PyObject *
+PyUnicode_FromFormat(const char *format, ...) {
+  PyObject *ret;
+  va_list vargs;
+
+  va_start(vargs, format);
+
+  ret = PyUnicode_FromFormatV(format, vargs);
+  va_end(vargs);
+  return ret;
 }

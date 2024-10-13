@@ -1,5 +1,7 @@
 #pragma once
 
+#include "abstract.h"
+
 #define PySet_MINSIZE 8
 
 #define PyAnySet_Check(ob) \
@@ -10,6 +12,8 @@
 #define PySet_Check(ob) \
 	(Py_IS_TYPE(ob, &PySet_Type) || \
 	PyType_IsSubtype(Py_TYPE(ob), &PySet_Type))
+
+#define PySet_CheckExact(op) Py_IS_TYPE(op, &PySet_Type)
 
 #define PySet_GET_SIZE(so) (assert(PyAnySet_Check(so)), (((PySetObject *) (so))->used))
 
@@ -97,6 +101,8 @@ set_dealloc(PySetObject *so) {
   Py_TYPE(so)->tp_free(so);
 }
 
+static PyObject *set_repr(PySetObject *so);
+
 PyTypeObject PySet_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "set",
@@ -108,6 +114,7 @@ PyTypeObject PySet_Type = {
   .tp_iter = (getiterfunc) set_iter,
   .tp_dealloc = (destructor) set_dealloc,
   .tp_free = PyObject_GC_Del,
+	.tp_repr = (reprfunc) set_repr,
 };
 
 PyTypeObject PyFrozenSet_Type = {
@@ -412,4 +419,35 @@ int PySet_Discard(PyObject *set, PyObject *key) {
 		assert(false);
 	}
 	return set_discard_key((PySetObject *) set, key);
+}
+
+static PyObject *set_repr(PySetObject *so) {
+	PyObject *result=NULL, *keys, *listrepr, *tmp;
+
+	if (!so->used) {
+		assert(false);
+	}
+
+	keys = PySequence_List((PyObject *) so);
+	if (keys == NULL)
+		assert(false);
+	
+	listrepr = PyObject_Repr(keys);
+	Py_DECREF(keys);
+	if (listrepr == NULL)
+		assert(false);
+	tmp = PyUnicode_Substring(listrepr, 1, PyUnicode_GET_LENGTH(listrepr) - 1);
+	Py_DECREF(listrepr);
+	if (tmp == NULL)
+		assert(false);
+	listrepr = tmp;
+
+	if (!PySet_CheckExact(so)) {
+		assert(false);
+	} else {
+		result = PyUnicode_FromFormat("{%U}", listrepr);
+	}
+	Py_DECREF(listrepr);
+done:
+	return result;
 }

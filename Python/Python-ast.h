@@ -291,3 +291,14 @@ _PyAST_Subscript(expr_ty value, expr_ty slice, expr_context_ty ctx) {
 	p->v.Subscript.ctx = ctx;
 	return p;
 }
+
+expr_ty
+_PyAST_Set(asdl_expr_seq *elts) {
+	expr_ty p;
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Set_kind;
+	p->v.Set.elts = elts;
+	return p;
+}

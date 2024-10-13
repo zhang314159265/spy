@@ -295,11 +295,16 @@ PyObject *PySequence_Fast(PyObject *o, const char *m);
 	(PyList_Check(sf) ? ((PyListObject *)(sf))->ob_item \
 		: ((PyTupleObject *)(sf))->ob_item)
 
+PyObject *PyObject_GetIter(PyObject * o);
+Py_ssize_t PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue);
+
 static PyObject *
 list_extend(PyListObject *self, PyObject *iterable) {
+	PyObject *it;
 	Py_ssize_t m;  // size of self
 	Py_ssize_t n; // guess for size of iterable
 	Py_ssize_t i;
+	PyObject *(*iternext)(PyObject *);
 
 	if (PyList_CheckExact(iterable) || PyTuple_CheckExact(iterable) ||
 				(PyObject *) self == iterable) {
@@ -331,7 +336,51 @@ list_extend(PyListObject *self, PyObject *iterable) {
 		Py_DECREF(iterable);
 		Py_RETURN_NONE;
 	}
-	assert(false);
+
+	it = PyObject_GetIter(iterable);
+	if (it == NULL)
+		return NULL;
+	iternext = *Py_TYPE(it)->tp_iternext;
+
+	// Guess a result list size
+	n = PyObject_LengthHint(iterable, 8);
+	if (n < 0) {
+		Py_DECREF(it);
+		return NULL;
+	}
+	m = Py_SIZE(self);
+
+	if (self->ob_item == NULL) {
+		if (n && list_preallocate_exact(self, n) < 0)
+			assert(false);
+	} else {
+		// make room
+		assert(false);
+	}
+
+	// Run iterator to exhausion
+	for (;;) {
+		PyObject *item = iternext(it);
+		if (item == NULL) {
+			if (PyErr_Occurred()) {
+				assert(false);
+			}
+			break;
+		}
+		if (Py_SIZE(self) < self->allocated) {
+			PyList_SET_ITEM(self, Py_SIZE(self), item);
+			Py_SET_SIZE(self, Py_SIZE(self) + 1);
+		} else {
+			assert(false);
+		}
+	}
+	if (Py_SIZE(self) < self->allocated) {
+		if (list_resize(self, Py_SIZE(self)) < 0)
+			assert(false);
+	}
+
+	Py_DECREF(it);
+	Py_RETURN_NONE;
 }
 
 PyObject *
