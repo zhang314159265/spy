@@ -915,6 +915,26 @@ compiler_list(struct compiler *c, expr_ty e) {
 }
 
 static int
+compiler_dict(struct compiler *c, expr_ty e) {
+  Py_ssize_t i, n, elements;
+  int have_dict;
+
+  n = asdl_seq_LEN(e->v.Dict.values);
+  have_dict = 0;
+  elements = 0;
+  for (i = 0; i < n; i++) {
+    assert(false);
+  }
+  if (elements) {
+    assert(false);
+  }
+  if (!have_dict) {
+    ADDOP_I(c, BUILD_MAP, 0);
+  }
+  return 1;
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -948,6 +968,8 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     return compiler_tuple(c, e);
   case List_kind:
     return compiler_list(c, e);
+  case Dict_kind:
+    return compiler_dict(c, e);
 	default:
 		assert(false);
 	}

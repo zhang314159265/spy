@@ -24,6 +24,8 @@
 #define EQUAL 22
 #define DOT 23
 #define PERCENT 24
+#define LBRACE 25
+#define RBRACE 26
 #define EQEQUAL 27
 #define DOUBLESTAR 35
 #define PLUSEQUAL 36
@@ -65,6 +67,8 @@ PyToken_OneChar(int c1) {
 	case '*': return STAR;
 	case '[': return LSQB;
 	case ']': return RSQB;
+	case '{': return LBRACE;
+	case '}': return RBRACE;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;

@@ -257,3 +257,15 @@ _PyAST_Starred(expr_ty value, expr_context_ty ctx) {
 	p->v.Starred.ctx = ctx;
 	return p;
 }
+
+expr_ty
+_PyAST_Dict(asdl_expr_seq *keys, asdl_expr_seq *values) {
+	expr_ty p;
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Dict_kind;
+	p->v.Dict.keys = keys;
+	p->v.Dict.values = values;
+	return p;
+}

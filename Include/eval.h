@@ -201,6 +201,21 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BUILD_MAP): {
+			Py_ssize_t i;
+			PyObject *map = _PyDict_NewPresized((Py_ssize_t) oparg);
+			if (map == NULL)
+				goto error;
+			for (i = oparg; i > 0; i--) {
+				assert(false);
+			}
+			while (oparg--) {
+				Py_DECREF(POP());
+				Py_DECREF(POP());
+			}
+			PUSH(map);
+			DISPATCH();
+		}
 		case TARGET(LIST_TO_TUPLE): {
 			PyObject *list = POP();
 			PyObject *tuple = PyList_AsTuple(list);

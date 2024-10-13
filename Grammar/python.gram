@@ -163,6 +163,20 @@ atom[expr_ty]:
 	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
 	| &'(' (tuple | group)
 	| &'[' list
+	| &'{' dict
+
+dict[expr_ty]:
+	| '{' a=[double_starred_kvpairs] '}' {
+		_PyAST_Dict(
+			CHECK(asdl_expr_seq*, _PyPegen_get_keys(p, a)),
+			CHECK(asdl_expr_seq*, _PyPegen_get_values(p, a))) }
+
+double_starred_kvpairs[asdl_seq*]: a=','.double_starred_kvpair+ [','] { a }
+
+double_starred_kvpair[KeyValuePair*]:
+	| kvpair
+
+kvpair[KeyValuePair*]: a=expression ':' b=expression { (assert(false), NULL) }
 
 list[expr_ty]:
 	| '[' a=[star_named_expressions] ']' { _PyAST_List(a, Load) }

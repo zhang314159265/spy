@@ -542,6 +542,10 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 	case Starred_kind:
 		VISIT(st, expr, e->v.Starred.value);
 		break;
+	case Dict_kind:
+		VISIT_SEQ_WITH_NULL(st, expr, e->v.Dict.keys);
+		VISIT_SEQ(st, expr, e->v.Dict.values);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);

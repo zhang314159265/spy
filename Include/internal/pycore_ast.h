@@ -87,6 +87,7 @@ enum _expr_kind {
 	BinOp_kind=3,
 	UnaryOp_kind=4,
 	IfExp_kind=6,
+	Dict_kind=7,
 	Compare_kind=16,
 	Call_kind=17,
 	Constant_kind=20,
@@ -100,6 +101,11 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			asdl_expr_seq *keys;
+			asdl_expr_seq *values;
+		} Dict;
+
 		struct {
 			expr_ty value;
 			expr_context_ty ctx;

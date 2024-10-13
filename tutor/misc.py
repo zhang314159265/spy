@@ -26,9 +26,15 @@
 # 
 # test_build_tuple()
 
-def test_list_ops():
-	a = [2]
-	x = (*a, 3)
+# def test_list_ops():
+# 	a = [2]
+# 	x = (*a, 3)
+# 	print(x)
+# 
+# test_list_ops()
+
+def test_dict_ops():
+	x = {}
 	print(x)
 
-test_list_ops()
+test_dict_ops()

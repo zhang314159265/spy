@@ -25,6 +25,7 @@
 #define LOAD_NAME 101
 #define BUILD_TUPLE 102
 #define BUILD_LIST 103
+#define BUILD_MAP 105
 #define LOAD_ATTR 106
 #define COMPARE_OP 107
 #define JUMP_FORWARD 110

@@ -64,6 +64,7 @@ static PyDictKeysObject empty_keys_struct = {
 #define DK_MASK(dk) (((dk)->dk_size) - 1)
 
 static void dict_dealloc(PyDictObject *mp);
+static PyObject *dict_repr(PyDictObject *mp);
 
 PyTypeObject PyDict_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -72,6 +73,7 @@ PyTypeObject PyDict_Type = {
   .tp_flags = Py_TPFLAGS_DICT_SUBCLASS,
   .tp_dealloc = (destructor) dict_dealloc,
   .tp_free = PyObject_GC_Del,
+  .tp_repr = (reprfunc) dict_repr,
 };
 
 static inline Py_ssize_t
@@ -807,3 +809,21 @@ _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
     return NULL;
   return value;
 }
+
+PyObject *
+_PyDict_NewPresized(Py_ssize_t minused) {
+
+  if (minused <= USABLE_FRACTION(PyDict_MINSIZE)) {
+    return PyDict_New();
+  }
+  assert(false);
+}
+
+static PyObject *dict_repr(PyDictObject *mp) {
+  if (mp->ma_used == 0) {
+    return PyUnicode_FromString("{}");
+  }
+  assert(false);
+}
+
+

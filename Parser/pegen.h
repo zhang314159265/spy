@@ -59,6 +59,11 @@ typedef struct {
 	int n_keyword_lists;
 } Parser;
 
+typedef struct {
+	expr_ty key;
+	expr_ty value;
+} KeyValuePair;
+
 // Generated function in parse.c - function definition in python.gram
 void *_PyPegen_parse(Parser *);
 int _PyPegen_fill_token(Parser *p);
@@ -614,4 +619,31 @@ _PyPegen_empty_arguments(Parser *p) {
 	return _PyAST_arguments(posargs);
 }
 
+asdl_expr_seq *
+_PyPegen_get_keys(Parser *p, asdl_seq *seq) {
+	Py_ssize_t len = asdl_seq_LEN(seq);
+	asdl_expr_seq *new_seq = _Py_asdl_expr_seq_new(len, p->arena);
+	if (!new_seq) {
+		return NULL;
+	}
+	for (Py_ssize_t i = 0; i < len; i++) {
+		KeyValuePair *pair = asdl_seq_GET_UNTYPED(seq, i);
+		asdl_seq_SET(new_seq, i, pair->key);
+	}
+	return new_seq;
+}
+
+asdl_expr_seq *
+_PyPegen_get_values(Parser *p, asdl_seq *seq) {
+	Py_ssize_t len = asdl_seq_LEN(seq);
+	asdl_expr_seq *new_seq = _Py_asdl_expr_seq_new(len, p->arena);
+	if (!new_seq) {
+		return NULL;
+	}
+	for (Py_ssize_t i = 0; i < len; i++) {
+		KeyValuePair *pair = asdl_seq_GET_UNTYPED(seq, i);
+		asdl_seq_SET(new_seq, i, pair->value);
+	}
+	return new_seq;
+}
 #endif
