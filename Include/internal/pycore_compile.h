@@ -881,7 +881,7 @@ starunpack_helper(struct compiler *c, asdl_expr_seq *elts, int pushed,
   }
   assert(sequence_built);
   if (tuple) {
-    assert(false);
+    ADDOP(c, LIST_TO_TUPLE);
   }
   return 1;
 }

@@ -189,11 +189,50 @@ static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i) {
 }
 
 static PyObject *tuplerepr(PyTupleObject *v) {
-	Py_ssize_t n;
+	Py_ssize_t i, n;
+	_PyUnicodeWriter writer;
 
 	n = Py_SIZE(v);
 	if (n == 0) {
 		return PyUnicode_FromString("()");
 	}
-	assert(false);
+
+	_PyUnicodeWriter_Init(&writer);
+	writer.overallocate = 1;
+	if (Py_SIZE(v) > 1) {
+		writer.min_length = 1 + 1 + (2 + 1) * (Py_SIZE(v) - 1) + 1;
+	} else {
+		/* "(1,)" */
+		writer.min_length = 4;
+	}
+
+	if (_PyUnicodeWriter_WriteChar(&writer, '(') < 0)
+		assert(false);
+	
+	for (i = 0; i < n; ++i) {
+		PyObject *s;
+
+		if (i > 0) {
+			if (_PyUnicodeWriter_WriteASCIIString(&writer, ", ", 2) < 0)
+				assert(false);
+		}
+
+		s = PyObject_Repr(v->ob_item[i]);
+		if (s == NULL)
+			assert(false);
+
+		if (_PyUnicodeWriter_WriteStr(&writer, s) < 0) {
+			assert(false);
+		}
+		Py_DECREF(s);
+	}
+
+	writer.overallocate = 0;
+	if (n > 1) {
+		if (_PyUnicodeWriter_WriteChar(&writer, ')') < 0)
+			assert(false);
+	} else {
+		assert(false);
+	}
+	return _PyUnicodeWriter_Finish(&writer);
 }

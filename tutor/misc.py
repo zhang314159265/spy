@@ -28,7 +28,7 @@
 
 def test_list_ops():
 	a = [2]
-	x = [*a, 3]
+	x = (*a, 3)
 	print(x)
 
 test_list_ops()

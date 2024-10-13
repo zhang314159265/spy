@@ -201,6 +201,16 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(LIST_TO_TUPLE): {
+			PyObject *list = POP();
+			PyObject *tuple = PyList_AsTuple(list);
+			Py_DECREF(list);
+			if (tuple == NULL) {
+				goto error;
+			}
+			PUSH(tuple);
+			DISPATCH();
+		}
 		case TARGET(LIST_EXTEND): {
 			PyObject *iterable = POP();
 			PyObject *list = PEEK(oparg);
