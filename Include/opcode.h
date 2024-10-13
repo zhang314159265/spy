@@ -14,6 +14,7 @@
 #define BINARY_FLOOR_DIVIDE 28
 #define INPLACE_ADD 55
 #define STORE_SUBSCR 60
+#define BINARY_AND 64
 #define GET_ITER 68
 #define LIST_TO_TUPLE 82
 #define RETURN_VALUE 83

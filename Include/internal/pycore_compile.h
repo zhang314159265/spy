@@ -793,6 +793,8 @@ binop(operator_ty op) {
     return BINARY_MULTIPLY;
   case FloorDiv:
     return BINARY_FLOOR_DIVIDE;
+	case BitAnd:
+		return BINARY_AND;
   default:
     assert(false);
   }

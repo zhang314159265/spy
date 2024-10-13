@@ -24,6 +24,9 @@ Quest 4:
 Quest 5:
 - closure
 
+Quest 6:
+- Class
+
 - goal
 	- ? exception handling
 

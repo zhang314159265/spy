@@ -15,5 +15,5 @@ static inline void _Py_atomic_size_set(Py_ssize_t *var, Py_ssize_t value)
 }
 
 #else
-#error don't HAVE_BUILTIN_ATOMIC
+#error "don't HAVE_BUILTIN_ATOMIC"
 #endif

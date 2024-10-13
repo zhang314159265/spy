@@ -28,6 +28,7 @@ typedef enum _operator {
 	Div=5,
 	Mod=6,
 	Pow=7,
+	BitAnd=12,
 	FloorDiv=13,
 } operator_ty;
 

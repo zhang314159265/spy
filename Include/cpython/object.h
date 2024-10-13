@@ -21,6 +21,7 @@ typedef struct {
   unaryfunc nb_absolute;
   ternaryfunc nb_power;
   binaryfunc nb_multiply;
+	binaryfunc nb_and;
 } PyNumberMethods;
 
 typedef struct {

@@ -97,6 +97,13 @@ eq_bitwise_or[CmpopExprPair*]: '==' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, E
 lt_bitwise_or[CmpopExprPair*]: '<' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Lt, a) }
 
 bitwise_or[expr_ty]:
+	| bitwise_and
+
+bitwise_and[expr_ty]:
+	| a=bitwise_and '&' b=shift_expr { _PyAST_BinOp(a, BitAnd, b) }
+	| shift_expr
+
+shift_expr[expr_ty]:
 	| sum
 
 sum[expr_ty]:

@@ -20,6 +20,7 @@
 #define MINUS 15
 #define STAR 16
 #define SLASH 17
+#define AMPER 19
 #define LESS 20
 #define EQUAL 22
 #define DOT 23
@@ -69,6 +70,7 @@ PyToken_OneChar(int c1) {
 	case ']': return RSQB;
 	case '{': return LBRACE;
 	case '}': return RBRACE;
+	case '&': return AMPER;
 	}
 	fatal("Unhandled OneChar token %d ('%c')\n", c1, (char) c1);
 	return OP;

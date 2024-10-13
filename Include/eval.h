@@ -203,6 +203,17 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(BINARY_AND): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_And(left, right);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
 		case TARGET(BUILD_SET): {
 			PyObject *set = PySet_New(NULL);
 			int err = 0;

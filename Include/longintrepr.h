@@ -37,6 +37,7 @@ static PyObject *long_true_divide(PyObject *v, PyObject *w);
 static PyObject *long_pow(PyObject *v, PyObject *w, PyObject *x);
 static PyObject *long_mul(PyLongObject *a, PyLongObject *b);
 static PyObject *long_to_decimal_string(PyObject *aa);
+static PyObject *long_and(PyObject *a, PyObject *b);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -47,6 +48,7 @@ static PyNumberMethods long_as_number = {
   .nb_true_divide = long_true_divide,
   .nb_power = long_pow,
   .nb_multiply = (binaryfunc) long_mul,
+	.nb_and = long_and,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -399,4 +401,98 @@ static PyObject *long_to_decimal_string(PyObject *aa) {
   if (long_to_decimal_string_internal(aa, &v, NULL, NULL, NULL) == -1)
     return NULL;
   return v;
+}
+
+static PyLongObject *
+long_normalize(PyLongObject *v) {
+	Py_ssize_t j = Py_ABS(Py_SIZE(v));
+	Py_ssize_t i = j;
+
+	while (i > 0 && v->ob_digit[i - 1] == 0)
+		--i;
+	if (i != j) {
+		Py_SET_SIZE(v, (Py_SIZE(v) < 0) ? -(i) : i);
+	}
+	return v;
+}
+
+static PyLongObject *
+maybe_small_long(PyLongObject *v) {
+	// TODO follow cpy
+	return v;
+}
+
+static PyObject *
+long_bitwise(PyLongObject *a,
+		char op,
+		PyLongObject *b) {
+	int nega, negb, negz;
+	Py_ssize_t size_a, size_b, size_z, i;
+	PyLongObject *z;
+
+	size_a = Py_ABS(Py_SIZE(a));
+	nega = Py_SIZE(a) < 0;
+	if (nega) {
+		assert(false);
+	} else
+		Py_INCREF(a);
+
+	size_b = Py_ABS(Py_SIZE(b));
+	negb = Py_SIZE(b) < 0;
+	if (negb) {
+		assert(false);
+	} else
+		Py_INCREF(b);
+
+	if (size_a < size_b) {
+		z = a; a = b; b = z;
+		size_z = size_a; size_a = size_b; size_b = size_z;
+		negz = nega; nega = negb; negb = negz;
+	}
+	
+	switch (op){
+	case '&':
+		negz = nega & negb;
+		size_z = negb ? size_a : size_b;
+		break;
+	default:
+		assert(false);
+	}
+	z = _PyLong_New(size_z + negz);
+	if (z == NULL) {
+		Py_DECREF(a);
+		Py_DECREF(b);
+		return NULL;
+	}
+
+	switch (op) {
+	case '&':
+		for (i = 0; i < size_b; ++i) {
+			z->ob_digit[i] = a->ob_digit[i] & b->ob_digit[i];
+		}
+		break;
+	default:
+		assert(false);
+	}
+	if (op == '^' && negb) {
+		assert(false);
+	} else if (i < size_z) {
+		assert(false);
+	}
+
+	if (negz) {
+		assert(false);
+	}
+
+	Py_DECREF(a);
+	Py_DECREF(b);
+
+	return (PyObject *)maybe_small_long(long_normalize(z));
+}
+
+static PyObject *long_and(PyObject *a, PyObject *b) {
+	PyObject *c;
+	CHECK_BINOP(a, b);
+	c = long_bitwise((PyLongObject *)a, '&', (PyLongObject*) b);
+	return c;
 }

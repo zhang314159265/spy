@@ -116,6 +116,7 @@ symtable_new(void) {
   if ((st->st_blocks = PyDict_New()) == NULL)
     assert(false);
 
+  st->st_cur = NULL;
   st->st_private = NULL;
 	return st;
 }

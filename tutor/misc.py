@@ -40,8 +40,15 @@
 # 
 # test_dict_ops()
 
-def test_build_set():
-	x = {3}
-	print(x)
+# def test_build_set():
+# 	x = {3}
+# 	print(x)
+# 
+# test_build_set()
 
-test_build_set()
+def test_binary_and():
+	x = 3
+	y = 2
+	print(x & y)
+
+test_binary_and()
