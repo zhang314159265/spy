@@ -1243,6 +1243,28 @@ inplace_binop(operator_ty op) {
   switch (op) {
   case Add:
     return INPLACE_ADD;
+  case Sub:
+    return INPLACE_SUBTRACT;
+  case Mult:
+    return INPLACE_MULTIPLY;
+  case Div:
+    return INPLACE_TRUE_DIVIDE;
+  case Mod:
+    return INPLACE_MODULO;
+  case Pow:
+    return INPLACE_POWER;
+  case LShift:
+    return INPLACE_LSHIFT;
+  case RShift:
+    return INPLACE_RSHIFT;
+  case BitOr:
+    return INPLACE_OR;
+  case BitXor:
+    return INPLACE_XOR;
+  case BitAnd:
+    return INPLACE_AND;
+  case FloorDiv:
+    return INPLACE_FLOOR_DIVIDE;
   default:
     assert(false);
   }

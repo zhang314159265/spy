@@ -169,6 +169,17 @@ single_target[expr_ty]:
 
 augassign[AugOperator*]:
 	| '+=' { _PyPegen_augoperator(p, Add) }
+	| '-=' { _PyPegen_augoperator(p, Sub) }
+	| '&=' { _PyPegen_augoperator(p, BitAnd) }
+	| '|=' { _PyPegen_augoperator(p, BitOr) }
+	| '^=' { _PyPegen_augoperator(p, BitXor) }
+	| '%=' { _PyPegen_augoperator(p, Mod) }
+	| '*=' { _PyPegen_augoperator(p, Mult) }
+	| '/=' { _PyPegen_augoperator(p, Div) }
+	| '//=' { _PyPegen_augoperator(p, FloorDiv) }
+	| '<<=' { _PyPegen_augoperator(p, LShift) }
+	| '>>=' { _PyPegen_augoperator(p, RShift) }
+	| '**=' { _PyPegen_augoperator(p, Pow) }
 
 star_targets[expr_ty]:
 	| a=star_target !',' {a}

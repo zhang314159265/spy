@@ -71,12 +71,29 @@
 # 
 # test_unary_ops()
 
-def test_more_cmp():
-	a = 3
-	b = [3]
-	print(a is b)
-	print(a is not b)
-	print(a in b)
-	print(a not in b)
+# def test_more_cmp():
+# 	a = 3
+# 	b = [3]
+# 	print(a is b)
+# 	print(a is not b)
+# 	print(a in b)
+# 	print(a not in b)
+# 
+# test_more_cmp()
 
-test_more_cmp()
+def test_inplace_ops():
+	a = 3
+	a -= 2
+	a &= 3
+	a //= 1
+	a <<= 2
+	a %= 200
+	a *= 3
+	a |= 3
+	a **= 2
+	a >>= 1
+	a ^= 4
+	# a /= 2
+	print(a)
+
+test_inplace_ops()

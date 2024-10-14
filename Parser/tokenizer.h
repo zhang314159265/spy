@@ -430,7 +430,14 @@ int tok_get(struct tok_state *tok, const char **p_start, const char **p_end) {
 		int c2 = tok_nextc(tok);
 		int token = PyToken_TwoChars(c, c2);
 		if (token != OP) {
-			// TODO handle 3 character tokens
+			int c3 = tok_nextc(tok);
+			int token3 = PyToken_ThreeChars(c, c2, c3);
+			if (token3 != OP) {
+				token = token3;
+			} else {
+				tok_backup(tok, c3);
+			}
+
 			*p_start = tok->start;
 			*p_end = tok->cur;
 			return token;

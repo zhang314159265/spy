@@ -35,7 +35,18 @@
 #define RIGHTSHIFT 34
 #define DOUBLESTAR 35
 #define PLUSEQUAL 36
+#define MINEQUAL 37
+#define STAREQUAL 38
+#define SLASHEQUAL 39
+#define PERCENTEQUAL 40
+#define AMPEREQUAL 41
+#define VBAREQUAL 42
+#define CIRCUMFLEXEQUAL 43
+#define LEFTSHIFTEQUAL 44
+#define RIGHTSHIFTEQUAL 45
+#define DOUBLESTAREQUAL 46
 #define DOUBLESLASH 47
+#define DOUBLESLASHEQUAL 48
 #define OP 54
 #define TYPE_IGNORE 57
 
@@ -91,6 +102,11 @@ int PyToken_TwoChars(int c1, int c2) {
 		case '=': return PLUSEQUAL;
 		}
 		break;
+	case '-':
+		switch (c2) {
+		case '=': return MINEQUAL;
+		}
+		break;
 	case '=':
 		switch (c2) {
 		case '=': return EQEQUAL;
@@ -99,11 +115,23 @@ int PyToken_TwoChars(int c1, int c2) {
 	case '*':
 		switch (c2) {
 		case '*': return DOUBLESTAR;
+		case '=': return STAREQUAL;
 		}
 		break;
 	case '/':
 		switch (c2) {
 		case '/': return DOUBLESLASH;
+		case '=': return SLASHEQUAL;
+		}
+		break;
+	case '^':
+		switch (c2) {
+		case '=': return CIRCUMFLEXEQUAL;
+		}
+		break;
+	case '|':
+		switch (c2) {
+		case '=': return VBAREQUAL;
 		}
 		break;
 	case '<':
@@ -114,6 +142,59 @@ int PyToken_TwoChars(int c1, int c2) {
 	case '>':
 		switch (c2) {
 		case '>': return RIGHTSHIFT;
+		}
+		break;
+	case '&':
+		switch (c2) {
+		case '=': return AMPEREQUAL;
+		}
+		break;
+	case '%':
+		switch (c2) {
+		case '=': return PERCENTEQUAL;
+		}
+		break;
+	}
+	return OP;
+}
+
+int
+PyToken_ThreeChars(int c1, int c2, int c3) {
+	switch (c1) {
+	case '/':
+		switch (c2) {
+		case '/':
+			switch (c3) {
+			case '=': return DOUBLESLASHEQUAL;
+			}
+			break;
+		}
+		break;
+	case '<':
+		switch (c2) {
+		case '<':
+			switch (c3) {
+			case '=': return LEFTSHIFTEQUAL;
+			}
+			break;
+		}
+		break;
+	case '*':
+		switch (c2) {
+		case '*':
+			switch (c3) {
+			case '=': return DOUBLESTAREQUAL;
+			}
+			break;
+		}
+		break;
+	case '>':
+		switch (c2) {
+		case '>':
+			switch (c3) {
+			case '=': return RIGHTSHIFTEQUAL;
+			}
+			break;
 		}
 		break;
 	}

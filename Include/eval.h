@@ -203,6 +203,59 @@ main_loop:
 			}
 			DISPATCH();
 		}
+
+#define HANDLE_BINARY_OP(meth) \
+		  PyObject *right = POP(); \
+			PyObject *left = TOP(); \
+			PyObject *res = meth(left, right); \
+			Py_DECREF(left); \
+			Py_DECREF(right); \
+			SET_TOP(res); \
+			if (res == NULL) \
+				goto error; \
+			DISPATCH()
+
+		case TARGET(INPLACE_SUBTRACT): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceSubtract);
+		}
+		case TARGET(INPLACE_FLOOR_DIVIDE): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceFloorDivide);
+		}
+		case TARGET(INPLACE_TRUE_DIVIDE): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceTrueDivide);
+		}
+		case TARGET(INPLACE_MULTIPLY): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceMultiply);
+		}
+		case TARGET(INPLACE_MODULO): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceRemainder);
+		}
+		case TARGET(INPLACE_POWER): {
+		  PyObject *right = POP();
+			PyObject *left = TOP();
+			PyObject *res = PyNumber_InPlacePower(left, right, Py_None);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH()
+		}
+		case TARGET(INPLACE_LSHIFT): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceLshift);
+		}
+		case TARGET(INPLACE_RSHIFT): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceRshift);
+		}
+		case TARGET(INPLACE_AND): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceAnd);
+		}
+		case TARGET(INPLACE_XOR): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceXor);
+		}
+		case TARGET(INPLACE_OR): {
+			HANDLE_BINARY_OP(PyNumber_InPlaceOr);
+		}
 		case TARGET(IS_OP): {
 			PyObject *right = POP();
 			PyObject *left = TOP();

@@ -112,6 +112,63 @@ binary_iop(PyObject *v, PyObject *w, const int iop_slot, const int op_slot,
   }
 
 INPLACE_BINOP(PyNumber_InPlaceOr, nb_inplace_or, nb_or, "|=")
+INPLACE_BINOP(PyNumber_InPlaceAnd, nb_inplace_and, nb_and, "&=")
+INPLACE_BINOP(PyNumber_InPlaceXor, nb_inplace_xor, nb_xor, "^=")
+INPLACE_BINOP(PyNumber_InPlaceSubtract, nb_inplace_subtract, nb_subtract, "-=")
+INPLACE_BINOP(PyNumber_InPlaceLshift, nb_inplace_lshift, nb_lshift, "<<=")
+INPLACE_BINOP(PyNumber_InPlaceRshift, nb_inplace_rshift, nb_rshift, ">>=")
+
+PyObject *
+PyNumber_InPlaceFloorDivide(PyObject *v, PyObject *w) {
+	return binary_iop(v, w, NB_SLOT(nb_inplace_floor_divide),
+			NB_SLOT(nb_floor_divide), "//=");
+}
+
+PyObject *
+PyNumber_InPlaceTrueDivide(PyObject *v, PyObject *w) {
+	return binary_iop(v, w, NB_SLOT(nb_inplace_true_divide),
+		NB_SLOT(nb_true_divide), "/=");
+}
+
+PyObject *
+PyNumber_InPlaceRemainder(PyObject *v, PyObject *w) {
+	return binary_iop(v, w, NB_SLOT(nb_inplace_remainder),
+		NB_SLOT(nb_remainder), "%=");
+}
+
+PyObject *
+PyNumber_InPlaceMultiply(PyObject *v, PyObject *w) {
+	PyObject *result = BINARY_IOP1(v, w, NB_SLOT(nb_inplace_multiply),
+			NB_SLOT(nb_multiply), "*=");
+	if (result == Py_NotImplemented) {
+		assert(false);
+	}
+	return result;
+}
+
+static PyObject *ternary_op(PyObject *v,
+		PyObject *w,
+		PyObject *z,
+		const int op_slot,
+		const char *op_name);
+
+static PyObject *
+ternary_iop(PyObject *v, PyObject *w, PyObject *z, const int iop_slot, const int op_slot, const char *op_name) {
+	PyNumberMethods *mv = Py_TYPE(v)->tp_as_number;
+	if (mv != NULL) {
+		ternaryfunc slot = NB_TERNOP(mv, iop_slot);
+		if (slot) {
+			assert(false);
+		}
+	}
+	return ternary_op(v, w, z, op_slot, op_name);
+}
+
+PyObject *
+PyNumber_InPlacePower(PyObject *v, PyObject *w, PyObject *z) {
+	return ternary_iop(v, w, z, NB_SLOT(nb_inplace_power),
+		NB_SLOT(nb_power), "**=");
+}
 
 // defined in cpy/Objects/abstract.c
 int PyIter_Check(PyObject *obj) {

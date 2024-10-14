@@ -30,6 +30,17 @@ typedef struct {
   unaryfunc nb_negative;
   unaryfunc nb_invert;
   inquiry nb_bool;
+
+  binaryfunc nb_inplace_and;
+  binaryfunc nb_inplace_xor;
+  binaryfunc nb_inplace_subtract;
+  binaryfunc nb_inplace_multiply;
+  binaryfunc nb_inplace_remainder;
+  binaryfunc nb_inplace_lshift;
+  binaryfunc nb_inplace_rshift;
+  binaryfunc nb_inplace_floor_divide;
+  binaryfunc nb_inplace_true_divide;
+  ternaryfunc nb_inplace_power;
 } PyNumberMethods;
 
 typedef struct {
