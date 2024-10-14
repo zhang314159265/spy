@@ -203,6 +203,33 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(UNARY_POSITIVE): {
+			PyObject *value = TOP();
+			PyObject *res = PyNumber_Positive(value);
+			Py_DECREF(value);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
+		case TARGET(UNARY_NEGATIVE): {
+			PyObject *value = TOP();
+			PyObject *res = PyNumber_Negative(value);
+			Py_DECREF(value);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
+		case TARGET(UNARY_INVERT): {
+			PyObject *value = TOP();
+			PyObject *res = PyNumber_Invert(value);
+			Py_DECREF(value);
+			SET_TOP(res);
+			if (res == NULL)
+				goto error;
+			DISPATCH();
+		}
 		case TARGET(BINARY_LSHIFT): {
 			PyObject *right = POP();
 			PyObject *left = TOP();

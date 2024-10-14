@@ -473,3 +473,48 @@ PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue) {
 	return defaultvalue;
 	// assert(false);
 }
+
+PyObject *
+PyNumber_Positive(PyObject *o) {
+	if (o == NULL) {
+		assert(false);
+	}
+
+	PyNumberMethods *m = Py_TYPE(o)->tp_as_number;
+	if (m && m->nb_positive) {
+		PyObject *res = (*m->nb_positive)(o);
+		assert(res != NULL);
+		return res;
+	}
+	assert(false);
+}
+
+PyObject *
+PyNumber_Negative(PyObject *o) {
+	if (o == NULL) {
+		assert(false);
+	}
+
+	PyNumberMethods *m = Py_TYPE(o)->tp_as_number;
+	if (m && m->nb_negative) {
+		PyObject *res = (*m->nb_negative)(o);
+		assert(res != NULL);
+		return res;
+	}
+	assert(false);
+}
+
+PyObject *
+PyNumber_Invert(PyObject *o) {
+	if (o == NULL) {
+		assert(false);
+	}
+
+	PyNumberMethods *m = Py_TYPE(o)->tp_as_number;
+	if (m && m->nb_invert) {
+		PyObject *res = (*m->nb_invert)(o);
+		assert(res != NULL);
+		return res;
+	}
+	assert(false);
+}

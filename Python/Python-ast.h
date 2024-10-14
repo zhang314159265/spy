@@ -302,3 +302,21 @@ _PyAST_Set(asdl_expr_seq *elts) {
 	p->v.Set.elts = elts;
 	return p;
 }
+
+expr_ty
+_PyAST_UnaryOp(unaryop_ty op, expr_ty operand) {
+	expr_ty p;
+	if (!op) {
+		assert(false);
+	}
+	if (!operand) {
+		assert(false);
+	}
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = UnaryOp_kind;
+	p->v.UnaryOp.op = op;
+	p->v.UnaryOp.operand = operand;
+	return p;
+}

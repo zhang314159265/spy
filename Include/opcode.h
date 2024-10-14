@@ -4,6 +4,10 @@
 
 #define POP_TOP 1
 #define DUP_TOP 4
+#define UNARY_POSITIVE 10
+#define UNARY_NEGATIVE 11
+#define UNARY_INVERT 15
+
 #define BINARY_POWER 19
 #define BINARY_MULTIPLY 20
 #define BINARY_MODULO 22

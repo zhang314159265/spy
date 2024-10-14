@@ -55,9 +55,17 @@
 # 
 # test_bitwise_ops()
 
-def test_shift():
-	x = 2
-	print(x << 1)
-	print(x >> 1)
+# def test_shift():
+# 	x = 2
+# 	print(x << 1)
+# 	print(x >> 1)
+# 
+# test_shift()
 
-test_shift()
+def test_unary_ops():
+	x = 2
+	print(-x)
+	print(+x)
+	print(~x)
+
+test_unary_ops()

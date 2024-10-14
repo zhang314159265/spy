@@ -975,6 +975,20 @@ compiler_set(struct compiler *c, expr_ty e) {
 }
 
 static int
+unaryop(unaryop_ty op) {
+  switch (op) {
+  case Invert:
+    return UNARY_INVERT;
+  case UAdd:
+    return UNARY_POSITIVE;
+  case USub:
+    return UNARY_NEGATIVE;
+  default:
+    assert(false);
+  }
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -1014,6 +1028,10 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     return compiler_subscript(c, e);
   case Set_kind:
     return compiler_set(c, e);
+  case UnaryOp_kind:
+    VISIT(c, expr, e->v.UnaryOp.operand);
+    ADDOP(c, unaryop(e->v.UnaryOp.op));
+    break;
 	default:
 		assert(false);
 	}

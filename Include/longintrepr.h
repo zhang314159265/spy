@@ -42,6 +42,9 @@ static PyObject *long_or(PyObject *a, PyObject *b);
 static PyObject *long_xor(PyObject *a, PyObject *b);
 static PyObject *long_lshift(PyObject *a, PyObject *b);
 static PyObject *long_rshift(PyObject *a, PyObject *b);
+static PyObject *long_neg(PyLongObject *v);
+static PyObject *long_invert(PyLongObject *v);
+static PyObject *long_long(PyObject *v);
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -57,6 +60,9 @@ static PyNumberMethods long_as_number = {
   .nb_xor = long_xor,
   .nb_lshift = long_lshift,
   .nb_rshift = long_rshift,
+  .nb_negative = (unaryfunc) long_neg,
+  .nb_positive = long_long,
+  .nb_invert = (unaryfunc) long_invert,
 };
 
 // defined in cpy/Objects/longobject.c
@@ -667,4 +673,18 @@ static PyObject *long_rshift(PyObject *a, PyObject *b) {
   if (divmod_shift(b, &wordshift, &remshift) < 0)
     return NULL;
   return long_rshift1((PyLongObject *) a, wordshift, remshift);
+}
+
+static PyObject *long_neg(PyLongObject *v) {
+  PyLongObject *z;
+  if (Py_ABS(Py_SIZE(v)) <= 1)
+    return PyLong_FromLong(-MEDIUM_VALUE(v));
+  assert(false);
+}
+
+static PyObject *long_invert(PyLongObject *v) {
+  PyLongObject *x;
+  if (Py_ABS(Py_SIZE(v)) <= 1)
+    return PyLong_FromLong(-(MEDIUM_VALUE(v) + 1));
+  assert(false);
 }

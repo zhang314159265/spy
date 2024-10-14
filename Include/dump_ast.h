@@ -99,6 +99,20 @@ void dump_operator_ty(operator_ty op, int indent) {
 	}
 }
 
+void dump_unaryop_ty(unaryop_ty op, int indent) {
+	_INDENT();
+	switch (op) {
+	case UAdd:
+		fprintf(stderr, "+\n"); break;
+	case USub:
+		fprintf(stderr, "-\n"); break;
+	case Invert:
+		fprintf(stderr, "~\n"); break;
+	default:
+		assert(false);
+	}
+}
+
 void dump_expr(expr_ty expr, int indent) {
 	_INDENT();
 	switch (expr->kind) {
@@ -177,6 +191,11 @@ void dump_expr(expr_ty expr, int indent) {
 	case Set_kind:
 		fprintf(stderr, "Set:\n");
 		dump_expr_seq(expr->v.Set.elts, indent + 2);
+		break;
+	case UnaryOp_kind:
+		fprintf(stderr, "UnaryOp:\n");
+		dump_unaryop_ty(expr->v.UnaryOp.op, indent + 2);
+		dump_expr(expr->v.UnaryOp.operand, indent + 2);
 		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);

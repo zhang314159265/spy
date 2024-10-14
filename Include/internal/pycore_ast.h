@@ -21,6 +21,8 @@ typedef struct {
 
 #include "internal/pycore_asdl.h"
 
+typedef enum _unaryop { Invert=1, UAdd=3, USub=4 } unaryop_ty;
+
 typedef enum _operator {
 	Add=1,
 	Sub=2,
@@ -108,6 +110,11 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			unaryop_ty op;
+			expr_ty operand;
+		} UnaryOp;
+
 		struct {
 			asdl_expr_seq *elts;
 		} Set;

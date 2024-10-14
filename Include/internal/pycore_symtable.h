@@ -554,6 +554,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 	case Set_kind:
 		VISIT_SEQ(st, expr, e->v.Set.elts);
 		break;
+	case UnaryOp_kind:
+		VISIT(st, expr, e->v.UnaryOp.operand);
+		break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);

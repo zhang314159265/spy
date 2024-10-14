@@ -126,6 +126,9 @@ term[expr_ty]:
 	| factor
 
 factor[expr_ty] (memo):
+	| '+' a=factor { _PyAST_UnaryOp(UAdd, a) }
+	| '-' a=factor { _PyAST_UnaryOp(USub, a) }
+	| '~' a=factor { _PyAST_UnaryOp(Invert, a) }
 	| power
 
 power[expr_ty]:

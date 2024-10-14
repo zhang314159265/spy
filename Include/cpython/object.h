@@ -25,6 +25,10 @@ typedef struct {
 	binaryfunc nb_and;
   binaryfunc nb_lshift;
   binaryfunc nb_rshift;
+
+  unaryfunc nb_positive;
+  unaryfunc nb_negative;
+  unaryfunc nb_invert;
 } PyNumberMethods;
 
 typedef struct {
