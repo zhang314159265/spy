@@ -306,3 +306,24 @@ PyObject *PyObject_Str(PyObject *v) {
   }
   assert(false);
 }
+
+// 1 for value interpreted as true, 0 for value interpreted as false;
+// -1 for error
+int PyObject_IsTrue(PyObject *v) {
+	Py_ssize_t res;
+	if (v == Py_True)
+		return 1;
+	if (v == Py_False)
+		return 0;
+	if (v == Py_None)
+		return 0;
+	else if (Py_TYPE(v)->tp_as_number != NULL &&
+			Py_TYPE(v)->tp_as_number->nb_bool != NULL) {
+		res = (*Py_TYPE(v)->tp_as_number->nb_bool)(v);
+	} else {
+		assert(false);
+	}
+	return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
+}
+
+

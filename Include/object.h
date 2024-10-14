@@ -35,6 +35,7 @@ typedef struct _object {
 	PyTypeObject *ob_type;
 } PyObject;
 
+typedef int (*inquiry)(PyObject *);
 typedef PyObject *(*unaryfunc)(PyObject *);
 typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
 typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
@@ -315,5 +316,6 @@ int Py_Is(PyObject *x, PyObject *y) {
 
 PyObject *PyObject_Str(PyObject *v);
 PyObject *PyObject_Repr(PyObject *v);
+int PyObject_IsTrue(PyObject *v);
 
 #endif

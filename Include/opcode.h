@@ -6,6 +6,7 @@
 #define DUP_TOP 4
 #define UNARY_POSITIVE 10
 #define UNARY_NEGATIVE 11
+#define UNARY_NOT 12
 #define UNARY_INVERT 15
 
 #define BINARY_POWER 19

@@ -9,10 +9,13 @@
 #define Py_RETURN_TRUE return Py_NewRef(Py_True)
 #define Py_RETURN_FALSE return Py_NewRef(Py_False)
 
+static PyObject *bool_repr(PyObject *self);
+
 PyTypeObject PyBool_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "bool",
 	.tp_basicsize = sizeof(struct _longobject),
+  .tp_repr = bool_repr,
 };
 
 struct _longobject _Py_FalseStruct = {
@@ -41,3 +44,19 @@ PyObject *PyBool_FromLong(long ok) {
 
 #define Py_IsTrue(x) Py_Is((x), Py_True)
 #define Py_IsFalse(x) Py_Is((x), Py_False)
+
+static PyObject *false_str = NULL;
+static PyObject *true_str = NULL;
+
+static PyObject *bool_repr(PyObject *self) {
+  PyObject *s;
+
+  if (self == Py_True)
+    s = true_str ? true_str :
+      (true_str = PyUnicode_InternFromString("True"));
+  else
+    s = false_str ? false_str :
+      (false_str = PyUnicode_InternFromString("False"));
+  Py_XINCREF(s);
+  return s;
+}

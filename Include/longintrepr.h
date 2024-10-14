@@ -45,6 +45,7 @@ static PyObject *long_rshift(PyObject *a, PyObject *b);
 static PyObject *long_neg(PyLongObject *v);
 static PyObject *long_invert(PyLongObject *v);
 static PyObject *long_long(PyObject *v);
+static int long_bool(PyLongObject *v) { return Py_SIZE(v) != 0; }
 
 static PyNumberMethods long_as_number = {
   .nb_inplace_add = 0,
@@ -63,6 +64,7 @@ static PyNumberMethods long_as_number = {
   .nb_negative = (unaryfunc) long_neg,
   .nb_positive = long_long,
   .nb_invert = (unaryfunc) long_invert,
+  .nb_bool = (inquiry) long_bool,
 };
 
 // defined in cpy/Objects/longobject.c

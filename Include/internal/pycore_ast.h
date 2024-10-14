@@ -21,7 +21,7 @@ typedef struct {
 
 #include "internal/pycore_asdl.h"
 
-typedef enum _unaryop { Invert=1, UAdd=3, USub=4 } unaryop_ty;
+typedef enum _unaryop { Invert=1, Not=2, UAdd=3, USub=4 } unaryop_ty;
 
 typedef enum _operator {
 	Add=1,

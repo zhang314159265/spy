@@ -67,5 +67,6 @@ def test_unary_ops():
 	print(-x)
 	print(+x)
 	print(~x)
+	print(not x)
 
 test_unary_ops()

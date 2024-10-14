@@ -12,7 +12,7 @@ else
 PREFIX :=
 endif
 
-# TUTOR=tutor/sqrt.py
+TUTOR=tutor/sqrt.py
 TUTOR=tutor/misc.py
 
 first: mine

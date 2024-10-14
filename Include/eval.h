@@ -203,6 +203,23 @@ main_loop:
 			}
 			DISPATCH();
 		}
+
+		case TARGET(UNARY_NOT): {
+			PyObject *value = TOP();
+			int err = PyObject_IsTrue(value);
+			Py_DECREF(value);
+			if (err == 0) {
+				Py_INCREF(Py_True);
+				SET_TOP(Py_True);
+				DISPATCH();
+			} else if (err > 0) {
+				Py_INCREF(Py_False);
+				SET_TOP(Py_False);
+				DISPATCH();
+			}
+			STACK_SHRINK(1);
+			goto error;
+		}
 		case TARGET(UNARY_POSITIVE): {
 			PyObject *value = TOP();
 			PyObject *res = PyNumber_Positive(value);

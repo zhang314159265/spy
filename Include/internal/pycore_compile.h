@@ -983,6 +983,8 @@ unaryop(unaryop_ty op) {
     return UNARY_POSITIVE;
   case USub:
     return UNARY_NEGATIVE;
+  case Not:
+    return UNARY_NOT;
   default:
     assert(false);
   }

@@ -29,6 +29,7 @@ typedef struct {
   unaryfunc nb_positive;
   unaryfunc nb_negative;
   unaryfunc nb_invert;
+  inquiry nb_bool;
 } PyNumberMethods;
 
 typedef struct {

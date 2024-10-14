@@ -108,6 +108,8 @@ void dump_unaryop_ty(unaryop_ty op, int indent) {
 		fprintf(stderr, "-\n"); break;
 	case Invert:
 		fprintf(stderr, "~\n"); break;
+	case Not:
+		fprintf(stderr, "not\n"); break;
 	default:
 		assert(false);
 	}
