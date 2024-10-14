@@ -36,6 +36,7 @@ typedef struct {
   ssizeobjargproc sq_ass_item;
   lenfunc sq_length;
   ssizeargfunc sq_item;
+  objobjproc sq_contains;
 } PySequenceMethods;
 
 struct _typeobject {

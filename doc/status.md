@@ -11,6 +11,7 @@ Quest 2:
 		- dict ops <===
 			- search dict or map
 	  - set ops
+		- ```'dis.dis("a = {3: 4}; b = {5:6, **a}")'```
 
 Quest 1:
 - cover import <+++++++++++

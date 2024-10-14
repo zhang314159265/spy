@@ -518,3 +518,14 @@ PyNumber_Invert(PyObject *o) {
 	}
 	assert(false);
 }
+
+int
+PySequence_Contains(PyObject *seq, PyObject *ob) {
+	PySequenceMethods *sqm = Py_TYPE(seq)->tp_as_sequence;
+	if (sqm != NULL && sqm->sq_contains != NULL) {
+		int res = (*sqm->sq_contains)(seq, ob);
+		assert(res >= 0);
+		return res;
+	}
+	assert(false);
+}

@@ -203,6 +203,31 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(IS_OP): {
+			PyObject *right = POP();
+			PyObject *left = TOP();
+			int res = Py_Is(left, right) ^ oparg;
+			PyObject *b = res ? Py_True : Py_False;
+			Py_INCREF(b);
+			SET_TOP(b);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			DISPATCH();
+		}
+		case TARGET(CONTAINS_OP): {
+			PyObject *right = POP();
+			PyObject *left = POP();
+			int res = PySequence_Contains(right, left);
+			Py_DECREF(left);
+			Py_DECREF(right);
+			if (res < 0) {
+				goto error;
+			}
+			PyObject *b = (res ^ oparg) ? Py_True : Py_False;
+			Py_INCREF(b);
+			PUSH(b);
+			DISPATCH();
+		}
 
 		case TARGET(UNARY_NOT): {
 			PyObject *value = TOP();

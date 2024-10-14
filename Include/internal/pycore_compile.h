@@ -817,6 +817,18 @@ static int compiler_addcompare(struct compiler *c, cmpop_ty op) {
   case Lt:
     cmp = Py_LT;
     break;
+  case Is:
+    ADDOP_I(c, IS_OP, 0);
+    return 1;
+  case IsNot:
+    ADDOP_I(c, IS_OP, 1);
+    return 1;
+  case In:
+    ADDOP_I(c, CONTAINS_OP, 0);
+    return 1;
+  case NotIn:
+    ADDOP_I(c, CONTAINS_OP, 1);
+    return 1;
   default:
     assert(false);
   }

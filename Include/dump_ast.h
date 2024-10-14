@@ -38,6 +38,18 @@ void dump_cmpop_seq(asdl_int_seq *cmpop_seq, int indent) {
 		case Lt:
 			fprintf(stderr, "<\n");
 			break;
+		case Is:
+			fprintf(stderr, "is\n");
+			break;
+		case IsNot:
+			fprintf(stderr, "is not\n");
+			break;
+		case In:
+			fprintf(stderr, "in\n");
+			break;
+		case NotIn:
+			fprintf(stderr, "not in\n");
+			break;
 		default:
 			assert(false);
 		}

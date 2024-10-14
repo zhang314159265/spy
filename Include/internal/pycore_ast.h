@@ -41,6 +41,10 @@ typedef enum _operator {
 typedef enum _cmpop {
 	Eq=1,
 	Lt=3,
+	Is=7,
+	IsNot=8,
+	In=9,
+	NotIn=10,
 } cmpop_ty;
 
 typedef enum _expr_context { Load=1, Store=2, Del=3} expr_context_ty;

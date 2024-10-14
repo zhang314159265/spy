@@ -32,9 +32,11 @@ list_dealloc(PyListObject *op) {
 
 static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v);
 static PyObject *list_repr(PyListObject *v);
+static int list_contains(PyListObject *a, PyObject *el);
 
 static PySequenceMethods list_as_sequence = {
 	.sq_ass_item = (ssizeobjargproc) list_ass_item,
+	.sq_contains = (objobjproc) list_contains,
 };
 
 extern PyTypeObject PyList_Type;
@@ -386,4 +388,18 @@ list_extend(PyListObject *self, PyObject *iterable) {
 PyObject *
 _PyList_Extend(PyListObject *self, PyObject *iterable) {
 	return list_extend(self, iterable);
+}
+
+static int list_contains(PyListObject *a, PyObject *el) {
+	PyObject *item;
+	Py_ssize_t i;
+	int cmp;
+
+	for (i = 0, cmp = 0; cmp == 0 && i < Py_SIZE(a); ++i) {
+		item = PyList_GET_ITEM(a, i);
+		Py_INCREF(item);
+		cmp = PyObject_RichCompareBool(item, el, Py_EQ);
+		Py_DECREF(item);
+	}
+	return cmp;
 }

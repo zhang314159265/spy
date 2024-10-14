@@ -62,11 +62,21 @@
 # 
 # test_shift()
 
-def test_unary_ops():
-	x = 2
-	print(-x)
-	print(+x)
-	print(~x)
-	print(not x)
+# def test_unary_ops():
+# 	x = 2
+# 	print(-x)
+# 	print(+x)
+# 	print(~x)
+# 	print(not x)
+# 
+# test_unary_ops()
 
-test_unary_ops()
+def test_more_cmp():
+	a = 3
+	b = [3]
+	print(a is b)
+	print(a is not b)
+	print(a in b)
+	print(a not in b)
+
+test_more_cmp()

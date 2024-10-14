@@ -35,6 +35,7 @@ typedef struct _object {
 	PyTypeObject *ob_type;
 } PyObject;
 
+typedef int (*objobjproc)(PyObject *, PyObject *);
 typedef int (*inquiry)(PyObject *);
 typedef PyObject *(*unaryfunc)(PyObject *);
 typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
