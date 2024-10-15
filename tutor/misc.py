@@ -81,19 +81,25 @@
 # 
 # test_more_cmp()
 
-def test_inplace_ops():
-	a = 3
-	a -= 2
-	a &= 3
-	a //= 1
-	a <<= 2
-	a %= 200
-	a *= 3
-	a |= 3
-	a **= 2
-	a >>= 1
-	a ^= 4
-	# a /= 2
-	print(a)
+# def test_inplace_ops():
+# 	a = 3
+# 	a -= 2
+# 	a &= 3
+# 	a //= 1
+# 	a <<= 2
+# 	a %= 200
+# 	a *= 3
+# 	a |= 3
+# 	a **= 2
+# 	a >>= 1
+# 	a ^= 4
+# 	# a /= 2
+# 	print(a)
+# 
+# test_inplace_ops()
 
-test_inplace_ops()
+def test_slice():
+	a = [2, 3, 5, 7]
+	print(a[1:3])
+
+test_slice()

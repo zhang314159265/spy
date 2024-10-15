@@ -87,7 +87,9 @@ intern_string_constants(PyObject *tuple, int *modified) {
         }
       }
     } else if (PyTuple_CheckExact(v)) {
-      assert(false);
+      if (intern_string_constants(v, NULL) < 0) {
+        return -1;
+      }
     }
   }
   return 0;

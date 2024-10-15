@@ -65,6 +65,7 @@ static PyNumberMethods long_as_number = {
   .nb_positive = long_long,
   .nb_invert = (unaryfunc) long_invert,
   .nb_bool = (inquiry) long_bool,
+  .nb_index = long_long,
 };
 
 // defined in cpy/Objects/longobject.c

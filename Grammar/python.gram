@@ -193,7 +193,11 @@ target_with_star_atom[expr_ty] (memo):
 	| star_atom
 
 slices[expr_ty]:
-	| NUMBER
+	| a=slice !',' {a}
+
+slice[expr_ty]:
+	| a=[expression] ':' b=[expression] c=[':' d=[expression] {d}] { _PyAST_Slice(a, b, c) }
+	| a=named_expression {a}
 
 t_primary[expr_ty]:
 	| a=atom &t_lookahead { a}

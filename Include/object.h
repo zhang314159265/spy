@@ -319,4 +319,6 @@ PyObject *PyObject_Str(PyObject *v);
 PyObject *PyObject_Repr(PyObject *v);
 int PyObject_IsTrue(PyObject *v);
 
+#define Py_IsNone(x) Py_Is((x), Py_None)
+
 #endif

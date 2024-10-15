@@ -129,6 +129,10 @@ void dump_unaryop_ty(unaryop_ty op, int indent) {
 
 void dump_expr(expr_ty expr, int indent) {
 	_INDENT();
+	if (!expr) {
+		fprintf(stderr, "NULL\n");
+		return;
+	}
 	switch (expr->kind) {
 	case Name_kind:
 		fprintf(stderr, "Name:\n");
@@ -210,6 +214,12 @@ void dump_expr(expr_ty expr, int indent) {
 		fprintf(stderr, "UnaryOp:\n");
 		dump_unaryop_ty(expr->v.UnaryOp.op, indent + 2);
 		dump_expr(expr->v.UnaryOp.operand, indent + 2);
+		break;
+	case Slice_kind:
+		fprintf(stderr, "Slice:\n");
+		dump_expr(expr->v.Slice.lower, indent + 2);
+		dump_expr(expr->v.Slice.upper, indent + 2);
+		dump_expr(expr->v.Slice.step, indent + 2);
 		break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);

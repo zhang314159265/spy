@@ -488,6 +488,12 @@ int PyObject_SetItem(PyObject *o, PyObject *key, PyObject *value) {
 	assert(false);
 }
 
+static inline int
+_PyIndex_Check(PyObject *obj) {
+	PyNumberMethods *tp_as_number = Py_TYPE(obj)->tp_as_number;
+	return (tp_as_number != NULL && tp_as_number->nb_index != NULL);
+}
+
 PyObject *
 PyObject_GetItem(PyObject *o, PyObject *key) {
 	if (o == NULL || key == NULL) {
@@ -499,6 +505,16 @@ PyObject_GetItem(PyObject *o, PyObject *key) {
 		PyObject *item = m->mp_subscript(o, key);
 		assert(item != NULL);
 		return item;
+	}
+
+	// printf("PyObject_GetItem obj type %s, key type %s\n", Py_TYPE(o)->tp_name, Py_TYPE(key)->tp_name);
+	PySequenceMethods *ms = Py_TYPE(o)->tp_as_sequence;
+	if (ms && ms->sq_item) {
+		if (_PyIndex_Check(key)) {
+			assert(false);
+		} else {
+			assert(false);
+		}
 	}
 	assert(false);
 }
@@ -585,4 +601,20 @@ PySequence_Contains(PyObject *seq, PyObject *ob) {
 		return res;
 	}
 	assert(false);
+}
+
+// return an error on Overflow only if err is not NULL
+Py_ssize_t
+PyNumber_AsSsize_t(PyObject *item, PyObject *err) {
+	Py_ssize_t result;
+	PyObject *value = _PyNumber_Index(item);
+	if (value == NULL)
+		return -1;
+	result = PyLong_AsSsize_t(value);
+	if (result != -1)
+		goto finish;
+	assert(false);
+finish:
+	Py_DECREF(value);
+	return result;
 }

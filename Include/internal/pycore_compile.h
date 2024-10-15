@@ -31,6 +31,18 @@ PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
 		return 0; \
 }
 
+#define ADDOP_LOAD_CONST_NEW(C, O) { \
+  PyObject *__new_const = (O); \
+  if (__new_const == NULL) { \
+    return 0; \
+  } \
+  if (!compiler_addop_load_const((C), __new_const)) { \
+    Py_DECREF(__new_const); \
+    return 0; \
+  } \
+  Py_DECREF(__new_const); \
+}
+
 #define ADDOP_I(C, OP, O) { \
 	if (!compiler_addop_i((C), (OP), (O))) \
 		return 0; \
@@ -749,7 +761,30 @@ merge_consts_recursive(struct compiler *c, PyObject *o) {
 	}
 
 	if (PyTuple_CheckExact(o)) {
-		assert(false);
+    Py_ssize_t len = PyTuple_GET_SIZE(o);
+    for (Py_ssize_t i = 0; i < len; i++) {
+      PyObject *item = PyTuple_GET_ITEM(o, i);
+      PyObject *u = merge_consts_recursive(c, item);
+      if (u == NULL) {
+        Py_DECREF(key);
+        return NULL;
+      }
+
+      // See _PyCode_ConstantKey()
+      PyObject *v;
+      if (PyTuple_CheckExact(u)) {
+        v = PyTuple_GET_ITEM(u, 1);
+      } else {
+        v = u;
+      }
+      if (v != item) {
+        Py_INCREF(v);
+        PyTuple_SET_ITEM(o, i, v);
+        Py_DECREF(item);
+      }
+
+      Py_DECREF(u);
+    }
 	}
 	return key;
 }
@@ -854,11 +889,42 @@ compiler_compare(struct compiler *c, expr_ty e) {
 }
 
 static int
+are_all_items_const(asdl_expr_seq *seq, Py_ssize_t begin, Py_ssize_t end) {
+  Py_ssize_t i;
+  for (i = begin; i < end; i++) {
+    expr_ty key = (expr_ty) asdl_seq_GET(seq, i);
+    if (key == NULL || key->kind != Constant_kind)
+      return 0;
+  }
+  return 1;
+}
+
+static int
 starunpack_helper(struct compiler *c, asdl_expr_seq *elts, int pushed,
     int build, int add, int extend, int tuple) {
   Py_ssize_t n = asdl_seq_LEN(elts);
-  if (n > 2) {
-    assert(false);
+  if (n > 2 && are_all_items_const(elts, 0, n)) {
+    PyObject *folded = PyTuple_New(n);
+    if (folded == NULL) {
+      return 0;
+    }
+    PyObject *val;
+    for (Py_ssize_t i = 0; i < n; i++) {
+      val = ((expr_ty) asdl_seq_GET(elts, i))->v.Constant.value;
+      Py_INCREF(val);
+      PyTuple_SET_ITEM(folded, i, val);
+    }
+    if (tuple) {
+      assert(false);
+    } else {
+      if (add == SET_ADD) {
+        assert(false);
+      }
+      ADDOP_I(c, build, pushed);
+      ADDOP_LOAD_CONST_NEW(c, folded);
+      ADDOP_I(c, extend, 1);
+    }
+    return 1;
   }
 
   int big = n + pushed > STACK_USE_GUIDELINE;
@@ -1003,6 +1069,31 @@ unaryop(unaryop_ty op) {
 }
 
 static int
+compiler_slice(struct compiler *c, expr_ty s) {
+  int n = 2;
+  assert(s->kind == Slice_kind);
+
+  if (s->v.Slice.lower) {
+    VISIT(c, expr, s->v.Slice.lower);
+  } else {
+    ADDOP_LOAD_CONST(c, Py_None);
+  }
+
+  if (s->v.Slice.upper) {
+    VISIT(c, expr, s->v.Slice.upper);
+  } else {
+    ADDOP_LOAD_CONST(c, Py_None);
+  }
+
+  if (s->v.Slice.step) {
+    n++;
+    VISIT(c, expr, s->v.Slice.step);
+  }
+  ADDOP_I(c, BUILD_SLICE, n);
+  return 1;
+}
+
+static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
 	case Call_kind:
@@ -1046,6 +1137,8 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     VISIT(c, expr, e->v.UnaryOp.operand);
     ADDOP(c, unaryop(e->v.UnaryOp.op));
     break;
+  case Slice_kind:
+    return compiler_slice(c, e);
 	default:
 		assert(false);
 	}

@@ -109,11 +109,18 @@ enum _expr_kind {
 	Name_kind=24,
 	List_kind=25,
 	Tuple_kind=26,
+	Slice_kind=27,
 };
 
 struct _expr {
 	enum _expr_kind kind;
 	union {
+		struct {
+			expr_ty lower;
+			expr_ty upper;
+			expr_ty step;
+		} Slice;
+
 		struct {
 			unaryop_ty op;
 			expr_ty operand;

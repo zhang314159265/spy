@@ -320,3 +320,16 @@ _PyAST_UnaryOp(unaryop_ty op, expr_ty operand) {
 	p->v.UnaryOp.operand = operand;
 	return p;
 }
+
+expr_ty
+_PyAST_Slice(expr_ty lower, expr_ty upper, expr_ty step) {
+	expr_ty p;
+	p = (expr_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Slice_kind;
+	p->v.Slice.lower = lower;
+	p->v.Slice.upper = upper;
+	p->v.Slice.step = step;
+	return p;
+}

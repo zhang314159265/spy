@@ -3,6 +3,7 @@
 #include "frameobject.h"
 #include "funcobject.h"
 #include "tupleobject.h"
+#include "sliceobject.h"
 
 PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define GETLOCAL(i) (fastlocals[i])
@@ -201,6 +202,24 @@ main_loop:
 			} else {
 				assert(false);
 			}
+			DISPATCH();
+		}
+
+		case TARGET(BUILD_SLICE): {
+			PyObject *start, *stop, *step, *slice;
+			if (oparg == 3)
+				step = POP();
+			else
+				step = NULL;
+			stop = POP();
+			start = TOP();
+			slice = PySlice_New(start, stop, step);
+			Py_DECREF(start);
+			Py_DECREF(stop);
+			Py_XDECREF(step);
+			SET_TOP(slice);
+			if (slice == NULL)
+				goto error;
 			DISPATCH();
 		}
 
@@ -957,4 +976,21 @@ PyObject *PyEval_GetGlobals(void) {
 		return NULL;
 	}
 	assert(false);
+}
+
+// return 0 on error, 1 on success
+int _PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi) {
+	PyThreadState *tstate = _PyThreadState_GET();
+	if (!Py_IsNone(v)) {
+		Py_ssize_t x;
+		if (_PyIndex_Check(v)) {
+			x = PyNumber_AsSsize_t(v, NULL);
+			if (x == -1 && _PyErr_Occurred(tstate))
+				return 0;
+		} else {
+			assert(false);
+		}
+		*pi = x;
+	}
+	return 1;
 }

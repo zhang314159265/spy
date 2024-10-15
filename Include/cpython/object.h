@@ -41,6 +41,8 @@ typedef struct {
   binaryfunc nb_inplace_floor_divide;
   binaryfunc nb_inplace_true_divide;
   ternaryfunc nb_inplace_power;
+
+  unaryfunc nb_index;
 } PyNumberMethods;
 
 typedef struct {

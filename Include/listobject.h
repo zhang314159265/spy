@@ -33,10 +33,12 @@ list_dealloc(PyListObject *op) {
 static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v);
 static PyObject *list_repr(PyListObject *v);
 static int list_contains(PyListObject *a, PyObject *el);
+static PyObject *list_item(PyListObject *a, Py_ssize_t i);
 
 static PySequenceMethods list_as_sequence = {
 	.sq_ass_item = (ssizeobjargproc) list_ass_item,
 	.sq_contains = (objobjproc) list_contains,
+	.sq_item = (ssizeargfunc) list_item,
 };
 
 extern PyTypeObject PyList_Type;
@@ -402,4 +404,8 @@ static int list_contains(PyListObject *a, PyObject *el) {
 		Py_DECREF(item);
 	}
 	return cmp;
+}
+
+static PyObject *list_item(PyListObject *a, Py_ssize_t i) {
+	assert(false);
 }
