@@ -11,7 +11,8 @@ Quest 2:
 		- dict ops <===
 			- search dict or map
 	  - set ops
-		- ```'dis.dis("a = {3: 4}; b = {5:6, **a}")'```
+			- ```'dis.dis("a = {3: 4}; b = {5:6, **a}")'```
+			  - do this for both set and dict; Do this with unpack at either beginning or end.
 
 Quest 1:
 - cover import <+++++++++++

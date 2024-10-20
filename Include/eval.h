@@ -205,6 +205,13 @@ main_loop:
 			DISPATCH();
 		}
 
+		case TARGET(DUP_TOP): {
+			PyObject *top = TOP();
+			Py_INCREF(top);
+			PUSH(top);
+			DISPATCH();
+		}
+
 		case TARGET(UNPACK_SEQUENCE): {
 			PyObject *seq = POP(), *item, **items;
 			if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) == oparg) {

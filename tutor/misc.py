@@ -111,8 +111,14 @@
 # 
 # test_unpack()
 
-def test_del():
-	a = 3
-	del a
+# def test_del():
+# 	a = 3
+# 	del a
+# 
+# test_del()
 
-test_del()
+def test_dup():
+	x = y = 5
+	print(x, y)
+
+test_dup()
