@@ -1407,6 +1407,12 @@ compiler_augassign(struct compiler *c, stmt_ty s) {
     if (!compiler_nameop(c, e->v.Name.id, Load))
       return 0;
     break;
+	case Subscript_kind:
+		VISIT(c, expr, e->v.Subscript.value);
+		VISIT(c, expr, e->v.Subscript.slice);
+		ADDOP(c, DUP_TOP_TWO);
+		ADDOP(c, BINARY_SUBSCR);
+		break;
   default:
     assert(false);
   }
@@ -1414,6 +1420,10 @@ compiler_augassign(struct compiler *c, stmt_ty s) {
   VISIT(c, expr, s->v.AugAssign.value);
   ADDOP(c, inplace_binop(s->v.AugAssign.op));
   switch (e->kind) {
+	case Subscript_kind:
+		ADDOP(c, ROT_THREE);
+		ADDOP(c, STORE_SUBSCR);
+		break;
   case Name_kind:
     return compiler_nameop(c, e->v.Name.id, Store);
   default:

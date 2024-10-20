@@ -117,8 +117,15 @@
 # 
 # test_del()
 
-def test_dup():
-	x = y = 5
-	print(x, y)
+# def test_dup():
+# 	x = y = 5
+# 	print(x, y)
+# 
+# test_dup()
 
-test_dup()
+def test_subscript_augassign():
+	x = [2, 3]
+	x[0] += 1
+	print(x)
+
+test_subscript_augassign()

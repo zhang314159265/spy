@@ -177,7 +177,11 @@ assignment[stmt_ty]:
 	}
 
 single_target[expr_ty]:
+	| single_subscript_attribute_target
 	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
+
+single_subscript_attribute_target[expr_ty]:
+	| a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
 
 augassign[AugOperator*]:
 	| '+=' { _PyPegen_augoperator(p, Add) }

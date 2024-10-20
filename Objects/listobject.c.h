@@ -6,9 +6,11 @@ static PyMethodDef list_methods[] = {
 };
 
 static PyObject *list_subscript(PyListObject *self, PyObject *item);
+static int list_ass_subscript(PyListObject *self, PyObject *item, PyObject *value);
 
 static PyMappingMethods list_as_mapping = {
 	(binaryfunc) list_subscript,
+	(objobjargproc) list_ass_subscript,
 };
 
 // defined in cpy/Objects/listobject.c
@@ -68,7 +70,16 @@ list_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh) {
 }
 
 static PyObject *list_subscript(PyListObject *self, PyObject *item) {
-	if (PySlice_Check(item)) {
+	if (_PyIndex_Check(item)) {
+		Py_ssize_t i;
+		// TODO in cpy the second arg is PyExc_IndexError
+		i = PyNumber_AsSsize_t(item, NULL);
+		if (i == -1 && PyErr_Occurred())
+			return NULL;
+		if (i < 0)
+			i += PyList_GET_SIZE(self);
+		return list_item(self, i);
+	} else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
 		if (PySlice_Unpack(item, &start, &stop, &step) < 0) {
@@ -82,6 +93,20 @@ static PyObject *list_subscript(PyListObject *self, PyObject *item) {
 		} else {
 			assert(false);
 		}
+	} else {
+		assert(false);
+	}
+}
+
+static int list_ass_subscript(PyListObject *self, PyObject *item, PyObject *value) {
+	if (_PyIndex_Check(item)) {
+		// TODO cpy pass the second arg as PyExc_IndexError
+		Py_ssize_t i = PyNumber_AsSsize_t(item, NULL);
+		if (i == -1 && PyErr_Occurred())
+			return -1;
+		if (i < 0)
+			i += PyList_GET_SIZE(self);
+		return list_ass_item(self, i, value);
 	} else {
 		assert(false);
 	}

@@ -227,7 +227,9 @@ PyList_Size(PyObject *op) {
 static int list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v) {
 	if (v == NULL)
 		return list_ass_slice(a, i, i + 1, v);
-	assert(false);
+	Py_INCREF(v);
+	Py_SETREF(a->ob_item[i], v);
+	return 0;
 }
 
 static PyObject *list_repr(PyListObject *v) {
@@ -407,5 +409,6 @@ static int list_contains(PyListObject *a, PyObject *el) {
 }
 
 static PyObject *list_item(PyListObject *a, Py_ssize_t i) {
-	assert(false);
+	Py_INCREF(a->ob_item[i]);
+	return a->ob_item[i];
 }

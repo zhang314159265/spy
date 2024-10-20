@@ -36,6 +36,8 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define THIRD() (stack_pointer[-3])
 #define PEEK(n) (stack_pointer[-(n)])
 #define SET_TOP(v) (stack_pointer[-1] = (v))
+#define SET_SECOND(v) (stack_pointer[-2] = (v))
+#define SET_THIRD(v) (stack_pointer[-3] = (v))
 
 #define EXT_POP(STACK_POINTER) (*--(STACK_POINTER))
 
@@ -202,6 +204,27 @@ main_loop:
 			} else {
 				assert(false);
 			}
+			DISPATCH();
+		}
+
+		case TARGET(ROT_THREE): {
+			PyObject *top = TOP();
+			PyObject *second = SECOND();
+			PyObject *third = THIRD();
+			SET_TOP(second);
+			SET_SECOND(third);
+			SET_THIRD(top);
+			DISPATCH();
+		}
+
+		case TARGET(DUP_TOP_TWO): {
+			PyObject *top = TOP();
+			PyObject *second = SECOND();
+			Py_INCREF(top);
+			Py_INCREF(second);
+			STACK_GROW(2);
+			SET_TOP(top);
+			SET_SECOND(second);
 			DISPATCH();
 		}
 

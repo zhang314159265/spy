@@ -119,6 +119,13 @@ typedef struct _Py_Identifier {
 #define _Py_static_string(varname, value) static _Py_Identifier varname = _Py_static_string_init(value)
 #define _Py_IDENTIFIER(varname) _Py_static_string(PyId_##varname, #varname)
 
+#define Py_SETREF(op, op2) \
+  do { \
+    PyObject *_py_tmp = _PyObject_CAST(op); \
+    (op) = (op2); \
+    Py_DECREF(_py_tmp); \
+  } while (0)
+
 #define Py_XSETREF(op, op2) \
   do { \
     PyObject *_py_tmp = _PyObject_CAST(op); \
