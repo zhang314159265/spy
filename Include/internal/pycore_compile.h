@@ -1632,6 +1632,9 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
     return compiler_while(c, s);
   case Break_kind:
     return compiler_break(c);
+	case Delete_kind:
+		VISIT_SEQ(c, expr, s->v.Delete.targets)
+		break;
 	default:
 		assert(false);
 	}

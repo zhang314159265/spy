@@ -194,6 +194,7 @@ struct _expr {
 enum _stmt_kind {
 	FunctionDef_kind = 1,
 	Return_kind = 4,
+	Delete_kind = 5,
 	Assign_kind = 6,
 	AugAssign_kind = 7,
 	For_kind = 9,
@@ -206,6 +207,9 @@ enum _stmt_kind {
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+		struct {
+			asdl_expr_seq *targets;
+		} Delete;
 		struct {
 			expr_ty test;
 			asdl_stmt_seq *body;

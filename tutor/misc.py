@@ -104,9 +104,15 @@
 # 
 # test_slice()
 
-def test_unpack():
-	l = [3, 5]
-	a, b = l
-	print(a, b)
+# def test_unpack():
+# 	l = [3, 5]
+# 	a, b = l
+# 	print(a, b)
+# 
+# test_unpack()
 
-test_unpack()
+def test_del():
+	a = 3
+	del a
+
+test_del()

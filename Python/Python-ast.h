@@ -333,3 +333,14 @@ _PyAST_Slice(expr_ty lower, expr_ty upper, expr_ty step) {
 	p->v.Slice.step = step;
 	return p;
 }
+
+stmt_ty
+_PyAST_Delete(asdl_expr_seq *targets) {
+	stmt_ty p;
+	p = (stmt_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = Delete_kind;
+	p->v.Delete.targets = targets;
+	return p;
+}

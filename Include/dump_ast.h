@@ -287,6 +287,10 @@ void dump_stmt(stmt_ty stmt, int indent) {
 	case Break_kind:
 		fprintf(stderr, "Break\n");
 		break;
+	case Delete_kind:
+		fprintf(stderr, "Del\n");
+		dump_expr_seq(stmt->v.Delete.targets, indent + 2);
+		break;
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);
 		assert(false && "dump_stmt");

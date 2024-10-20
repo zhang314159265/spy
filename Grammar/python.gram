@@ -66,6 +66,18 @@ simple_stmt[stmt_ty] (memo):
 	| &'return' return_stmt
 	| e=primary { _PyAST_Expr(e) }
 	| 'break' { _PyAST_Break() }
+	| &'del' del_stmt
+
+del_stmt[stmt_ty]:
+	| 'del' a=del_targets &(';' | NEWLINE) { _PyAST_Delete(a) }
+
+del_targets[asdl_expr_seq*]: a[asdl_expr_seq*]=','.del_target+ [','] { a}
+
+del_target[expr_ty] (memo):
+	| del_t_atom
+
+del_t_atom[expr_ty]:
+	| a=NAME { _PyPegen_set_expr_context(p, a, Del) }
 
 return_stmt[stmt_ty]:
 	| 'return' a=[star_expressions] { _PyAST_Return(a) }

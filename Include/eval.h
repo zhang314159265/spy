@@ -912,6 +912,14 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(DELETE_FAST): {
+			PyObject *v = GETLOCAL(oparg);
+			if (v != NULL) {
+				SETLOCAL(oparg, NULL);
+				DISPATCH();
+			}
+			assert(false);
+		}
 		default:
 			printf("Can not handle opcode %d\n", opcode);
 			assert(false);
