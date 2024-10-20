@@ -41,6 +41,7 @@
 #define HAVE_ARGUMENT 90
 #define STORE_NAME 90
 #define DELETE_NAME 91
+#define UNPACK_SEQUENCE 92
 #define FOR_ITER 93
 #define STORE_GLOBAL 97
 #define DELETE_GLOBAL 98

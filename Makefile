@@ -28,6 +28,6 @@ pegen:
 	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/$(PYEXE) -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
 CFLAGS := -IInclude -I.
-mine: # pegen
+mine: pegen
 	gcc -g main.c $(CFLAGS)
 	$(PREFIX) ./a.out $(TUTOR)

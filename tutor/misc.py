@@ -98,8 +98,15 @@
 # 
 # test_inplace_ops()
 
-def test_slice():
-	a = [2, 3, 5, 7]
-	print(a[1:3])
+# def test_slice():
+# 	a = [2, 3, 5, 7]
+# 	print(a[1:3])
+# 
+# test_slice()
 
-test_slice()
+def test_unpack():
+	l = [3, 5]
+	a, b = l
+	print(a, b)
+
+test_unpack()

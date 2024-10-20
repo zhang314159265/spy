@@ -183,6 +183,9 @@ augassign[AugOperator*]:
 
 star_targets[expr_ty]:
 	| a=star_target !',' {a}
+	| a=star_target b=(',' c=star_target { c})* [','] {
+	  _PyAST_Tuple(CHECK(asdl_expr_seq*, _PyPegen_seq_insert_in_front(p, a, b)), Store)
+	}
 
 star_target[expr_ty] (memo):
 	| target_with_star_atom

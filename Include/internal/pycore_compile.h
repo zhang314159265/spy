@@ -974,11 +974,45 @@ starunpack_helper(struct compiler *c, asdl_expr_seq *elts, int pushed,
   return 1;
 }
 
+#define RETURN_IF_FALSE(X) \
+	if (!(X)) { \
+		return 0; \
+	}
+
+static int
+unpack_helper(struct compiler *c, asdl_expr_seq *elts) {
+	Py_ssize_t n = asdl_seq_LEN(elts);
+	int seen_star = 0;
+	for (Py_ssize_t i = 0; i < n; i++) {
+		expr_ty elt = asdl_seq_GET(elts, i);
+		if (elt->kind == Starred_kind) {
+			assert(false);
+		}
+	}
+
+	if (!seen_star) {
+		ADDOP_I(c, UNPACK_SEQUENCE, n);
+	}
+	return 1;
+}
+
+static int
+assignment_helper(struct compiler *c, asdl_expr_seq *elts) {
+	Py_ssize_t n = asdl_seq_LEN(elts);
+	RETURN_IF_FALSE(unpack_helper(c, elts));
+	for (Py_ssize_t i = 0; i < n; i++) {
+		expr_ty elt = asdl_seq_GET(elts, i);
+		assert(elt->kind != Starred_kind);
+		VISIT(c, expr, elt);
+	}
+	return 1;
+}
+
 static int
 compiler_tuple(struct compiler *c, expr_ty e) {
   asdl_expr_seq *elts = e->v.Tuple.elts;
   if (e->v.Tuple.ctx == Store) {
-    assert(false);
+		return assignment_helper(c, elts);
   } else if (e->v.Tuple.ctx == Load) {
     return starunpack_helper(c, elts, 0, BUILD_LIST,
         LIST_APPEND, LIST_EXTEND, 1);

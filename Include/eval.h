@@ -205,6 +205,25 @@ main_loop:
 			DISPATCH();
 		}
 
+		case TARGET(UNPACK_SEQUENCE): {
+			PyObject *seq = POP(), *item, **items;
+			if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) == oparg) {
+				assert(false);
+			} else if (PyList_CheckExact(seq) &&
+					PyList_GET_SIZE(seq) == oparg) {
+				items = ((PyListObject *) seq)->ob_item;
+				while (oparg--) {
+					item = items[oparg];
+					Py_INCREF(item);
+					PUSH(item);
+				}
+			} else {
+				assert(false);
+			}
+			Py_DECREF(seq);
+			DISPATCH();
+		}
+
 		case TARGET(BUILD_SLICE): {
 			PyObject *start, *stop, *step, *slice;
 			if (oparg == 3)
