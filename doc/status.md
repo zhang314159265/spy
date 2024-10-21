@@ -3,16 +3,19 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 # NOTE
 - run `make regen-pegen` to regenerated CPython parser.
 
+# Archivement
+- cpython 3.10.11 has 127 opcode. spy has implemented more than half. There are <=60 opcodes not implemented.
+
 # Scratch
 
-Quest 2:
-  - cover most bytecode <+++++++
-		- other 'subscr' ops
-		- dict ops <===
-			- search dict or map
-	  - set ops
-			- ```'dis.dis("a = {3: 4}; b = {5:6, **a}")'```
-			  - do this for both set and dict; Do this with unpack at either beginning or end.
+Quest 6:
+- Class
+
+Quest 5:
+- closure
+
+Quest x:
+- generator / yield
 
 Quest 1:
 - cover import <+++++++++++
@@ -22,12 +25,6 @@ Quest 3:
 
 Quest 4:
 - extension module ++++++++
-
-Quest 5:
-- closure
-
-Quest 6:
-- Class
 
 - goal
 	- ? exception handling
