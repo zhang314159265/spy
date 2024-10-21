@@ -1,5 +1,4 @@
-#ifndef PEGEN_H
-#define PEGEN_H
+#pragma once
 
 #include <assert.h>
 #include <stdio.h>
@@ -654,4 +653,14 @@ _PyPegen_lookahead(int positive, void *(func)(Parser *), Parser *p) {
 	p->mark = mark;
 	return (res != NULL) == positive;
 }
-#endif
+
+KeyValuePair *
+_PyPegen_key_value_pair(Parser *p, expr_ty key, expr_ty value) {
+	KeyValuePair *a = _PyArena_Malloc(p->arena, sizeof(KeyValuePair));
+	if (!a) {
+		return NULL;
+	}
+	a->key = key;
+	a->value = value;
+	return a;
+}

@@ -1037,18 +1037,62 @@ compiler_list(struct compiler *c, expr_ty e) {
 }
 
 static int
+compiler_subdict(struct compiler *c, expr_ty e, Py_ssize_t begin, Py_ssize_t end) {
+	Py_ssize_t i, n = end - begin;
+	int big = n * 2 > STACK_USE_GUIDELINE;
+	if (n > 1 && !big && are_all_items_const(e->v.Dict.keys, begin, end)) {
+		assert(false);
+	}
+	if (big) {
+		assert(false);
+	}
+	for (i = begin; i < end; i++) {
+		VISIT(c, expr, (expr_ty) asdl_seq_GET(e->v.Dict.keys, i));
+		VISIT(c, expr, (expr_ty) asdl_seq_GET(e->v.Dict.values, i));
+		if (big) {
+			assert(false);
+		}
+	}
+	if (!big) {
+		ADDOP_I(c, BUILD_MAP, n);
+	}
+	return 1;
+}
+
+static int
 compiler_dict(struct compiler *c, expr_ty e) {
   Py_ssize_t i, n, elements;
   int have_dict;
+	int is_unpacking = 0;
 
   n = asdl_seq_LEN(e->v.Dict.values);
   have_dict = 0;
   elements = 0;
   for (i = 0; i < n; i++) {
-    assert(false);
+		is_unpacking = (expr_ty) asdl_seq_GET(e->v.Dict.keys, i) == NULL;
+		if (is_unpacking) {
+			if (elements) {
+				assert(false);
+			}
+			if (have_dict == 0) {
+				ADDOP_I(c, BUILD_MAP, 0);
+				have_dict = 1;
+			}
+			// unpacking has no key part
+			VISIT(c, expr, (expr_ty) asdl_seq_GET(e->v.Dict.values, i));
+			ADDOP_I(c, DICT_UPDATE, 1);
+		} else {
+			elements++;
+		}
   }
   if (elements) {
-    assert(false);
+		if (!compiler_subdict(c, e, n - elements, n)) {
+			return 0;
+		}
+		if (have_dict) {
+			ADDOP_I(c, DICT_UPDATE, 1);
+		}
+		have_dict = 1;
   }
   if (!have_dict) {
     ADDOP_I(c, BUILD_MAP, 0);

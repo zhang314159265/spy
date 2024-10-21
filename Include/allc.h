@@ -16,3 +16,4 @@
 #include "Objects/codeobject.c.h"
 #include "Objects/floatobject.c.h"
 #include "Objects/listobject.c.h"
+#include "Objects/dictobject.c.h"

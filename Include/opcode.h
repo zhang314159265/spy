@@ -82,5 +82,6 @@
 #define CALL_METHOD 161
 #define LIST_EXTEND 162
 #define SET_UPDATE 163
+#define DICT_UPDATE 165
 
 #define HAS_ARG(op) ((op) >= HAVE_ARGUMENT)

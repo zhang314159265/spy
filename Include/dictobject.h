@@ -67,6 +67,7 @@ static void dict_dealloc(PyDictObject *mp);
 static PyObject *dict_repr(PyDictObject *mp);
 static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w);
 static PyObject *dict_subscript(PyDictObject *mp, PyObject *key);
+static PyObject *dict_iter(PyDictObject *dict);
 
 static PyMappingMethods dict_as_mapping = {
   .mp_subscript = (binaryfunc) dict_subscript,
@@ -82,6 +83,7 @@ PyTypeObject PyDict_Type = {
   .tp_free = PyObject_GC_Del,
   .tp_repr = (reprfunc) dict_repr,
   .tp_as_mapping = &dict_as_mapping,
+	.tp_iter = (getiterfunc) dict_iter,
 };
 
 static inline Py_ssize_t
@@ -376,7 +378,9 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value) {
   Py_INCREF(key);
   Py_INCREF(value);
   if (mp->ma_values != NULL && !PyUnicode_CheckExact(key)) {
-    assert(false);
+		if (insertion_resize(mp) < 0) {
+			assert(false);
+		}
   }
 
   Py_ssize_t ix = mp->ma_keys->dk_lookup(mp, key, hash, &old_value);
@@ -613,7 +617,15 @@ dictresize(PyDictObject *mp, Py_ssize_t newsize)
   newentries = DK_ENTRIES(mp->ma_keys);
   oldvalues = mp->ma_values;
   if (oldvalues != NULL) {
-    assert(false);
+		for (Py_ssize_t i = 0; i < numentries; i++) {
+			assert(false);
+		}
+		dictkeys_decref(oldkeys);
+		mp->ma_values = NULL;
+		if (oldvalues != empty_values) {
+			// free_values(oldvalues);
+			assert(false);
+		}
   } else {  // combined table.
     if (oldkeys->dk_nentries == numentries) {
       memcpy(newentries, oldentries, numentries * sizeof(PyDictKeyEntry));
@@ -853,7 +865,9 @@ static PyObject *dict_repr(PyDictObject *mp) {
     Py_INCREF(value);
 
     if (!first) {
-      assert(false);
+			if (_PyUnicodeWriter_WriteASCIIString(&writer, ", ", 2) < 0) {
+				assert(false);
+			}
     }
     first = 0;
 
@@ -916,3 +930,4 @@ static PyObject *dict_subscript(PyDictObject *mp, PyObject *key) {
   return value;
 }
 
+int PyDict_Update(PyObject *a, PyObject *b);

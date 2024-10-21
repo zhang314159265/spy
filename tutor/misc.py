@@ -130,9 +130,16 @@
 # 
 # test_subscript_augassign()
 
-def test_unpack_set():
-	a = {3}
-	b = {*a, 5}
+# def test_unpack_set():
+# 	a = {3}
+# 	b = {*a, 5}
+# 	print(b)
+# 
+# test_unpack_set()
+
+def test_unpack_dict():
+	a = {3: 4}
+	b = {**a, 5:6}
 	print(b)
 
-test_unpack_set()
+test_unpack_dict()

@@ -206,6 +206,15 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(DICT_UPDATE): {
+			PyObject *update = POP();
+			PyObject *dict = PEEK(oparg);
+			if (PyDict_Update(dict, update) < 0) {
+				assert(false);
+			}
+			Py_DECREF(update);
+			DISPATCH();
+		}
 		case TARGET(SET_ADD): {
 			PyObject *v = POP();
 			PyObject *set = PEEK(oparg);
@@ -521,7 +530,14 @@ main_loop:
 			if (map == NULL)
 				goto error;
 			for (i = oparg; i > 0; i--) {
-				assert(false);
+				int err;
+				PyObject *key = PEEK(2 * i);
+				PyObject *value = PEEK(2 * i - 1);
+				err = PyDict_SetItem(map, key, value);
+				if (err != 0) {
+					Py_DECREF(map);
+					goto error;
+				}
 			}
 			while (oparg--) {
 				Py_DECREF(POP());
