@@ -451,3 +451,10 @@ static PyObject *set_repr(PySetObject *so) {
 done:
 	return result;
 }
+
+int _PySet_Update(PyObject *set, PyObject *iterable) {
+	if (!PySet_Check(set)) {
+		assert(false);
+	}
+	return set_update_internal((PySetObject *) set, iterable);
+}

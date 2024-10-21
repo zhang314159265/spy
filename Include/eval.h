@@ -206,6 +206,26 @@ main_loop:
 			}
 			DISPATCH();
 		}
+		case TARGET(SET_ADD): {
+			PyObject *v = POP();
+			PyObject *set = PEEK(oparg);
+			int err;
+			err = PySet_Add(set, v);
+			Py_DECREF(v);
+			if (err != 0)
+				goto error;
+			DISPATCH();
+		}
+		case TARGET(SET_UPDATE): {
+			PyObject *iterable = POP();
+			PyObject *set = PEEK(oparg);
+			int err = _PySet_Update(set, iterable);
+			Py_DECREF(iterable);
+			if (err < 0) {
+				goto error;
+			}
+			DISPATCH();
+		}
 
 		case TARGET(ROT_THREE): {
 			PyObject *top = TOP();

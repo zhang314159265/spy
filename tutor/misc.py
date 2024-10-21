@@ -123,9 +123,16 @@
 # 
 # test_dup()
 
-def test_subscript_augassign():
-	x = [2, 3]
-	x[0] += 1
-	print(x)
+# def test_subscript_augassign():
+# 	x = [2, 3]
+# 	x[0] += 1
+# 	print(x)
+# 
+# test_subscript_augassign()
 
-test_subscript_augassign()
+def test_unpack_set():
+	a = {3}
+	b = {*a, 5}
+	print(b)
+
+test_unpack_set()
