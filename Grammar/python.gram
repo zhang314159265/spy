@@ -11,6 +11,17 @@ compound_stmt[stmt_ty]:
 	| &'if' if_stmt
 	| &'for' for_stmt
 	| &'while' while_stmt
+	| &('class' | '@') class_def
+
+class_def[stmt_ty]:
+	| class_def_raw
+
+class_def_raw[stmt_ty]:
+	| 'class' a=NAME ':' c=block  {
+		_PyAST_ClassDef(a->v.Name.id,
+			NULL, NULL,
+			c, NULL)
+	}
 
 while_stmt[stmt_ty]:
 	| 'while' a=named_expression ':' b=block c=[else_block] { _PyAST_While(a, b, c) }
@@ -52,6 +63,7 @@ parameters[arguments_ty]:
 	}
 
 param_no_default[arg_ty]:
+	| a=param ',' { _PyPegen_add_type_comment_to_arg(p, a, NULL) }
 	| a=param &')' {
 		_PyPegen_add_type_comment_to_arg(p, a, NULL) }
 
@@ -207,7 +219,7 @@ star_target[expr_ty] (memo):
 	| target_with_star_atom
 
 target_with_star_atom[expr_ty] (memo):
-	| a=t_primary '.' b=NAME !t_lookahead { (assert(false), NULL) }
+	| a=t_primary '.' b=NAME !t_lookahead { _PyAST_Attribute(a, b->v.Name.id, Store) }
 	| a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
 	| star_atom
 

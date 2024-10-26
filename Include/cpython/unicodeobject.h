@@ -75,6 +75,7 @@ typedef struct {
 
 typedef struct {
 	PyASCIIObject _base;
+  Py_ssize_t utf8_length; // exclude '\0'
   char *utf8;
 } PyCompactUnicodeObject;
 

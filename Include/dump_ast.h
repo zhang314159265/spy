@@ -291,6 +291,13 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		fprintf(stderr, "Del\n");
 		dump_expr_seq(stmt->v.Delete.targets, indent + 2);
 		break;
+	case ClassDef_kind:
+		fprintf(stderr, "ClassDef: %s\n", (char *) PyUnicode_DATA(stmt->v.ClassDef.name));
+		assert(!stmt->v.ClassDef.bases);
+		assert(!stmt->v.ClassDef.keywords);
+		dump_stmt_seq(stmt->v.ClassDef.body, indent + 2);
+		dump_expr_seq(stmt->v.ClassDef.decorator_list, indent + 2);
+		break;	
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);
 		assert(false && "dump_stmt");

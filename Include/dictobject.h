@@ -765,20 +765,64 @@ _PyDict_SetItemId(PyObject *v, struct _Py_Identifier *key, PyObject *item) {
   return PyDict_SetItem(v, kv, item);
 }
 
+#define new_values(size) PyMem_NEW(PyObject *, size)
+
+static PyObject *
+new_dict_with_shared_keys(PyDictKeysObject *keys) {
+  PyObject **values;
+  Py_ssize_t i, size;
+
+  size = USABLE_FRACTION(DK_SIZE(keys));
+  values = new_values(size);
+  if (values == NULL) {
+    assert(false);
+  }
+  for (i = 0; i < size; ++i) {
+    values[i] = NULL;
+  }
+  return new_dict(keys, values);
+}
+
+#define CACHED_KEYS(tp) (((PyHeapTypeObject*) tp)->ht_cached_keys)
+
 int
 _PyObjectDict_SetItem(PyTypeObject *tp, PyObject **dictptr,
     PyObject *key, PyObject *value) {
   PyObject *dict;
   int res;
+  PyDictKeysObject *cached;
 
   assert(dictptr != NULL);
 
-  if ((tp->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
-    assert(false);
-  } else {
+  // TODO use split table for class
+  /* if ((tp->tp_flags & Py_TPFLAGS_HEAPTYPE) && (cached = CACHED_KEYS(tp))) {
+    assert(dictptr != NULL);
     dict = *dictptr;
     if (dict == NULL) {
+      dictkeys_incref(cached);
+      dict = new_dict_with_shared_keys(cached);
+      if (dict == NULL)
+        return -1;
+      *dictptr = dict;
+    }
+    if (value == NULL) {
       assert(false);
+    } else {
+      int was_shared = (cached == ((PyDictObject *) dict)->ma_keys);
+      res = PyDict_SetItem(dict, key, value);
+      if (was_shared &&
+          (cached = CACHED_KEYS(tp)) != NULL &&
+          cached != ((PyDictObject *) dict)->ma_keys) {
+        assert(false);
+      }
+    }
+  } else */ {
+    dict = *dictptr;
+    if (dict == NULL) {
+      dict = PyDict_New();
+      if (dict == NULL)
+        return -1;
+      *dictptr = dict;
     }
     if (value == NULL) {
       assert(false);
@@ -931,3 +975,133 @@ static PyObject *dict_subscript(PyDictObject *mp, PyObject *key) {
 }
 
 int PyDict_Update(PyObject *a, PyObject *b);
+PyObject *PyDict_Copy(PyObject *o);
+
+// Return 1 if `key` is in dict `op`, 0 if not, and -1 on error
+int
+PyDict_Contains(PyObject *op, PyObject *key) {
+  Py_hash_t hash;
+  Py_ssize_t ix;
+  PyDictObject *mp = (PyDictObject *) op;
+  PyObject *value;
+
+  if (!PyUnicode_CheckExact(key) ||
+      (hash = ((PyASCIIObject *) key)->hash) == -1) {
+    hash = PyObject_Hash(key);
+    if (hash == -1)
+      return -1;
+  }
+  ix = (mp->ma_keys->dk_lookup)(mp, key, hash, &value);
+  if (ix == DKIX_ERROR)
+    return -1;
+  return (ix != DKIX_EMPTY && value != NULL);
+}
+
+int
+_PyDict_ContainsId(PyObject *op, struct _Py_Identifier *key) {
+  PyObject *kv = _PyUnicode_FromId(key); // borrowed
+  if (kv == NULL) {
+    return -1;
+  }
+  return PyDict_Contains(op, kv);
+}
+
+// search index of hash table from offset of entry table
+static Py_ssize_t
+lookdict_index(PyDictKeysObject *k, Py_hash_t hash, Py_ssize_t index) {
+  size_t mask = DK_MASK(k);
+  size_t perturb = (size_t) hash;
+  size_t i = (size_t) hash & mask;
+
+  for (;;) {
+    Py_ssize_t ix = dictkeys_get_index(k, i);
+    if (ix == index) {
+      return i;
+    }
+    if (ix == DKIX_EMPTY) {
+      assert(false);
+    }
+    perturb >>= PERTURB_SHIFT;
+    i = mask & (i * 5 + perturb + 1);
+  }
+  Py_UNREACHABLE();
+}
+
+static int
+delitem_common(PyDictObject *mp, Py_hash_t hash, Py_ssize_t ix,
+    PyObject *old_value) {
+  PyObject *old_key;
+  PyDictKeyEntry *ep;
+
+  Py_ssize_t hashpos = lookdict_index(mp->ma_keys, hash, ix);
+  assert(hashpos >= 0);
+
+  mp->ma_used--;
+  mp->ma_version_tag = DICT_NEXT_VERSION();
+  ep = &DK_ENTRIES(mp->ma_keys)[ix];
+  dictkeys_set_index(mp->ma_keys, hashpos, DKIX_DUMMY);
+  old_key = ep->me_key;
+  ep->me_key = NULL;
+  ep->me_value = NULL;
+  Py_DECREF(old_key);
+  Py_DECREF(old_value);
+  
+  return 0;
+}
+
+int _PyDict_DelItem_KnownHash(PyObject *op, PyObject *key, Py_hash_t hash) {
+  Py_ssize_t ix;
+  PyDictObject *mp;
+  PyObject *old_value;
+
+  if (!PyDict_Check(op)) {
+    assert(false);
+  }
+  assert(key);
+  assert(hash != -1);
+  mp = (PyDictObject *) op;
+  ix = (mp->ma_keys->dk_lookup)(mp, key, hash, &old_value);
+  if (ix == DKIX_ERROR)
+    return -1;
+  if (ix == DKIX_EMPTY || old_value == NULL) {
+    assert(false);
+  }
+
+  // split table doesn't allow deletion. combine it
+  if (_PyDict_HasSplitTable(mp)) {
+    assert(false);
+  }
+  return delitem_common(mp, hash, ix, old_value);
+}
+
+int
+PyDict_DelItem(PyObject *op, PyObject *key) {
+  Py_hash_t hash;
+  assert(key);
+  if (!PyUnicode_CheckExact(key) ||
+    (hash = ((PyASCIIObject *) key)->hash) == -1) {
+    hash = PyObject_Hash(key);
+    if (hash == -1)
+      return -1;
+  }
+
+  return _PyDict_DelItem_KnownHash(op, key, hash);
+}
+
+int _PyDict_DelItemId(PyObject *v, _Py_Identifier *key) {
+  PyObject *kv = _PyUnicode_FromId(key);
+  if (kv == NULL)
+    return -1;
+  return PyDict_DelItem(v, kv);
+}
+
+PyDictKeysObject *
+_PyDict_NewKeysForClass(void) {
+  PyDictKeysObject *keys = new_keys_object(PyDict_MINSIZE);
+  if (keys == NULL) {
+    assert(false);
+  } else {
+    keys->dk_lookup = lookdict_split;
+  }
+  return keys;
+}

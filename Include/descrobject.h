@@ -1,5 +1,20 @@
 #pragma once
 
+#define PyWrapperFlag_KEYWORDS 1  // wrapper function takes keyword args
+
+typedef PyObject *(*wrapperfunc)(PyObject *self, PyObject *args,
+    void *wrapped);
+
+struct wrapperbase {
+  const char *name;
+  int offset;
+  void *function;
+  wrapperfunc wrapper;
+  const char *doc;
+  int flags;
+  PyObject *name_strobj;
+};
+
 typedef struct {
 	PyObject_HEAD
 	PyTypeObject *d_type;
@@ -9,11 +24,30 @@ typedef struct {
 
 #define PyDescr_COMMON PyDescrObject d_common
 
+#define PyDescr_TYPE(x) (((PyDescrObject *) (x))->d_type)
+
+typedef PyObject *(*getter)(PyObject *, void *);
+typedef int (*setter)(PyObject *, PyObject *, void *);
+
+typedef struct PyGetSetDef {
+  const char *name;
+  getter get;
+  setter set;
+  const char *doc;
+  void *closure;
+} PyGetSetDef;
+
 typedef struct {
 	PyDescr_COMMON;
 	PyMethodDef *d_method;
 	vectorcallfunc vectorcall;
 } PyMethodDescrObject;
+
+typedef struct {
+  PyDescr_COMMON;
+  struct wrapperbase *d_base;
+  void *d_wrapped;
+} PyWrapperDescrObject;
 
 typedef void (*funcptr)(void);
 
@@ -50,6 +84,12 @@ exit:
 	return result;
 }
 
+static PyObject *
+classmethoddescr_call(PyMethodDescrObject *descr, PyObject *args,
+    PyObject *kwds) {
+  assert(false);
+}
+
 PyTypeObject PyMethodDescr_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "method_descriptor",
@@ -57,6 +97,25 @@ PyTypeObject PyMethodDescr_Type = {
 	.tp_flags = Py_TPFLAGS_HAVE_VECTORCALL | Py_TPFLAGS_METHOD_DESCRIPTOR,
 	.tp_call = PyVectorcall_Call,
 	.tp_vectorcall_offset = offsetof(PyMethodDescrObject, vectorcall),
+};
+
+static PyObject * classmethod_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type);
+
+PyTypeObject PyClassMethodDescr_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "classmethod_descriptor",
+  .tp_basicsize = sizeof(PyMethodDescrObject),
+  .tp_call = (ternaryfunc) classmethoddescr_call,
+  .tp_descr_get = (descrgetfunc) classmethod_get,
+  .tp_descr_set = 0,
+};
+
+PyTypeObject PyWrapperDescr_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "wrapper_descriptor",
+  .tp_basicsize = sizeof(PyWrapperDescrObject),
+  .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+      Py_TPFLAGS_METHOD_DESCRIPTOR,
 };
 
 static PyDescrObject *
@@ -121,3 +180,51 @@ PyDescr_NewMethod(PyTypeObject *type, PyMethodDef *method) {
 }
 
 #define PyDescr_NAME(x) (((PyDescrObject *)(x))->d_name)
+
+PyObject *
+PyDescr_NewClassMethod(PyTypeObject *type, PyMethodDef *method) {
+  PyMethodDescrObject *descr;
+
+  descr = (PyMethodDescrObject *) descr_new(
+      &PyClassMethodDescr_Type,
+      type, method->ml_name);
+  if (descr != NULL)
+    descr->d_method = method;
+  return (PyObject *) descr;
+}
+
+static PyObject * classmethod_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type) {
+  if (type == NULL) {
+    assert(false);
+  }
+  if (!PyType_Check(type)) {
+    assert(false);
+  }
+  if (!PyType_IsSubtype((PyTypeObject *) type, PyDescr_TYPE(descr))) {
+    assert(false);
+  }
+  PyTypeObject *cls = NULL;
+  if (descr->d_method->ml_flags & METH_METHOD) {
+    assert(false);
+  }
+  return PyCMethod_New(descr->d_method, type, NULL, cls);
+}
+
+int
+PyDescr_IsData(PyObject *ob) {
+  return Py_TYPE(ob)->tp_descr_set != NULL;
+}
+
+PyObject *
+PyDescr_NewWrapper(PyTypeObject *type, struct wrapperbase *base, void *wrapped) {
+  PyWrapperDescrObject *descr;
+
+  descr = (PyWrapperDescrObject *) descr_new(&PyWrapperDescr_Type,
+      type, base->name);
+
+  if (descr != NULL) {
+    descr->d_base = base;
+    descr->d_wrapped = wrapped;
+  }
+  return (PyObject *) descr;
+}

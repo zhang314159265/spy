@@ -22,8 +22,17 @@ int _PyLong_Init(PyInterpreterState *interp) {
 	return 0;
 }
 
+PyStatus _PyTypes_InitSlotDefs(void);
+
+extern PyTypeObject PySuper_Type;
+
 // defined in cpy/Objects/object.c
 PyStatus _PyTypes_Init() {
+  PyStatus status = _PyTypes_InitSlotDefs();
+  if (_PyStatus_EXCEPTION(status)) {
+    return status;
+  }
+
 #define INIT_TYPE(TYPE) \
 	do { \
 		if (PyType_Ready(&(TYPE)) < 0) { \
@@ -44,6 +53,9 @@ PyStatus _PyTypes_Init() {
 	INIT_TYPE(PyCode_Type);
 	INIT_TYPE(PyBool_Type);
 	INIT_TYPE(PyFloat_Type);
+  INIT_TYPE(PyTuple_Type);
+  INIT_TYPE(PyDict_Type);
+  INIT_TYPE(PySuper_Type);
 
 	return _PyStatus_OK();
 

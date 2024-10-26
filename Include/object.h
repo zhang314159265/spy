@@ -1,5 +1,4 @@
-#ifndef Py_OBJECT_H
-#define Py_OBJECT_H
+#pragma once
 
 #include <assert.h>
 #include <string.h>
@@ -7,8 +6,13 @@
 #include "pyport.h"
 #include "cpython/objimpl.h"
 
+#define Py_TPFLAGS_DISALLOW_INSTANTIATION (1UL << 7)
+
 // Set if the type object is dynamically allocated
 #define Py_TPFLAGS_HEAPTYPE (1UL << 9)
+
+// set if the type allows subclassing
+#define Py_TPFLAGS_BASETYPE (1UL << 10)
 
 #define Py_TPFLAGS_HAVE_VECTORCALL (1UL << 11)
 
@@ -20,6 +24,9 @@
 
 #define Py_TPFLAGS_HAVE_GC (1UL << 14)
 #define Py_TPFLAGS_METHOD_DESCRIPTOR (1UL << 17)
+
+#define Py_TPFLAGS_IS_ABSTRACT (1UL << 20)
+
 #define Py_TPFLAGS_LONG_SUBCLASS (1UL << 24)
 #define Py_TPFLAGS_LIST_SUBCLASS (1UL << 25)
 #define Py_TPFLAGS_TUPLE_SUBCLASS (1UL << 26)
@@ -27,6 +34,12 @@
 #define Py_TPFLAGS_UNICODE_SUBCLASS (1UL << 28)
 #define Py_TPFLAGS_DICT_SUBCLASS (1UL << 29)
 #define Py_TPFLAGS_TYPE_SUBCLASS (1UL << 31)
+
+#define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION 0
+
+#define Py_TPFLAGS_DEFAULT ( \
+  Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | \
+  0)
 
 typedef struct _typeobject PyTypeObject;
 
@@ -55,6 +68,13 @@ typedef Py_ssize_t (*lenfunc)(PyObject *);
 typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 typedef PyObject *(*reprfunc)(PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
+typedef PyObject *(*descrgetfunc)(PyObject *, PyObject *, PyObject *);
+typedef int (*descrsetfunc)(PyObject *, PyObject *, PyObject *);
+typedef PyObject *(*newfunc)(PyTypeObject *, PyObject *, PyObject *);
+typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
+typedef int (*visitproc)(PyObject *, void *);
+typedef int(*traverseproc)(PyObject *, visitproc, void *);
+
 
 typedef struct {
 	PyObject ob_base;
@@ -162,36 +182,6 @@ static inline int _PyType_Check(PyObject *op) {
 
 #include "internal/pycore_object.h"
 #include "objimpl.h"
-
-// defined in cpy/Objects/typeobject.c
-PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems) {
-  PyObject *obj;
-  const size_t size = _PyObject_VAR_SIZE(type, nitems + 1);
-  /* note that we need to add one, for the sentinel */
-
-  if (_PyType_IS_GC(type)) {
-    obj = _PyObject_GC_Malloc(size);
-  } else {
-		obj = (PyObject *) PyObject_Malloc(size);
-  }
-  
-  if (obj == NULL) {
-    assert(false);
-  }
-
-  memset(obj, '\0', size);
-
-  if (type->tp_itemsize == 0) {
-    _PyObject_Init(obj, type);
-  } else {
-    assert(false);
-  }
-
-  if (_PyType_IS_GC(type)) {
-    _PyObject_GC_TRACK(obj);
-  }
-  return obj;
-}
 
 // Generic type check
 // defined in cpy/Objects/typeobject.c
@@ -321,4 +311,9 @@ int PyObject_IsTrue(PyObject *v);
 
 #define Py_IsNone(x) Py_Is((x), Py_None)
 
-#endif
+Py_hash_t
+PyObject_HashNotImplemented(PyObject *v) {
+  assert(false);
+}
+
+int PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value);

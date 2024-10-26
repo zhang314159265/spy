@@ -33,6 +33,7 @@
 #define BINARY_OR 66
 #define INPLACE_POWER 67
 #define GET_ITER 68
+#define LOAD_BUILD_CLASS 71
 #define INPLACE_LSHIFT 75
 #define INPLACE_RSHIFT 76
 #define INPLACE_AND 77
@@ -45,6 +46,7 @@
 #define DELETE_NAME 91
 #define UNPACK_SEQUENCE 92
 #define FOR_ITER 93
+#define STORE_ATTR 95
 #define STORE_GLOBAL 97
 #define DELETE_GLOBAL 98
 #define LOAD_CONST 100

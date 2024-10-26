@@ -153,4 +153,7 @@ _PyUnicodeWriter_WriteSubstring(_PyUnicodeWriter *writer, PyObject *str,
 	return 0;
 }
 
-
+int
+_PyUnicode_EqualToASCIIId(PyObject *left, _Py_Identifier *right) {
+  assert(false);
+}

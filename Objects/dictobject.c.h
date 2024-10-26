@@ -71,3 +71,74 @@ PyDict_Update(PyObject *a, PyObject *b) {
 static PyObject *dict_iter(PyDictObject *dict) {
 	assert(false);
 }
+
+Py_ssize_t
+_PyDict_KeysSize(PyDictKeysObject *keys) {
+  return (sizeof(PyDictKeysObject)
+    + DK_IXSIZE(keys) * DK_SIZE(keys)
+    + USABLE_FRACTION(DK_SIZE(keys)) * sizeof(PyDictKeyEntry));
+}
+
+static PyDictKeysObject *
+clone_combined_dict_keys(PyDictObject *orig) {
+  assert(PyDict_Check(orig));
+  assert(Py_TYPE(orig)->tp_iter == (getiterfunc) dict_iter);
+  assert(orig->ma_values == NULL);
+  assert(orig->ma_keys->dk_refcnt == 1);
+
+  Py_ssize_t keys_size = _PyDict_KeysSize(orig->ma_keys);
+  PyDictKeysObject *keys = PyObject_Malloc(keys_size);
+  if (keys == NULL) {
+    assert(false);
+  }
+
+  memcpy(keys, orig->ma_keys, keys_size);
+
+  PyDictKeyEntry *ep0 = DK_ENTRIES(keys);
+  Py_ssize_t n = keys->dk_nentries;
+  for (Py_ssize_t i = 0; i < n; i++) {
+    PyDictKeyEntry *entry = &ep0[i];
+    PyObject *value = entry->me_value;
+    if (value != NULL) {
+      Py_INCREF(value);
+      Py_INCREF(entry->me_key);
+    }
+  }
+  return keys;
+}
+
+PyObject *PyDict_Copy(PyObject *o) {
+  PyObject *copy;
+  PyDictObject *mp;
+
+  if (o == NULL || !PyDict_Check(o)) {
+    assert(false);
+  }
+
+  mp = (PyDictObject *) o;
+  if (mp->ma_used == 0) {
+    return PyDict_New();
+  }
+
+  if (_PyDict_HasSplitTable(mp)) {
+    assert(false);
+  }
+
+  if (Py_TYPE(mp)->tp_iter == (getiterfunc) dict_iter &&
+      mp->ma_values == NULL &&
+      (mp->ma_used >= (mp->ma_keys->dk_nentries * 2) / 3)) {
+    // fast copy
+    PyDictKeysObject *keys = clone_combined_dict_keys(mp);
+    if (keys == NULL) {
+      return NULL;
+    }
+    PyDictObject *new = (PyDictObject *) new_dict(keys, NULL);
+    if (new == NULL) {
+      return NULL;
+    }
+    
+    new->ma_used = mp->ma_used;
+    return (PyObject *) new;
+  }
+  assert(false);
+}

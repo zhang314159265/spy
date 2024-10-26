@@ -242,6 +242,15 @@ PyVectorcall_Function(PyObject *callable) {
 
 PyObject *_Py_CheckFunctionResult(PyThreadState *tstate, PyObject *callabble, PyObject *result, const char *where);
 
+static inline Py_ssize_t
+PyVectorcall_NARGS(size_t n) {
+	return n & ~PY_VECTORCALL_ARGUMENTS_OFFSET;
+}
+
+PyObject *_PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
+    PyObject *const *args, Py_ssize_t nargs,
+    PyObject *keywords);
+
 // defined in cpy/Include/cpython/abstract.h
 static inline PyObject *
 _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
@@ -253,7 +262,8 @@ _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
 	func = PyVectorcall_Function(callable);
 	if (func == NULL) {
 		// printf("tp_name %s, no vector call\n", ((PyTypeObject *) Py_TYPE(callable))->tp_name);
-		assert(false);
+    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+    return _PyObject_MakeTpCall(tstate, callable, args, nargs, kwnames);
 	}
 	res = func(callable, args, nargsf, kwnames);
 	return _Py_CheckFunctionResult(tstate, callable, res, NULL);
@@ -265,11 +275,6 @@ PyObject_Vectorcall(PyObject *callable, PyObject *const *args,
 	PyThreadState *tstate = PyThreadState_Get();
 	return _PyObject_VectorcallTstate(tstate, callable,
 			args, nargsf, kwnames);
-}
-
-static inline Py_ssize_t
-PyVectorcall_NARGS(size_t n) {
-	return n & ~PY_VECTORCALL_ARGUMENTS_OFFSET;
 }
 
 int
@@ -618,3 +623,25 @@ finish:
 	Py_DECREF(value);
 	return result;
 }
+
+int
+PyMapping_Check(PyObject *o) {
+  return o && Py_TYPE(o)->tp_as_mapping &&
+      Py_TYPE(o)->tp_as_mapping->mp_subscript;
+}
+
+static inline PyObject *
+_PyObject_FastCallTstate(PyThreadState *tstate, PyObject *func, PyObject *const *args, Py_ssize_t nargs) {
+  return _PyObject_VectorcallTstate(tstate, func, args, (size_t) nargs, NULL);
+}
+
+// defined in cpy/Include/cpython/abstract.h
+static inline PyObject *
+_PyObject_FastCall(PyObject *func, PyObject *const *args, Py_ssize_t nargs) {
+  PyThreadState *tstate = PyThreadState_Get();
+  return _PyObject_FastCallTstate(tstate, func, args, nargs);
+}
+
+PyObject *_PyObject_Call(PyThreadState *tstate, PyObject *callable, PyObject *args, PyObject *kwargs);
+
+#define _PY_FASTCALL_SMALL_STACK 5

@@ -98,6 +98,9 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value) {
     Py_DECREF(name);
     return err;
   }
+  if (tp->tp_setattr != NULL) {
+    assert(false);
+  }
   assert(false);
 }
 
@@ -161,6 +164,7 @@ _PyObject_GenericSetAttrWithDict(PyObject *obj, PyObject *name,
   if (dict == NULL) {
     dictptr = _PyObject_GetDictPtr(obj);
     if (dictptr == NULL) {
+      printf("obj ptr %p, object of type %s has no dict, attr name %s\n", obj, tp->tp_name, (char*) PyUnicode_DATA(name));
       assert(false);
     }
     res = _PyObjectDict_SetItem(tp, dictptr, name, value);
@@ -217,6 +221,10 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
 {
   PyTypeObject *tp = Py_TYPE(obj);
   PyObject *descr = NULL;
+  PyObject *res = NULL;
+  descrgetfunc f;
+  Py_ssize_t dictoffset;
+  PyObject **dictptr;
 
   if (!PyUnicode_Check(name)) {
     assert(false);
@@ -227,9 +235,55 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
     if (PyType_Ready(tp) < 0)
       assert(false);
   }
+  // printf("get attr %s from type %s\n", (char*) PyUnicode_DATA(name), tp->tp_name);
 
   descr = _PyType_Lookup(tp, name);
-  assert(false);
+
+  f = NULL;
+  if (descr != NULL) {
+    assert(false);
+  }
+
+  if (dict == NULL) {
+    dictoffset = tp->tp_dictoffset;
+    if (dictoffset != 0) {
+      if (dictoffset < 0) {
+        assert(false);
+      }
+      dictptr = (PyObject **) ((char *) obj + dictoffset);
+      dict = *dictptr;
+    }
+  }
+
+  if (dict != NULL) {
+    Py_INCREF(dict);
+    res = PyDict_GetItemWithError(dict, name);
+    if (res != NULL) {
+      Py_INCREF(res);
+      Py_DECREF(dict);
+      goto done;
+    } else {
+      assert(false);
+    }
+    assert(false);
+  }
+
+  if (f != NULL) {
+    assert(false);
+  }
+
+  if (descr != NULL) {
+    assert(false);
+  }
+
+  if (!suppress) {
+    printf("'%s' object has no attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+    assert(false);
+  }
+ done:
+  Py_XDECREF(descr);
+  Py_DECREF(name);
+  return res;
 }
 
 PyObject *
@@ -326,4 +380,47 @@ int PyObject_IsTrue(PyObject *v) {
 	return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
 }
 
+int _PyObject_LookupAttr(PyObject *v, PyObject *name, PyObject **result) {
+  PyTypeObject *tp = Py_TYPE(v);
 
+  if (!PyUnicode_Check(name)) {
+    assert(false);
+  }
+
+  if (tp->tp_getattro == PyObject_GenericGetAttr) {
+    assert(false);
+  }
+  if (tp->tp_getattro != NULL) {
+    *result = (*tp->tp_getattro)(v, name);
+  } else if (tp->tp_getattr != NULL) {
+    assert(false);
+  } else {
+    assert(false);
+    *result = NULL;
+    return 0;
+  }
+
+  if (*result != NULL) {
+    return 1;
+  }
+  assert(false);
+}
+
+int _PyObject_LookupAttrId(PyObject *v, struct _Py_Identifier *name, PyObject **result) {
+  PyObject *oname = _PyUnicode_FromId(name);
+  if (!oname) {
+    assert(false);
+  }
+  return _PyObject_LookupAttr(v, oname, result);
+  assert(false);
+}
+
+PyObject *
+_PyObject_GetAttrId(PyObject *v, _Py_Identifier *name) {
+  PyObject *result;
+  PyObject *oname = _PyUnicode_FromId(name);
+  if (!oname)
+    return NULL;
+  result = PyObject_GetAttr(v, oname);
+  return result;
+}

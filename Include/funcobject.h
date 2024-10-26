@@ -26,9 +26,12 @@ typedef struct {
 	PyObject *func_doc;
 	PyObject *func_dict;
 
+  PyObject *func_weakreflist;
 	PyObject *func_module;
 	vectorcallfunc vectorcall;
 } PyFunctionObject;
+
+static void func_dealloc(PyFunctionObject *op);
 
 PyObject *PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *kwargs);
 
@@ -36,7 +39,8 @@ PyTypeObject PyFunction_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "function",
 	.tp_basicsize = sizeof(PyFunctionObject),
-	.tp_flags = Py_TPFLAGS_HAVE_VECTORCALL,
+  .tp_dealloc = (destructor) func_dealloc,
+	.tp_flags = Py_TPFLAGS_HAVE_VECTORCALL | Py_TPFLAGS_METHOD_DESCRIPTOR,
 	.tp_call = PyVectorcall_Call,
 	.tp_vectorcall_offset = offsetof(PyFunctionObject, vectorcall),
 };
@@ -108,9 +112,36 @@ PyObject *PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject
 	op->func_closure = NULL;
 	op->func_doc = doc;
 	op->func_dict = NULL;
+  op->func_weakreflist = NULL;
 	op->func_module = module;
 	op->vectorcall = _PyFunction_Vectorcall;
 
 	return (PyObject *) op;
 	assert(false);
+}
+
+static int
+func_clear(PyFunctionObject *op) {
+  Py_CLEAR(op->func_code);
+  Py_CLEAR(op->func_globals);
+  Py_CLEAR(op->func_builtins);
+  Py_CLEAR(op->func_name);
+  Py_CLEAR(op->func_qualname);
+  Py_CLEAR(op->func_module);
+  Py_CLEAR(op->func_defaults);
+  Py_CLEAR(op->func_kwdefaults);
+  Py_CLEAR(op->func_doc);
+  Py_CLEAR(op->func_dict);
+  Py_CLEAR(op->func_closure);
+  // Py_CLEAR(op->func_annotations);
+  return 0;
+}
+
+static void func_dealloc(PyFunctionObject *op) {
+  _PyObject_GC_UNTRACK(op);
+  if (op->func_weakreflist != NULL) {
+    assert(false);
+  }
+  (void) func_clear(op);
+  PyObject_GC_Del(op);
 }

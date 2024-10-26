@@ -132,6 +132,14 @@ call_function(PyThreadState *tstate,
 	return x;
 }
 
+void debug_eval(int opcode, int oparg, PyObject *top) {
+  // dump op code and stack before process a opcode
+  printf("<opcode %d, oparg %d>\n", opcode, oparg);
+  if (top) {
+    printf("  - type %s\n", Py_TYPE(top)->tp_name);
+  }
+}
+
 PyObject *
 _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag) {
 	PyObject **stack_pointer;
@@ -186,6 +194,8 @@ main_loop:
 
 		dispatch_opcode:
 
+    // debug_eval(opcode, oparg, stack_pointer > f->f_valuestack ? TOP() : NULL);
+
 		switch (opcode) {
 		case TARGET(LOAD_METHOD): {
 			PyObject *name = GETITEM(names, oparg);
@@ -206,6 +216,35 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(STORE_ATTR): {
+      PyObject *name = GETITEM(names, oparg);
+      PyObject *owner = TOP();
+      PyObject *v = SECOND();
+      int err;
+      STACK_SHRINK(2);
+      err = PyObject_SetAttr(owner, name, v);
+      Py_DECREF(v);
+      Py_DECREF(owner);
+      if (err != 0)
+        goto error;
+      DISPATCH();
+    }
+    case TARGET(LOAD_BUILD_CLASS): {
+      _Py_IDENTIFIER(__build_class__);
+
+      PyObject *bc;
+      if (PyDict_CheckExact(f->f_builtins)) {
+        bc = _PyDict_GetItemIdWithError(f->f_builtins, &PyId___build_class__);
+        if (bc == NULL) {
+          assert(false);
+        }
+        Py_INCREF(bc);
+      } else {
+        assert(false);
+      }
+      PUSH(bc);
+      DISPATCH();
+    }
 		case TARGET(DICT_UPDATE): {
 			PyObject *update = POP();
 			PyObject *dict = PEEK(oparg);

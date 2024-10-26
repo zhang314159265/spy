@@ -40,7 +40,7 @@ PyThread_type_lock PyThread_allocate_lock() {
 	// pthread_lock *lock;
 	int status, error = 0;
 
-	printf("WARNING: PyThread_allocate_lock is not implemented yet\n");
+	// printf("WARNING: PyThread_allocate_lock is not implemented yet\n");
 	return NULL;
 }
 
@@ -48,10 +48,10 @@ PyThread_type_lock PyThread_allocate_lock() {
 #define NOWAIT_LOCK 0
 
 int PyThread_acquire_lock(PyThread_type_lock lock, int waitflag) {
-	printf("WARNING: PyThread_acquire_lock not implemented yet\n");
+	// printf("WARNING: PyThread_acquire_lock not implemented yet\n");
 	return 0;
 }
 
 void PyThread_release_lock(PyThread_type_lock lock) {
-	printf("WARNING: PyThread_release_lock not implemented yet\n");
+	// printf("WARNING: PyThread_release_lock not implemented yet\n");
 }

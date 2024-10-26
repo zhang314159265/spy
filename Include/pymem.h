@@ -22,4 +22,6 @@ void PyMem_Free(void *ptr) {
 #define PyMem_New(type, n) \
 	((type*) PyMem_Malloc((n) * sizeof(type)))
 
+#define PyMem_NEW(type, n) PyMem_New(type, n)
+
 #endif

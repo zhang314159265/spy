@@ -102,6 +102,7 @@ set_dealloc(PySetObject *so) {
 }
 
 static PyObject *set_repr(PySetObject *so);
+PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems);
 
 PyTypeObject PySet_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -124,6 +125,8 @@ PyTypeObject PyFrozenSet_Type = {
   .tp_itemsize = 0,
   .tp_flags = 0,
 };
+
+static int set_add_entry(PySetObject *so, PyObject *key, Py_hash_t hash);
 
 static int
 set_merge(PySetObject *so, PyObject *otherset) {
@@ -163,7 +166,18 @@ set_merge(PySetObject *so, PyObject *otherset) {
 		so->used = other->used;
 		return 0;
 	}
-  assert(false);
+	if (so->fill == 0) {
+		assert(false);
+	}
+	for (i = 0; i <= other->mask; i++) {
+		other_entry = &other->table[i];
+		key = other_entry->key;
+		if (key != NULL && key != dummy) {
+			if (set_add_entry(so, key, other_entry->hash))
+				return -1;
+		}
+	}
+	return 0;
 }
 
 static int

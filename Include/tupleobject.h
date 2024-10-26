@@ -107,10 +107,15 @@ PyObject *PyTuple_New(Py_ssize_t size) {
 
 #define PyTuple_CheckExact(op) Py_IS_TYPE(op, &PyTuple_Type)
 
+static PyObject *
+tuple_get_empty(void) {
+  return PyTuple_New(0);
+}
+
 PyObject *
 _PyTuple_FromArray(PyObject *const *src, Py_ssize_t n) {
 	if (n == 0) {
-		assert(false);
+    return tuple_get_empty();
 	}
 
 	#if 0
@@ -236,3 +241,5 @@ static PyObject *tuplerepr(PyTupleObject *v) {
 	}
 	return _PyUnicodeWriter_Finish(&writer);
 }
+
+PyObject *PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j);

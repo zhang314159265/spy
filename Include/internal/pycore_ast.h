@@ -193,6 +193,7 @@ struct _expr {
 
 enum _stmt_kind {
 	FunctionDef_kind = 1,
+	ClassDef_kind = 3,
 	Return_kind = 4,
 	Delete_kind = 5,
 	Assign_kind = 6,
@@ -207,6 +208,14 @@ enum _stmt_kind {
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+		struct {
+			identifier name;
+			asdl_expr_seq *bases;
+			asdl_keyword_seq *keywords;
+			asdl_stmt_seq *body;
+			asdl_expr_seq *decorator_list;
+		} ClassDef;
+
 		struct {
 			asdl_expr_seq *targets;
 		} Delete;

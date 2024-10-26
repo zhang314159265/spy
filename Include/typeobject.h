@@ -2,6 +2,7 @@
 // no such header in cpy
 
 #include "tupleobject.h"
+#include "methodobject.h"
 
 
 static int type_ready(PyTypeObject *type);
@@ -16,6 +17,25 @@ object_dealloc(PyObject *self)
 	Py_TYPE(self)->tp_free(self);
 }
 
+PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems);
+
+PyDoc_STRVAR(object_init_subclass_doc, "");
+
+// defined in cpy/Objects/typeobject.c
+static PyObject *
+object_init_subclass(PyObject *cls, PyObject *arg) {
+  Py_RETURN_NONE;
+}
+
+static PyMethodDef object_methods[] = {
+  {"__init_subclass__", object_init_subclass, METH_CLASS | METH_NOARGS,
+    object_init_subclass_doc},
+  {0},
+};
+
+static PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+static int object_init(PyObject *self, PyObject *args, PyObject *kwds);
+
 // defined in cpy/Objects/typeobject.c
 PyTypeObject PyBaseObject_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -24,6 +44,12 @@ PyTypeObject PyBaseObject_Type = {
 	.tp_dealloc = object_dealloc,
 	.tp_free = PyObject_Del,
 	.tp_hash = (hashfunc) _Py_HashPointer,
+  .tp_alloc = PyType_GenericAlloc,
+  .tp_methods = object_methods,
+  .tp_new = object_new,
+  .tp_init = object_init,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_setattro = PyObject_GenericSetAttr,
 };
 
 static int
@@ -167,6 +193,14 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
 	basebase = base->tp_base;
 
 	COPYSLOT(tp_dealloc);
+  if (type->tp_getattr == NULL && type->tp_getattro == NULL) {
+    type->tp_getattr = base->tp_getattr;
+    type->tp_getattro = base->tp_getattro;
+  }
+  if (type->tp_setattr == NULL && type->tp_setattro == NULL) {
+    type->tp_setattr = base->tp_setattr;
+    type->tp_setattro = base->tp_setattro;
+  }
 	{
 		if (type->tp_richcompare == NULL && type->tp_hash == NULL) {
 			int r = overrides_hash(type);
@@ -179,6 +213,9 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
 			}
 		}
 	}
+  {
+    COPYSLOT(tp_alloc);
+  }
 	return 0;
 }
 
@@ -209,17 +246,76 @@ type_ready_inherit(PyTypeObject *type) {
 }
 
 static int type_add_methods(PyTypeObject *type);
+static int add_operators(PyTypeObject *type);
 
 static int
 type_ready_fill_dict(PyTypeObject *type) {
+  if (add_operators(type) < 0) {
+    return -1;
+  }
 	if (type_add_methods(type) < 0) {
 		return -1;
 	}
 	return 0;
 }
 
+static PyObject *
+tp_new_wrapper(PyObject *self, PyObject *args, PyObject *kwds) {
+  assert(false);
+}
+
+static struct PyMethodDef tp_new_methoddef[] = {
+  {"__new__", (PyCFunction)(void(*)(void)) tp_new_wrapper, METH_VARARGS | METH_KEYWORDS,
+    PyDoc_STR("")},
+  {0},
+};
+
+static int
+add_tp_new_wrapper(PyTypeObject *type) {
+  _Py_IDENTIFIER(__new__);
+  int r = _PyDict_ContainsId(type->tp_dict, &PyId___new__);
+  if (r > 0) {
+    return 0;
+  }
+  if (r < 0) {
+    return -1;
+  }
+
+  PyObject *func = PyCFunction_NewEx(tp_new_methoddef, (PyObject *) type, NULL);
+  if (func == NULL) {
+    return -1;
+  }
+  r = _PyDict_SetItemId(type->tp_dict, &PyId___new__, func);
+  Py_DECREF(func);
+  return r;
+}
+
+static int
+type_ready_set_new(PyTypeObject *type) {
+  PyTypeObject *base = type->tp_base;
+  if (type->tp_new == NULL
+      && base == &PyBaseObject_Type
+      && !(type->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
+    type->tp_flags |= Py_TPFLAGS_DISALLOW_INSTANTIATION;
+  }
+
+  if (!(type->tp_flags & Py_TPFLAGS_DISALLOW_INSTANTIATION)) {
+    if (type->tp_new != NULL) {
+      if (add_tp_new_wrapper(type) < 0) {
+        return -1;
+      }
+    } else {
+      type->tp_new = base->tp_new;
+    }
+  } else {
+    type->tp_new = NULL;
+  }
+  return 0;
+}
+
 static int
 type_ready(PyTypeObject *type) {
+  printf("type_ready: %s\n", type->tp_name);
   if (type_ready_set_dict(type) < 0) {
     return -1;
   }
@@ -227,6 +323,9 @@ type_ready(PyTypeObject *type) {
     return -1;
   }
   if (type_ready_mro(type) < 0) {
+    return -1;
+  }
+  if (type_ready_set_new(type) < 0) {
     return -1;
   }
 	if (type_ready_fill_dict(type) < 0) {
@@ -403,7 +502,17 @@ find_name_in_mro(PyTypeObject *type, PyObject *name, int *error) {
 	mro = type->tp_mro;
 
 	if (mro == NULL) {
-		assert(false);
+    if ((type->tp_flags & Py_TPFLAGS_READYING) == 0) {
+      if (PyType_Ready(type) < 0) {
+        *error = -1;
+        return NULL;
+      }
+      mro = type->tp_mro;
+    }
+    if (mro == NULL) {
+      *error = 1;
+      return NULL;
+    }
 	}
 
 	res = NULL;
@@ -439,4 +548,23 @@ _PyType_Lookup(PyTypeObject *type, PyObject *name) {
 		assert(false);
 	}
 	return res;
+}
+
+static int excess_args(PyObject *args, PyObject *kwds);
+
+
+static PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  if (excess_args(args, kwds)) {
+    if (type->tp_new != object_new) {
+      assert(false);
+    }
+    if (type->tp_init == object_init) {
+      assert(false);
+    }
+  }
+
+  if (type->tp_flags & Py_TPFLAGS_IS_ABSTRACT) {
+    assert(false);
+  }
+  return type->tp_alloc(type, 0);
 }

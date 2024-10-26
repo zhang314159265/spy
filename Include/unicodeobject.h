@@ -7,6 +7,9 @@ typedef uint32_t Py_UCS4;
 typedef uint16_t Py_UCS2;
 typedef uint8_t Py_UCS1;
 
+#define PyUnicode_CHECK_INTERNED(op) \
+    (((PyASCIIObject *)(op))->state.interned)
+
 #define _Py_RETURN_UNICODE_EMPTY() \
 	do { \
 		return unicode_new_empty(); \
@@ -200,17 +203,6 @@ PyObject *PyUnicode_InternFromString(const char *cp) {
 
 PyObject * _PyUnicode_FromId(_Py_Identifier *id);
 
-const char *
-PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *psize) {
-  assert(false);
-}
-
-const char *
-PyUnicode_AsUTF8(PyObject *unicode)
-{
-  return PyUnicode_AsUTF8AndSize(unicode, NULL);
-}
-
 int
 _PyUnicode_EqualToASCIIString(PyObject *unicode, const char *str) {
   size_t len;
@@ -266,6 +258,13 @@ _PyUnicodeWriter_Init(_PyUnicodeWriter *writer) {
 #define _PyUnicode_UTF8(op) \
   (((PyCompactUnicodeObject*)(op))->utf8)
 
+#define PyUnicode_UTF8(op) \
+  (assert(_PyUnicode_CHECK(op)), \
+   assert(PyUnicode_IS_READY(op)), \
+   PyUnicode_IS_COMPACT_ASCII(op) ? \
+     ((char *) ((PyASCIIObject*) (op) + 1)) : \
+     _PyUnicode_UTF8(op))
+
 #define _PyUnicode_HAS_UTF8_MEMORY(op) \
   ((!PyUnicode_IS_COMPACT_ASCII(op) \
     && _PyUnicode_UTF8(op) \
@@ -278,6 +277,39 @@ _PyUnicodeWriter_Init(_PyUnicodeWriter *writer) {
   ((_PyUnicode_WSTR(op) && \
    (!PyUnicode_IS_READY(op) || \
     _PyUnicode_WSTR(op) != PyUnicode_DATA(op))))
+
+#define _PyUnicode_UTF8_LENGTH(op) \
+  (((PyCompactUnicodeObject *)(op))->utf8_length)
+
+#define PyUnicode_UTF8_LENGTH(op) \
+  (assert(_PyUnicode_CHECK(op)), \
+   assert(PyUnicode_IS_READY(op)), \
+   PyUnicode_IS_COMPACT_ASCII(op) ? \
+     ((PyASCIIObject *)(op))->length : \
+     _PyUnicode_UTF8_LENGTH(op))
+
+const char *
+PyUnicode_AsUTF8AndSize(PyObject *unicode, Py_ssize_t *psize) {
+  if (!PyUnicode_Check(unicode)) {
+    assert(false);
+  }
+  if (PyUnicode_READY(unicode) == -1)
+    return NULL;
+
+  if (PyUnicode_UTF8(unicode) == NULL) {
+    assert(false);
+  }
+
+  if (psize)
+    *psize = PyUnicode_UTF8_LENGTH(unicode);
+  return PyUnicode_UTF8(unicode);
+}
+
+const char *
+PyUnicode_AsUTF8(PyObject *unicode)
+{
+  return PyUnicode_AsUTF8AndSize(unicode, NULL);
+}
 
 static PyObject *
 resize_compact(PyObject *unicode, Py_ssize_t length) {

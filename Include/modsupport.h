@@ -190,3 +190,10 @@ PyObject * _PyModule_CreateInitialized(struct PyModuleDef* module, int module_ap
 	m->md_def = module;
 	return (PyObject *) m;
 }
+
+int PyArg_ParseTuple(PyObject *, const char *, ...);
+
+int _PyArg_NoKeywords(const char *funcname, PyObject *kwargs);
+
+#define _PyArg_NoKeywords(funcname, kwargs) \
+  ((kwargs) == NULL || _PyArg_NoKeywords((funcname), (kwargs)))

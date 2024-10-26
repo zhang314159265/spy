@@ -8,8 +8,18 @@
 #define STACK_USE_GUIDELINE 30
 
 // defined in cpy/Python/compile.c
+// privateobj can be the class name
 PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
-  assert(privateobj == NULL); // TODO: support non-null privateobj
+	/* Name mangling: __private becomes _classname__private.
+		 This is indenpendent from how the name is used */
+	#if 0
+	printf("mangle ident %s\n", (char *) PyUnicode_DATA(ident));
+	if (privateobj) {
+		printf("PrivateObj %s\n", (char *) PyUnicode_DATA(privateobj));
+	}
+	#endif
+	// TODO follow cpy
+  // assert(privateobj == NULL); // TODO: support non-null privateobj
   Py_INCREF(ident);
   return ident;
 }
@@ -19,6 +29,13 @@ PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
 #define NEXT_BLOCK(C) { \
   if (compiler_next_block((C)) == NULL) \
     return 0; \
+}
+
+#define ADDOP_IN_SCOPE(C, OP) { \
+  if (!compiler_addop((C), (OP))) { \
+    compiler_exit_scope(C); \
+    return 0; \
+  } \
 }
 
 #define ADDOP_COMPARE(C, CMP) { \
@@ -135,6 +152,7 @@ struct compiler_unit {
 	PyObject *u_consts; // all constants
 	PyObject *u_names; // all names
 	PyObject *u_varnames; // local variables
+  PyObject *u_cellvars;
 
 	int u_firstlineno;
 	int u_lineno; // the lineno for the current stmt
@@ -238,6 +256,9 @@ astfold_stmt(stmt_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
   case For_kind:
     // TODO follow cpy
     break;
+	case ClassDef_kind:
+    // TODO follow cpy
+		break;
 	default:
 		fprintf(stderr, "stmt kind %d\n", node_->kind);
 		assert(false);
@@ -420,6 +441,12 @@ compiler_enter_scope(struct compiler *c, identifier name,
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
+  #if 0
+  // TODO follow cpy
+  u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0, 0);
+  #else
+  u->u_cellvars = PyDict_New();
+  #endif
 
   u->u_nfblocks = 0;
 	u->u_consts = PyDict_New();
@@ -1195,6 +1222,10 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
       ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
       break;
     }
+    case Store: {
+      ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
+      break;
+    }
     default:
       assert(false);
     }
@@ -1652,6 +1683,89 @@ compiler_break(struct compiler *c) {
   return 1;
 }
 
+static int compiler_body(struct compiler *c, asdl_stmt_seq *stmts);
+
+static int
+compiler_class(struct compiler *c, stmt_ty s) {
+	PyCodeObject *co;
+	PyObject *str;
+	int i, firstlineno = 0;
+	asdl_expr_seq *decos = s->v.ClassDef.decorator_list;
+
+	if (!compiler_decorators(c, decos))
+		return 0;
+	
+	if (asdl_seq_LEN(decos)) {
+		assert(false);
+	}
+
+	// 1. compile the class body into a code object
+	if (!compiler_enter_scope(c, s->v.ClassDef.name,
+			COMPILER_SCOPE_CLASS, (void *) s, firstlineno)) {
+		return 0;
+	}
+	// This block represents what we do in the new scope
+	{
+		// use the class name for name mangling
+		Py_INCREF(s->v.ClassDef.name);
+		Py_XSETREF(c->u->u_private, s->v.ClassDef.name);
+		// load (global) __name__
+		str = PyUnicode_InternFromString("__name__");
+		if (!str || !compiler_nameop(c, str, Load)) {
+			assert(false);
+		}
+		Py_DECREF(str);
+		// ... and store it as __module__
+    str = PyUnicode_InternFromString("__module__");
+    if (!str || !compiler_nameop(c, str, Store)) {
+      assert(false);
+    }
+    Py_DECREF(str);
+    assert(c->u->u_qualname);
+    ADDOP_LOAD_CONST(c, c->u->u_qualname);
+    str = PyUnicode_InternFromString("__qualname__");
+    if (!str || !compiler_nameop(c, str, Store)) {
+      assert(false);
+    }
+    Py_DECREF(str);
+    if (!compiler_body(c, s->v.ClassDef.body)) {
+      assert(false);
+    }
+    if (c->u->u_ste->ste_needs_class_closure) {
+      assert(false);
+    } else {
+      assert(PyDict_GET_SIZE(c->u->u_cellvars) == 0);
+      ADDOP_LOAD_CONST(c, Py_None);
+    }
+    ADDOP_IN_SCOPE(c, RETURN_VALUE);
+    co = assemble(c, 1);
+	}
+  compiler_exit_scope(c);
+  if (co == NULL)
+    return 0;
+
+  ADDOP(c, LOAD_BUILD_CLASS);
+
+  if (!compiler_make_closure(c, co, 0, NULL)) {
+    assert(false);
+  }
+  Py_DECREF(co);
+
+  ADDOP_LOAD_CONST(c, s->v.ClassDef.name);
+
+  if (!compiler_call_helper(c, 2, s->v.ClassDef.bases, s->v.ClassDef.keywords))
+    return 0;
+
+  // apply decorators
+  for (i = 0; i < asdl_seq_LEN(decos); i++) {
+    assert(false);
+  }
+
+  if (!compiler_nameop(c, s->v.ClassDef.name, Store))
+    return 0;
+  return 1;
+}
+
 static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
@@ -1689,6 +1803,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	case Delete_kind:
 		VISIT_SEQ(c, expr, s->v.Delete.targets)
 		break;
+	case ClassDef_kind:
+		return compiler_class(c, s);
 	default:
 		assert(false);
 	}

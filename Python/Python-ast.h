@@ -344,3 +344,21 @@ _PyAST_Delete(asdl_expr_seq *targets) {
 	p->v.Delete.targets = targets;
 	return p;
 }
+
+stmt_ty
+_PyAST_ClassDef(identifier name, asdl_expr_seq *bases, asdl_keyword_seq *keywords, asdl_stmt_seq *body, asdl_expr_seq *decorator_list) {
+	stmt_ty p;
+	if (!name) {
+		assert(false);
+	}
+	p = (stmt_ty) malloc(sizeof(*p));
+	if (!p)
+		return NULL;
+	p->kind = ClassDef_kind;
+	p->v.ClassDef.name = name;
+	p->v.ClassDef.bases = bases;
+	p->v.ClassDef.keywords = keywords;
+	p->v.ClassDef.body = body;
+	p->v.ClassDef.decorator_list = decorator_list;
+	return p;
+}

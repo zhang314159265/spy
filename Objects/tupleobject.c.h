@@ -37,3 +37,26 @@ static PyObject *tuplerichcompare(PyObject *v, PyObject *w, int op) {
 
 	return PyObject_RichCompare(vt->ob_item[i], wt->ob_item[i], op);
 }
+
+static PyObject *
+tupleslice(PyTupleObject *a, Py_ssize_t ilow,
+    Py_ssize_t ihigh) {
+  if (ilow < 0)
+    ilow = 0;
+  if (ihigh > Py_SIZE(a))
+    ihigh = Py_SIZE(a);
+  if (ihigh < ilow)
+    ihigh = ilow;
+  if (ilow == 0 && ihigh == Py_SIZE(a) && PyTuple_CheckExact(a)) {
+    Py_INCREF(a);
+    return (PyObject *) a;
+  }
+  return _PyTuple_FromArray(a->ob_item + ilow, ihigh - ilow);
+}
+
+PyObject *PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j) {
+  if (op == NULL || !PyTuple_Check(op)) {
+    assert(false);
+  }
+  return tupleslice((PyTupleObject *) op, i, j);
+}

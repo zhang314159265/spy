@@ -52,6 +52,14 @@ typedef struct {
   objobjproc sq_contains;
 } PySequenceMethods;
 
+typedef struct {
+} PyAsyncMethods;
+
+typedef struct {
+} PyBufferProcs;
+
+struct PyMemberDef;
+
 struct _typeobject {
 	PyObject_VAR_HEAD
 	const char *tp_name; // for printing, in format "<module>.<name>"
@@ -65,6 +73,9 @@ struct _typeobject {
   PyObject *tp_mro; // method resolution order
   PyNumberMethods *tp_as_number;
   PyMappingMethods *tp_as_mapping;
+
+  PyAsyncMethods *tp_as_async;
+  PyBufferProcs *tp_as_buffer;
 
   struct _typeobject *tp_base;
 
@@ -97,12 +108,41 @@ struct _typeobject {
 
   reprfunc tp_repr;
   reprfunc tp_str;
+
+  descrgetfunc tp_descr_get;
+  descrsetfunc tp_descr_set;
+
+  newfunc tp_new;
+  initproc tp_init;
+
+  // weak reference enabler
+  Py_ssize_t tp_weaklistoffset;
+
+  // delete references to contained objects
+  inquiry tp_clear;
+
+  traverseproc tp_traverse;
+  struct PyMemberDef *tp_members;
+  struct PyGetSetDef *tp_getset;
 };
 
 // The *real* layout of a type object when allocated on the heap
 typedef struct _heaptypeobject {
   PyTypeObject ht_type;
+
+  PyAsyncMethods as_async;
+  PyNumberMethods as_number;
+  PyMappingMethods as_mapping;
+  PySequenceMethods as_sequence;
+
+  PyBufferProcs as_buffer;
+  PyObject *ht_name, *ht_slots, *ht_qualname;
+  struct _dictkeysobject *ht_cached_keys;
+  PyObject *ht_module;
 } PyHeapTypeObject;
+
+#define PyHeapType_GET_MEMBERS(etype) \
+  ((struct PyMemberDef *)(((char *)etype) + Py_TYPE(etype)->tp_basicsize))
 
 // defined in cpy/Objects/object.c
 PyObject *_PyObject_NextNotImplemented(PyObject *self) {
@@ -132,3 +172,7 @@ typedef struct _Py_Identifier {
     (op) = (op2); \
     Py_XDECREF(_py_tmp); \
   } while (0)
+
+int _PyObject_LookupAttrId(PyObject *v, struct _Py_Identifier *name, PyObject **result);
+
+

@@ -8,6 +8,11 @@
 #include "abstract.h"
 #include "internal/pycore_compile.h"
 
+static identifier __class__ = NULL;
+
+#define GET_IDENTIFIER(VAR) \
+	((VAR) ? (VAR) : ((VAR) = PyUnicode_InternFromString(# VAR)))
+
 #define DEF_GLOBAL 1 // global stmt
 #define DEF_LOCAL 2 // assignment in code block
 #define DEF_PARAM 2<<1 // formal parameter
@@ -76,6 +81,7 @@ typedef struct _symtable_entry {
 
   unsigned ste_comp_iter_target : 1; /* true if visiting comprehension target */
 	unsigned ste_returns_value : 1; // true if namespace uses return with an argument
+	unsigned ste_needs_class_closure : 1;
   _Py_block_ty ste_type; // module, class or function
 } PySTEntryObject;
 
@@ -142,6 +148,7 @@ ste_new(struct symtable *st, _Py_block_ty block, void *key) {
   ste->ste_varnames = PyList_New(0);
   ste->ste_comp_iter_target = 0;
   ste->ste_type = block;
+	ste->ste_needs_class_closure = 0;
 
   ste->ste_children = PyList_New(0);
 
@@ -322,6 +329,19 @@ analyze_cells(PyObject *scopes, PyObject *free) {
 }
 
 static int
+drop_class_free(PySTEntryObject *ste, PyObject *free) {
+	int res;
+	if (!GET_IDENTIFIER(__class__))
+		return 0;
+	res = PySet_Discard(free, __class__);
+	if (res < 0)
+		return 0;
+	if (res)
+		ste->ste_needs_class_closure = 1;
+	return 1;
+}
+
+static int
 analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
     PyObject *global) {
   PyObject *name, *v, *local = NULL, *scopes = NULL, *newbound = NULL;
@@ -348,7 +368,16 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
     assert(false);
 
   if (ste->ste_type == ClassBlock) {
-    assert(false);
+		temp = PyNumber_InPlaceOr(newglobal, global);
+		if (!temp)
+			assert(false);
+		Py_DECREF(temp);
+		if (bound) {
+			temp = PyNumber_InPlaceOr(newbound, bound);
+			if (!temp)
+				assert(false);
+			Py_DECREF(temp);
+		}
   }
 
   while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
@@ -383,7 +412,10 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
     Py_DECREF(temp);
   } else {
     // special-case __class__
-    assert(false);
+		if (!GET_IDENTIFIER(__class__))
+			assert(false);
+		if (PySet_Add(newbound, __class__) < 0)
+			assert(false);
   }
 
   allfree = PySet_New(NULL);
@@ -408,7 +440,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
   if (ste->ste_type == FunctionBlock && !analyze_cells(scopes, newfree)) {
     assert(false);
   }
-  else if (ste->ste_type == ClassBlock) {
+  else if (ste->ste_type == ClassBlock && !drop_class_free(ste, newfree)) {
     assert(false);
   }
   // Records the results of the analysis in the symbol table entry
@@ -614,6 +646,26 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
 		if (!symtable_exit_block(st))
 			VISIT_QUIT(st, 0);
 		break;
+	case ClassDef_kind: {
+		PyObject *tmp;
+		if (!symtable_add_def(st, s->v.ClassDef.name, DEF_LOCAL, LOCATION(s)))
+			VISIT_QUIT(st, 0);
+		VISIT_SEQ(st, expr, s->v.ClassDef.bases);
+		VISIT_SEQ(st, keyword, s->v.ClassDef.keywords);
+		if (s->v.ClassDef.decorator_list)
+			VISIT_SEQ(st, expr, s->v.ClassDef.decorator_list);
+		if (!symtable_enter_block(st, ClassBlock, (void *) s)) {
+			VISIT_QUIT(st, 0);
+		}
+
+		tmp = st->st_private;
+		st->st_private = s->v.ClassDef.name;
+		VISIT_SEQ(st, stmt, s->v.ClassDef.body);
+		st->st_private = tmp;
+		if (!symtable_exit_block(st))
+			VISIT_QUIT(st, 0);
+		break;
+	}
   case Expr_kind:
     VISIT(st, expr, s->v.Expr.value);
     break;

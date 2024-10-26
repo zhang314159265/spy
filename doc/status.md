@@ -17,6 +17,9 @@ Quest 5:
 Quest x:
 - generator / yield
 
+Quest:
+- decorators
+
 Quest 1:
 - cover import <+++++++++++
 
@@ -25,6 +28,9 @@ Quest 3:
 
 Quest 4:
 - extension module ++++++++
+
+Later:
+- Arguments when defining class (e.g. base class)
 
 - goal
 	- ? exception handling
