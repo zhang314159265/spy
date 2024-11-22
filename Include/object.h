@@ -6,6 +6,13 @@
 #include "pyport.h"
 #include "cpython/objimpl.h"
 
+// result of calling PyIter_Send
+typedef enum {
+  PYGEN_RETURN = 0,
+  PYGEN_ERROR = -1,
+  PYGEN_NEXT = 1,
+} PySendResult;
+
 #define Py_TPFLAGS_DISALLOW_INSTANTIATION (1UL << 7)
 
 // Set if the type object is dynamically allocated
@@ -317,3 +324,10 @@ PyObject_HashNotImplemented(PyObject *v) {
 }
 
 int PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value);
+
+PyObject *PyObject_SelfIter(PyObject *obj) {
+  Py_INCREF(obj);
+  return obj;
+}
+
+int PyObject_CallFinalizerFromDealloc(PyObject *self);

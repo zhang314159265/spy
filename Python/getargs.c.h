@@ -204,5 +204,31 @@ int PyArg_ParseTuple(PyObject *args, const char *format, ...) {
 
 int
 _PyArg_NoKeywords(const char *funcname, PyObject *kwargs) {
+  if (kwargs == NULL) {
+    return 1;
+  }
   assert(false);
+}
+
+#undef _PyArg_CheckPositional
+
+int
+_PyArg_CheckPositional(const char *name, Py_ssize_t nargs,
+    Py_ssize_t min, Py_ssize_t max) {
+  assert(min >= 0);
+  assert(min <= max);
+
+  if (nargs < min) {
+    assert(false);
+  }
+
+  if (nargs == 0) {
+    return 1;
+  }
+
+  if (nargs > max) {
+    assert(false);
+  }
+
+  return 1;
 }

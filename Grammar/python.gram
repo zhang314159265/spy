@@ -79,6 +79,12 @@ simple_stmt[stmt_ty] (memo):
 	| e=primary { _PyAST_Expr(e) }
 	| 'break' { _PyAST_Break() }
 	| &'del' del_stmt
+	| &'yield' yield_stmt
+
+yield_stmt[stmt_ty]: y=yield_expr { _PyAST_Expr(y) }
+
+yield_expr[expr_ty]:
+    | 'yield' a=[star_expressions] { _PyAST_Yield(a) }
 
 del_stmt[stmt_ty]:
 	| 'del' a=del_targets &(';' | NEWLINE) { _PyAST_Delete(a) }

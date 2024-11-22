@@ -5,6 +5,7 @@
 
 enum _framestate {
 	FRAME_CREATED = -2,
+  FRAME_SUSPENDED = -1,
 	FRAME_EXECUTING = 0,
 	FRAME_RETURNED = 1,
 };
@@ -21,6 +22,9 @@ struct _frame {
 	PyObject *f_locals;
 	PyObject **f_valuestack; // points after the last local
 	int f_stackdepth;
+
+  PyObject *f_gen;
+
 	int f_lasti; // last instruction if called
 	PyFrameState f_state;
 	PyObject *f_localsplus[1]; // locals + stack
@@ -100,4 +104,16 @@ static void frame_dealloc(PyFrameObject *f) {
 	PyCodeObject *co = f->f_code;
 	PyObject_GC_Del(f);
 	Py_DECREF(co);
+}
+
+static inline int _PyFrame_IsRunnable(struct _frame *f) {
+  return f->f_state < FRAME_EXECUTING;
+}
+
+static inline int _PyFrame_IsExecuting(struct _frame *f) {
+  return f->f_state == FRAME_EXECUTING;
+}
+
+static inline int _PyFrameHasCompleted(struct _frame *f) {
+  return f->f_state > FRAME_EXECUTING;
 }

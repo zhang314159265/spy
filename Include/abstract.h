@@ -205,6 +205,11 @@ PyIter_Next(PyObject *iter) {
 }
 
 PyObject *PySequence_Tuple(PyObject *v) {
+  PyObject *it;
+  Py_ssize_t n;
+  PyObject *result = NULL;
+  Py_ssize_t j;
+
   if (v == NULL) {
     assert(false);
   }
@@ -217,7 +222,37 @@ PyObject *PySequence_Tuple(PyObject *v) {
   if (PyList_CheckExact(v)) {
     return PyList_AsTuple(v);
   }
-  assert(false);
+
+  // Get iterator
+  it = PyObject_GetIter(v);
+  if (it == NULL) {
+    return NULL;
+  }
+
+  n = PyObject_LengthHint(v, 10);
+  if (n == -1)
+    assert(false);
+  result = PyTuple_New(n);
+  if (result == NULL)
+    assert(false);
+
+  for (j = 0; ; ++j) {
+    PyObject *item = PyIter_Next(it);
+    if (item == NULL) {
+      if (PyErr_Occurred())
+        assert(false);
+      break;
+    }
+    if (j >= n) {
+      assert(false);
+    }
+    PyTuple_SET_ITEM(result, j, item);
+  }
+  if (j < n && _PyTuple_Resize(&result, j) != 0)
+    assert(false);
+
+  Py_DECREF(it);
+  return result;
 }
 
 static inline vectorcallfunc
@@ -645,3 +680,5 @@ _PyObject_FastCall(PyObject *func, PyObject *const *args, Py_ssize_t nargs) {
 PyObject *_PyObject_Call(PyThreadState *tstate, PyObject *callable, PyObject *args, PyObject *kwargs);
 
 #define _PY_FASTCALL_SMALL_STACK 5
+
+

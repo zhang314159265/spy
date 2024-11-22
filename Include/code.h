@@ -14,6 +14,7 @@ typedef struct PyCodeObject PyCodeObject;
 #define CO_OPTIMIZED 0x0001
 #define CO_NEWLOCALS 0x0002
 #define CO_NOFREE 0x0040
+#define CO_ASYNC_GENERATOR 0x0200
 
 #define CO_MAXBLOCKS 20
 

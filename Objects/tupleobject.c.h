@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Python/getargs.c.h"
+
 static PyObject *tuplerichcompare(PyObject *v, PyObject *w, int op) {
 	PyTupleObject *vt, *wt;
 	Py_ssize_t i;
@@ -59,4 +61,45 @@ PyObject *PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j) {
     assert(false);
   }
   return tupleslice((PyTupleObject *) op, i, j);
+}
+
+static PyObject *
+tuple_new_impl(PyTypeObject *type, PyObject *iterable) {
+  printf("tuple_new_impl iterable type %s\n", Py_TYPE(iterable)->tp_name);
+
+  if (type != &PyTuple_Type) {
+    assert(false);
+  }
+
+  if (iterable == NULL) {
+    assert(false);
+  } else {
+    return PySequence_Tuple(iterable);
+  }
+}
+
+// defined in cpy/Objects/clinic/tupleobject.c.h
+static PyObject *tuple_new(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
+  PyObject *return_value = NULL;
+  PyObject *iterable = NULL;
+
+  if ((type == &PyTuple_Type) &&
+      !_PyArg_NoKeywords("tuple", kwargs)) {
+    goto exit;
+  }
+  if (!_PyArg_CheckPositional("tuple", PyTuple_GET_SIZE(args), 0, 1)) {
+    goto exit;
+  }
+  if (PyTuple_GET_SIZE(args) < 1) {
+    goto skip_optional;
+  }
+  iterable = PyTuple_GET_ITEM(args, 0);
+ skip_optional:
+  return_value = tuple_new_impl(type, iterable);
+ exit:
+  return return_value;
+}
+
+int _PyTuple_Resize(PyObject **pv, Py_ssize_t newsize) {
+  assert(false);
 }

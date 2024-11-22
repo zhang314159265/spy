@@ -221,6 +221,10 @@ void dump_expr(expr_ty expr, int indent) {
 		dump_expr(expr->v.Slice.upper, indent + 2);
 		dump_expr(expr->v.Slice.step, indent + 2);
 		break;
+  case Yield_kind:
+    fprintf(stderr, "Yield:\n");
+    dump_expr(expr->v.Yield.value, indent + 2);
+    break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

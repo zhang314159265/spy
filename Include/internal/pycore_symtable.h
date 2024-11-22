@@ -8,6 +8,14 @@
 #include "abstract.h"
 #include "internal/pycore_compile.h"
 
+typedef enum _comprehension_type {
+  NoComprehension = 0,
+  ListComprehension = 1,
+  DictComprehension = 2,
+  SetComprehension = 3,
+  GeneratorExpression = 4,
+} _Py_comprehension_ty;
+
 static identifier __class__ = NULL;
 
 #define GET_IDENTIFIER(VAR) \
@@ -82,6 +90,9 @@ typedef struct _symtable_entry {
   unsigned ste_comp_iter_target : 1; /* true if visiting comprehension target */
 	unsigned ste_returns_value : 1; // true if namespace uses return with an argument
 	unsigned ste_needs_class_closure : 1;
+  unsigned ste_generator : 1; // true if namespace is a generator
+  unsigned ste_coroutine : 1;
+  _Py_comprehension_ty ste_comprehension;
   _Py_block_ty ste_type; // module, class or function
 } PySTEntryObject;
 
@@ -142,6 +153,8 @@ ste_new(struct symtable *st, _Py_block_ty block, void *key) {
   ste->ste_table = st;
   ste->ste_id = k; /* ste owns reference to k */
 
+  ste->ste_generator = 0;
+  ste->ste_coroutine = 0;
 	ste->ste_returns_value = 0;
 
   ste->ste_symbols = PyDict_New();
@@ -539,6 +552,14 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag,
 }
 
 static int
+symtable_raise_if_annotation_block(struct symtable *st, const char *name, expr_ty e) {
+  if (st->st_cur->ste_type != AnnotationBlock) {
+    return 1;
+  }
+  assert(false);
+}
+
+static int
 symtable_visit_expr(struct symtable *st, expr_ty e) {
   switch (e->kind) {
   case Call_kind:
@@ -597,6 +618,17 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
 		if (e->v.Slice.step)
 			VISIT(st, expr, e->v.Slice.step);
 		break;
+  case Yield_kind:
+    if (!symtable_raise_if_annotation_block(st, "yield expression", e)) {
+      VISIT_QUIT(st, 0);
+    }
+    if (e->v.Yield.value)
+      VISIT(st, expr, e->v.Yield.value);
+    st->st_cur->ste_generator = 1;
+    if (st->st_cur->ste_comprehension) {
+      assert(false);
+    }
+    break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);

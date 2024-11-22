@@ -1,5 +1,9 @@
 #pragma once
 
+#define CO_GENERATOR 0x0020
+#define CO_COROUTINE 0x0080
+#define CO_ASYNC_GENERATOR 0x0200
+
 struct PyCodeObject {
 	PyObject_HEAD
 

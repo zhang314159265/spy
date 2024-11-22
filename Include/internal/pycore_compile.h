@@ -1248,6 +1248,16 @@ compiler_visit_expr1(struct compiler *c, expr_ty e) {
     break;
   case Slice_kind:
     return compiler_slice(c, e);
+  case Yield_kind:
+    if (c->u->u_ste->ste_type != FunctionBlock)
+      assert(false);
+    if (e->v.Yield.value) {
+      VISIT(c, expr, e->v.Yield.value);
+    } else {
+      assert(false);
+    }
+    ADDOP(c, YIELD_VALUE);
+    break;
 	default:
 		assert(false);
 	}
@@ -1868,10 +1878,37 @@ extend_block(basicblock *bb) {
 	assert(false);
 }
 
+static int compute_code_flags(struct compiler *c);
+
 static int
 insert_generator_prefix(struct compiler *c, basicblock *entryblock) {
-	// not implemented yet
-	return 0;
+  int flags = compute_code_flags(c);
+  if (flags < 0) {
+    return -1;
+  }
+  int kind;
+  if (flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
+    if (flags & CO_COROUTINE) {
+      kind = 1;
+    } else if (flags & CO_ASYNC_GENERATOR) {
+      kind = 2;
+    } else {
+      kind = 0;
+    }
+  } else {
+    return 0;
+  }
+  if (compiler_next_instr(entryblock) < 0) {
+    return -1;
+  }
+  for (int i = entryblock->b_iused - 1; i > 0; i--) {
+    entryblock->b_instr[i] = entryblock->b_instr[i - 1];
+  }
+  entryblock->b_instr[0].i_opcode = GEN_START;
+  entryblock->b_instr[0].i_oparg = kind;
+  entryblock->b_instr[0].i_lineno = -1;
+  entryblock->b_instr[0].i_target = NULL;
+  return 0;
 }
 
 #define DEFAULT_CODE_SIZE 128
@@ -2000,6 +2037,9 @@ compute_code_flags(struct compiler *c) {
 
   if (ste->ste_type == FunctionBlock) {
     flags |= CO_NEWLOCALS | CO_OPTIMIZED;
+    if (ste->ste_generator && !ste->ste_coroutine) {
+      flags |= CO_GENERATOR;
+    }
   }
   return flags;
 }

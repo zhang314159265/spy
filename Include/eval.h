@@ -4,6 +4,7 @@
 #include "funcobject.h"
 #include "tupleobject.h"
 #include "sliceobject.h"
+#include "genobject.h"
 
 PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define GETLOCAL(i) (fastlocals[i])
@@ -216,6 +217,22 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(GEN_START): {
+      PyObject *none = POP();
+      assert(none == Py_None);
+      assert(oparg < 3);
+      Py_DECREF(none);
+      DISPATCH();
+    }
+    case TARGET(YIELD_VALUE): {
+      retval = POP();
+      if (co->co_flags & CO_ASYNC_GENERATOR) {
+        assert(false);
+      }
+      f->f_state = FRAME_SUSPENDED;
+      f->f_stackdepth = (int)(stack_pointer - f->f_valuestack);
+      goto exiting;
+    }
     case TARGET(STORE_ATTR): {
       PyObject *name = GETITEM(names, oparg);
       PyObject *owner = TOP();
@@ -1048,6 +1065,28 @@ exit_eval_frame:
 	return _Py_CheckFunctionResult(tstate, NULL, retval, __func__);
 }
 
+static PyObject *
+make_coro(PyFrameConstructor *con, PyFrameObject *f) {
+  PyObject *gen;
+  int is_coro = ((PyCodeObject *)con->fc_code)->co_flags & CO_COROUTINE;
+
+  Py_CLEAR(f->f_back);
+
+  if (is_coro) {
+    assert(false);
+  } else if (((PyCodeObject *) con->fc_code)->co_flags & CO_ASYNC_GENERATOR) {
+    assert(false);
+  } else {
+    gen = PyGen_NewWithQualName(f, con->fc_name, con->fc_qualname);
+  }
+  if (gen == NULL) {
+    return NULL;
+  }
+
+  _PyObject_GC_TRACK(f);
+  return gen;
+}
+
 PyObject *
 _PyEval_Vector(PyThreadState *tstate, PyFrameConstructor *con,
 		PyObject *locals,
@@ -1058,6 +1097,10 @@ _PyEval_Vector(PyThreadState *tstate, PyFrameConstructor *con,
 	if (f == NULL) {
 		return NULL;
 	}
+
+  if (((PyCodeObject *) con->fc_code)->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) {
+    return make_coro(con, f);
+  }
 
 	PyObject *retval = _PyEval_EvalFrame(tstate, f, 0);
 

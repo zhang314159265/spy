@@ -41,6 +41,7 @@
 #define INPLACE_OR 79
 #define LIST_TO_TUPLE 82
 #define RETURN_VALUE 83
+#define YIELD_VALUE 86
 #define HAVE_ARGUMENT 90
 #define STORE_NAME 90
 #define DELETE_NAME 91
@@ -72,6 +73,7 @@
 #define LOAD_FAST 124
 #define STORE_FAST 125
 #define DELETE_FAST 126
+#define GEN_START 129
 #define RAISE_VARARGS 130
 #define CALL_FUNCTION 131
 #define MAKE_FUNCTION 132

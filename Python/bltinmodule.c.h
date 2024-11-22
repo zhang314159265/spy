@@ -98,6 +98,7 @@ _PyBuiltin_Init(PyInterpreterState *interp)
 	ADD_TO_ALL(OBJECT)
 
 	SETBUILTIN("range", &PyRange_Type);
+  SETBUILTIN("tuple", &PyTuple_Type);
 
 	return mod;
 #undef ADD_TO_ALL

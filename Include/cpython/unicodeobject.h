@@ -175,7 +175,7 @@ _PyUnicode_Ready(PyObject *unicode) {
 }
 
 static void unicode_dealloc(PyObject *unicode) {
-	printf("WARNING: dealloc str object is not implemented yet\n");
+	// printf("WARNING: dealloc str object is not implemented yet\n");
 }
 
 static int

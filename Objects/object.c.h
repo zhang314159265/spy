@@ -424,3 +424,43 @@ _PyObject_GetAttrId(PyObject *v, _Py_Identifier *name) {
   result = PyObject_GetAttr(v, oname);
   return result;
 }
+
+void PyObject_CallFinalizer(PyObject *self) {
+  PyTypeObject *tp = Py_TYPE(self);
+
+  if (tp->tp_finalize == NULL)
+    return;
+
+  // TODO follow cpy
+  #if 0
+  if (_PyType_IS_GC(tp) && _PyGC_FINALIZED(self))
+    return;
+  #endif
+
+  tp->tp_finalize(self);
+
+  // TODO follow cpy
+  #if 0
+  if (_PyType_IS_GC(tp)) {
+    _PyGC_SET_FINALIZED(self);
+  }
+  #endif
+}
+
+int PyObject_CallFinalizerFromDealloc(PyObject *self) {
+  if (Py_REFCNT(self) != 0) {
+    assert(false);
+  }
+
+  // temporarily resurrect the object
+  Py_SET_REFCNT(self, 1);
+
+  PyObject_CallFinalizer(self);
+
+  assert(Py_REFCNT(self) > 0);
+  Py_SET_REFCNT(self, Py_REFCNT(self) - 1);
+  if (Py_REFCNT(self) == 0) {
+    return 0;
+  }
+  assert(false);
+}

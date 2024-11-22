@@ -124,6 +124,8 @@ struct _typeobject {
   traverseproc tp_traverse;
   struct PyMemberDef *tp_members;
   struct PyGetSetDef *tp_getset;
+
+  destructor tp_finalize;
 };
 
 // The *real* layout of a type object when allocated on the heap

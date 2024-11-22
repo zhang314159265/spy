@@ -1,6 +1,5 @@
 // TODO generate this file rather than manually create it
-#ifndef Py_INTERNAL_AST_H
-#define Py_INTERNAL_AST_H
+#pragma once
 
 #define _ASDL_SEQ_HEAD \
 	Py_ssize_t size; \
@@ -100,6 +99,7 @@ enum _expr_kind {
 	IfExp_kind=6,
 	Dict_kind=7,
 	Set_kind=8,
+  Yield_kind=14,
 	Compare_kind=16,
 	Call_kind=17,
 	Constant_kind=20,
@@ -115,6 +115,9 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+    struct {
+      expr_ty value;
+    } Yield;
 		struct {
 			expr_ty lower;
 			expr_ty upper;
@@ -345,4 +348,12 @@ stmt_ty _PyAST_While(expr_ty test, asdl_stmt_seq *body, asdl_stmt_seq *orelse) {
 	assert(false);
 }
 
-#endif
+expr_ty _PyAST_Yield(expr_ty value) {
+  expr_ty p;
+  p = (expr_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = Yield_kind;
+  p->v.Yield.value = value;
+  return p;
+}

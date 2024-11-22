@@ -49,6 +49,8 @@ static PySequenceMethods tuple_as_sequence = {
 	.sq_item = (ssizeargfunc) tupleitem,
 };
 
+static PyObject *tuple_new(PyTypeObject *type, PyObject *args, PyObject *kwargs);
+
 PyTypeObject PyTuple_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "tuple",
@@ -61,6 +63,7 @@ PyTypeObject PyTuple_Type = {
 	.tp_free = PyObject_GC_Del,
 	.tp_as_sequence = &tuple_as_sequence,
 	.tp_repr = (reprfunc) tuplerepr,
+  .tp_new = tuple_new,
 };
 
 static PyTupleObject *
@@ -243,3 +246,5 @@ static PyObject *tuplerepr(PyTupleObject *v) {
 }
 
 PyObject *PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j);
+
+int _PyTuple_Resize(PyObject **pv, Py_ssize_t newsize);
