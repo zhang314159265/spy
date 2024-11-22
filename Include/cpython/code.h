@@ -7,6 +7,10 @@
 struct PyCodeObject {
 	PyObject_HEAD
 
+  int co_argcount;
+  int co_posonlyargcount;
+  int co_kwonlyargcount;
+
   int co_nlocals; // #local variables
   int co_stacksize;
   int co_flags;
@@ -21,6 +25,8 @@ struct PyCodeObject {
   void *co_extra;
 
   PyObject *co_freevars;
+  PyObject *co_cellvars;
+  Py_ssize_t *co_cell2arg;
 };
 
 #define _Py_OPCODE(word) ((word) & 255)

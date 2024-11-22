@@ -1,6 +1,7 @@
 #pragma once
 
 #include "abstract.h"
+#include "Objects/stringlib/eq.h"
 
 #define PySet_MINSIZE 8
 
@@ -237,6 +238,7 @@ PyObject *PySet_New(PyObject *iterable) {
 
 static setentry *
 set_lookkey(PySetObject *so, PyObject *key, Py_hash_t hash) {
+  setentry *table;
   setentry *entry;
   size_t perturb = hash;
   size_t mask = so->mask;
@@ -250,6 +252,15 @@ set_lookkey(PySetObject *so, PyObject *key, Py_hash_t hash) {
       if (entry->hash == 0 && entry->key == NULL)
         return entry;
       if (entry->hash == hash) {
+        PyObject *startkey = entry->key;
+        assert(startkey != dummy);
+        if (startkey == key)
+          return entry;
+        if (PyUnicode_CheckExact(startkey)
+            && PyUnicode_CheckExact(key)
+            && _PyUnicode_EQ(startkey, key))
+          return entry;
+        table = so->table;
         assert(false);
       }
       entry++;
@@ -405,13 +416,19 @@ int PySet_Add(PyObject *anyset, PyObject *key) {
 static int
 set_discard_entry(PySetObject *so, PyObject *key, Py_hash_t hash) {
 	setentry *entry;
+  PyObject *old_key;
 
 	entry = set_lookkey(so, key, hash);
 	if (entry == NULL)
 		return -1;
 	if (entry->key == NULL)
 		return DISCARD_NOTFOUND;
-	assert(false);
+  old_key = entry->key;
+  entry->key = dummy;
+  entry->hash = -1;
+  so->used--;
+  Py_DECREF(old_key);
+  return DISCARD_FOUND;
 }
 
 static int

@@ -412,3 +412,373 @@ static PyObject *list_item(PyListObject *a, Py_ssize_t i) {
 	Py_INCREF(a->ob_item[i]);
 	return a->ob_item[i];
 }
+
+#define MAX_MERGE_PENDING 85
+#define MERGESTATE_TEMP_SIZE 256
+
+#define MIN_GALLOP 7
+
+typedef struct {
+  PyObject **keys;
+  PyObject **values;
+} sortslice;
+
+struct s_slice {
+  sortslice base;
+  Py_ssize_t len;
+};
+
+typedef struct s_MergeState MergeState;
+struct s_MergeState {
+  Py_ssize_t min_gallop;
+
+  int (*key_compare)(PyObject *, PyObject *, MergeState *);
+
+  // temp storage. Contains room for alloced entries
+  sortslice a;
+  Py_ssize_t alloced;
+
+  // A stack of n pending runs yet to be merged
+  int n;
+  struct s_slice pending[MAX_MERGE_PENDING];
+
+  PyObject *temparray[MERGESTATE_TEMP_SIZE];
+};
+
+static int
+unsafe_latin_compare(PyObject *v, PyObject *w, MergeState *ms) {
+  Py_ssize_t len;
+  int res;
+
+  assert(Py_IS_TYPE(v, &PyUnicode_Type));
+  assert(Py_IS_TYPE(w, &PyUnicode_Type));
+  assert(PyUnicode_KIND(v) == PyUnicode_KIND(w));
+  assert(PyUnicode_KIND(v) == PyUnicode_1BYTE_KIND);
+
+  len = Py_MIN(PyUnicode_GET_LENGTH(v), PyUnicode_GET_LENGTH(w));
+  res = memcmp(PyUnicode_DATA(v), PyUnicode_DATA(w), len);
+
+  res = (res != 0 ?
+    res < 0 :
+    PyUnicode_GET_LENGTH(v) < PyUnicode_GET_LENGTH(w));
+
+  assert(res == PyObject_RichCompareBool(v, w, Py_LT));
+  return res;
+}
+
+static void 
+merge_init(MergeState *ms, Py_ssize_t list_size, int has_keyfunc) {
+  assert(ms != NULL);
+
+  if (has_keyfunc) {
+    assert(false);
+  } else {
+    ms->alloced = MERGESTATE_TEMP_SIZE;
+    ms->a.values = NULL;
+  }
+  ms->a.keys = ms->temparray;
+  ms->n = 0;
+  ms->min_gallop = MIN_GALLOP;
+}
+
+static Py_ssize_t 
+merge_compute_minrun(Py_ssize_t n) {
+  Py_ssize_t r = 0;
+
+  assert(n >= 0);
+
+  while (n >= 64) {
+    r |= n & 1;
+    n >>= 1;
+  }
+  return n + r;
+}
+
+#define ISLT(X, Y) (*(ms->key_compare))(X, Y, ms)
+
+#define IFLT(X, Y) if ((k = ISLT(X, Y)) < 0) goto fail; \
+    if (k)
+
+static Py_ssize_t
+count_run(MergeState *ms, PyObject **lo, PyObject **hi, int *descending) {
+  Py_ssize_t k;
+  Py_ssize_t n;
+
+  assert(lo < hi);
+  *descending = 0;
+  ++lo;
+  if (lo == hi)
+    return 1;
+
+  n = 2;
+  IFLT(*lo, *(lo - 1)) {
+    *descending = 1;
+    for (lo = lo + 1; lo < hi; ++lo, ++n) {
+      IFLT(*lo, *(lo - 1))
+        ;
+      else
+        break;
+    }
+  } else {
+    for (lo = lo + 1; lo < hi; ++lo, ++n) {
+      IFLT(*lo, *(lo - 1))
+        break;
+    }
+  }
+
+  return n;
+fail:
+  return -1;
+}
+
+static void
+reverse_slice(PyObject **lo, PyObject **hi) {
+  assert(lo && hi);
+
+  --hi;
+  while (lo < hi) {
+    PyObject *t = *lo;
+    *lo = *hi;
+    *hi = t;
+    ++lo;
+    --hi;
+  }
+}
+
+static void
+reverse_sortslice(sortslice *s, Py_ssize_t n) {
+  reverse_slice(s->keys, &s->keys[n]);
+  if (s->values != NULL)
+    reverse_slice(s->values, &s->values[n]);
+}
+
+static int
+merge_collapse(MergeState *ms) {
+  struct s_slice *p = ms->pending;
+
+  assert(ms);
+  while (ms->n > 1) {
+    assert(false);
+  }
+  return 0;
+}
+
+void sortslice_advance(sortslice *slice, Py_ssize_t n) {
+  slice->keys += n;
+  if (slice->values != NULL)
+    slice->values += n;
+}
+
+// Merge the two runs at stack indices i and i + 1
+static Py_ssize_t
+merge_at(MergeState *ms, Py_ssize_t i) {
+  assert(false);
+}
+
+static int
+merge_force_collapse(MergeState *ms) {
+  struct s_slice *p = ms->pending;
+
+  assert(ms);
+  while (ms->n > 1) {
+    Py_ssize_t n = ms->n - 2;
+    if (n > 0 && p[n - 1].len < p[n + 1].len)
+      --n;
+    if (merge_at(ms, n) < 0)
+      return -1;
+  }
+  return 0;
+}
+
+static void
+merge_freemem(MergeState *ms) {
+  assert(ms != NULL);
+  if (ms->a.keys != ms->temparray) {
+    assert(false);
+  }
+}
+
+static PyObject *
+list_sort_impl(PyListObject *self, PyObject *keyfunc, int reverse) {
+  MergeState ms;
+  Py_ssize_t nremaining;
+  Py_ssize_t minrun;
+  sortslice lo;
+  Py_ssize_t saved_ob_size, saved_allocated;
+  PyObject **saved_ob_item;
+  PyObject **final_ob_item;
+  PyObject *result = NULL;
+  Py_ssize_t i;
+  PyObject **keys;
+
+  assert(self != NULL);
+  assert(PyList_Check(self));
+  if (keyfunc == Py_None)
+    keyfunc = NULL;
+
+  saved_ob_size = Py_SIZE(self);
+  saved_ob_item = self->ob_item;
+  saved_allocated = self->allocated;
+  Py_SET_SIZE(self, 0);
+  self->ob_item = NULL;
+  self->allocated = -1;
+
+  if (keyfunc == NULL) {
+    keys = NULL;
+    lo.keys = saved_ob_item;
+    lo.values = NULL;
+  } else {
+    assert(false);
+  }
+
+  if (saved_ob_size > 1) {
+    int keys_are_in_tuples = (Py_IS_TYPE(lo.keys[0], &PyTuple_Type) &&
+        Py_SIZE(lo.keys[0]) > 0);
+    // printf("keys_are_in_tuples %d\n", keys_are_in_tuples);
+    PyTypeObject *key_type = (keys_are_in_tuples ?
+      Py_TYPE(PyTuple_GET_ITEM(lo.keys[0], 0)) :
+      Py_TYPE(lo.keys[0]));
+    // printf("key type %s\n", key_type->tp_name);
+
+    int keys_are_all_same_type = 1;
+    int strings_are_latin = 1;
+    int ints_are_bounded = 1;
+
+    for (i = 0; i < saved_ob_size; i++) {
+
+      if (keys_are_in_tuples &&
+          !(Py_IS_TYPE(lo.keys[i], &PyTuple_Type) && Py_SIZE(lo.keys[i]) != 0)) {
+        keys_are_in_tuples = 0;
+        keys_are_all_same_type = 0;
+        break;
+      }
+
+      PyObject *key = (keys_are_in_tuples ?
+          PyTuple_GET_ITEM(lo.keys[i], 0) :
+          lo.keys[i]);
+
+      if (!Py_IS_TYPE(key, key_type)) {
+        keys_are_all_same_type = 0;
+        if (!keys_are_in_tuples) {
+          break;
+        }
+      }
+
+      if (keys_are_all_same_type) {
+        if (key_type == &PyLong_Type &&
+            ints_are_bounded &&
+            Py_ABS(Py_SIZE(key)) > 1) {
+          ints_are_bounded = 0;
+        } else if (key_type == &PyUnicode_Type &&
+            strings_are_latin &&
+            PyUnicode_KIND(key) != PyUnicode_1BYTE_KIND) {
+          strings_are_latin = 0;
+        }
+      }
+    }
+
+    // Choose the best compare
+    if (keys_are_all_same_type) {
+      if (key_type == &PyUnicode_Type && strings_are_latin) {
+        ms.key_compare = unsafe_latin_compare;
+      } else {
+        assert(false);
+      }
+    } else {
+      assert(false);
+    }
+
+    if (keys_are_in_tuples) {
+      assert(false);
+    }
+  }
+
+  // End of pre-sort check: ms is now set properly
+
+  merge_init(&ms, saved_ob_size, keys != NULL);
+
+  nremaining = saved_ob_size;
+  if (nremaining < 2)
+    goto succeed;
+
+  if (reverse) {
+    assert(false);
+  }
+
+  minrun = merge_compute_minrun(nremaining);
+  do {
+    int descending;
+    Py_ssize_t n;
+
+    n = count_run(&ms, lo.keys, lo.keys + nremaining, &descending);
+    if (n < 0)
+      goto fail;
+    if (descending)
+      reverse_sortslice(&lo, n);
+    if (n < minrun) {
+      assert(false);
+    }
+    assert(ms.n < MAX_MERGE_PENDING);
+    ms.pending[ms.n].base = lo;
+    ms.pending[ms.n].len = n;
+    ++ms.n;
+    if (merge_collapse(&ms) < 0)
+      goto fail;
+
+    sortslice_advance(&lo, n);
+    nremaining -= n;
+  } while (nremaining);
+
+  if (merge_force_collapse(&ms) < 0)
+    goto fail;
+
+  assert(ms.n == 1);
+  assert(keys == NULL
+    ? ms.pending[0].base.keys == saved_ob_item
+    : ms.pending[0].base.keys == &keys[0]);
+  assert(ms.pending[0].len == saved_ob_size);
+  lo = ms.pending[0].base;
+
+ succeed:
+  result = Py_None;
+ fail:
+  if (keys != NULL) {
+    assert(false);
+  }
+
+  if (self->allocated != -1 && result != NULL) {
+    assert(false);
+  }
+
+  if (reverse && saved_ob_size > 1) {
+    assert(false);
+  }
+
+  merge_freemem(&ms);
+
+keyfunc_fail:
+  final_ob_item = self->ob_item;
+  i = Py_SIZE(self);
+  Py_SET_SIZE(self, saved_ob_size);
+  self->ob_item = saved_ob_item;
+  self->allocated = saved_allocated;
+  if (final_ob_item != NULL) {
+    while (--i >= 0) {
+      Py_XDECREF(final_ob_item[i]);
+    }
+    PyMem_Free(final_ob_item);
+  }
+  Py_XINCREF(result);
+  return result;
+}
+
+int PyList_Sort(PyObject *v) {
+  if (v == NULL || !PyList_Check(v)) {
+    assert(false);
+  }
+  v = list_sort_impl((PyListObject *) v, NULL, 0);
+  if (v == NULL)
+    return -1;
+  Py_DECREF(v);
+  return 0;
+}

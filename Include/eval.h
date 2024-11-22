@@ -4,6 +4,7 @@
 #include "funcobject.h"
 #include "tupleobject.h"
 #include "sliceobject.h"
+#include "cellobject.h"
 #include "genobject.h"
 
 PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
@@ -74,7 +75,7 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 		PyObject *const *args, Py_ssize_t argcount,
 		PyObject *kwnames) {
 	PyCodeObject *co = (PyCodeObject*) con->fc_code;
-	const Py_ssize_t total_args; // TODO follow cpy
+	const Py_ssize_t total_args = co->co_argcount + co->co_kwonlyargcount;
 
 	/* Create the frame */
 	PyFrameObject *f = _PyFrame_New_NoTrack(tstate, con, locals);
@@ -86,14 +87,13 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 
 	// Create a dictionary for keyword parameters (**kwargs)
 	PyObject *kwdict = NULL;
+  Py_ssize_t i;
 
 	// Copy all positional arguments into local variables
 	Py_ssize_t j, n;
-	#if 0
 	if (argcount > co->co_argcount) {
 		n = co->co_argcount;
 	} else 
-	#endif
 	{
 		n = argcount;
 	}
@@ -102,6 +102,50 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 		Py_INCREF(x);
 		SETLOCAL(j, x);
 	}
+
+  if (co->co_flags & CO_VARARGS) {
+    assert(false);
+  }
+
+  if (kwnames != NULL) {
+    assert(false);
+  }
+
+  if ((argcount > co->co_argcount) && !(co->co_flags & CO_VARARGS)) {
+    assert(false);
+  }
+
+  if (argcount < co->co_argcount) {
+    assert(false);
+  }
+
+  if (co->co_kwonlyargcount > 0) {
+    assert(false);
+  }
+
+  printf("#cell %ld, #free %ld\n", PyTuple_GET_SIZE(co->co_cellvars), PyTuple_GET_SIZE(co->co_freevars));
+
+  for (i = 0; i < PyTuple_GET_SIZE(co->co_cellvars); ++i) {
+    PyObject *c;
+    Py_ssize_t arg;
+
+    if (co->co_cell2arg != NULL &&
+        (arg = co->co_cell2arg[i]) != CO_CELL_NOT_AN_ARG) {
+      c = PyCell_New(GETLOCAL(arg));
+      SETLOCAL(arg, NULL);
+    } else {
+      c = PyCell_New(NULL);
+    }
+    if (c == NULL)
+      assert(false);
+    SETLOCAL(co->co_nlocals + i, c);
+  }
+
+  for (i = 0; i < PyTuple_GET_SIZE(co->co_freevars); ++i) {
+    PyObject *o = PyTuple_GET_ITEM(con->fc_closure, i);
+    Py_INCREF(o);
+    freevars[PyTuple_GET_SIZE(co->co_cellvars) + i] = o;
+  }
 
 	return f;
 }
@@ -147,7 +191,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
 	const _Py_CODEUNIT *next_instr;
 	int opcode;
 	int oparg;
-	PyObject **fastlocals;
+	PyObject **fastlocals, **freevars;
 	const _Py_CODEUNIT *first_instr;
 	PyObject *retval = NULL;
 	PyCodeObject *co;
@@ -162,6 +206,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag)
 	names = co->co_names;
 	consts = co->co_consts;
 	fastlocals = f->f_localsplus;
+  freevars = f->f_localsplus + co->co_nlocals;
 
 	first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(co->co_code);
 	assert(f->f_lasti >= -1);
@@ -217,6 +262,17 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(LOAD_DEREF): {
+      PyObject *cell = freevars[oparg];
+      assert(PyCell_Check(cell));
+      PyObject *value = PyCell_GET(cell);
+      if (value == NULL) {
+        assert(false);
+      }
+      Py_INCREF(value);
+      PUSH(value);
+      DISPATCH();
+    }
     case TARGET(GEN_START): {
       PyObject *none = POP();
       assert(none == Py_None);
@@ -994,7 +1050,8 @@ main_loop:
 			}
 
 			if (oparg & 0x08) {
-				assert(false);
+        assert(PyTuple_CheckExact(TOP()));
+        func->func_closure = POP();
 			}
 			if (oparg & 0x04) {
 				assert(false);
@@ -1042,6 +1099,12 @@ main_loop:
 			}
 			assert(false);
 		}
+    case TARGET(LOAD_CLOSURE): {
+      PyObject *cell = freevars[oparg];
+      Py_INCREF(cell);
+      PUSH(cell);
+      DISPATCH();
+    }
 		default:
 			printf("Can not handle opcode %d\n", opcode);
 			assert(false);

@@ -1105,3 +1105,47 @@ _PyDict_NewKeysForClass(void) {
   }
   return keys;
 }
+
+static PyObject *
+dict_keys(PyDictObject *mp) {
+  PyObject *v;
+  Py_ssize_t i, j;
+  PyDictKeyEntry *ep;
+  Py_ssize_t n, offset;
+  PyObject **value_ptr;
+
+ again:
+  n = mp->ma_used;
+  v = PyList_New(n);
+  if (v == NULL)
+    return NULL;
+  if (n != mp->ma_used) {
+    assert(false);
+  }
+  ep = DK_ENTRIES(mp->ma_keys);
+  if (mp->ma_values) {
+    assert(false);
+  } else {
+    value_ptr = &ep[0].me_value;
+    offset = sizeof(PyDictKeyEntry);
+  }
+  for (i = 0, j = 0; j < n; i++) {
+    if (*value_ptr != NULL) {
+      PyObject *key = ep[i].me_key;
+      Py_INCREF(key);
+      PyList_SET_ITEM(v, j, key);
+      j++;
+    }
+    value_ptr = (PyObject **)(((char *) value_ptr) + offset);
+  }
+  assert(j == n);
+  return v;
+}
+
+PyObject *
+PyDict_Keys(PyObject *mp) {
+  if (mp == NULL || !PyDict_Check(mp)) {
+    assert(false);
+  }
+  return dict_keys((PyDictObject *) mp);
+}

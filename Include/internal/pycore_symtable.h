@@ -26,6 +26,7 @@ static identifier __class__ = NULL;
 #define DEF_PARAM 2<<1 // formal parameter
 #define DEF_NONLOCAL 2<<2 /* nonlocal stmt */
 #define USE 2 << 3 // name is used
+#define DEF_FREE_CLASS 2<<5 
 #define DEF_IMPORT 2<<6 // assignment occured via import
 
 #define SCOPE_OFFSET 11
@@ -87,6 +88,7 @@ typedef struct _symtable_entry {
 
   PyObject *ste_children; // list of child blocks
 
+  unsigned ste_free : 1;
   unsigned ste_comp_iter_target : 1; /* true if visiting comprehension target */
 	unsigned ste_returns_value : 1; // true if namespace uses return with an argument
 	unsigned ste_needs_class_closure : 1;
@@ -152,6 +154,8 @@ ste_new(struct symtable *st, _Py_block_ty block, void *key) {
 
   ste->ste_table = st;
   ste->ste_id = k; /* ste owns reference to k */
+
+  ste->ste_free = 0;
 
   ste->ste_generator = 0;
   ste->ste_coroutine = 0;
@@ -245,7 +249,9 @@ analyze_name(PySTEntryObject *ste, PyObject *scopes, PyObject *name, long flags,
 		return 1;
   }
   if (bound && PySet_Contains(bound, name)) {
-    assert(false);
+    SET_SCOPE(scopes, name, FREE);
+    ste->ste_free = 1;
+    return PySet_Add(free, name) >= 0;
   }
   if (global && PySet_Contains(global, name)) {
     assert(false);
@@ -335,10 +341,31 @@ analyze_child_block(PySTEntryObject *entry, PyObject *bound, PyObject *free,
 
 static int
 analyze_cells(PyObject *scopes, PyObject *free) {
-	if (PySet_GET_SIZE(free) == 0) {
-		return 1;
-	}
-	assert(false);
+  PyObject *name, *v, *v_cell;
+  int success = 0;
+  Py_ssize_t pos = 0;
+
+  v_cell = PyLong_FromLong(CELL);
+  if (!v_cell)
+    return 0;
+
+  while (PyDict_Next(scopes, &pos, &name, &v)) {
+    long scope;
+    assert(PyLong_Check(v));
+    scope = PyLong_AS_LONG(v);
+    if (scope != LOCAL)
+      continue;
+    if (!PySet_Contains(free, name))
+      continue;
+    if (PyDict_SetItem(scopes, name, v_cell) < 0)
+      goto error;
+    if (PySet_Discard(free, name) < 0)
+      goto error;
+  }
+  success = 1;
+ error:
+  Py_DECREF(v_cell);
+  return success;
 }
 
 static int

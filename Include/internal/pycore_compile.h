@@ -153,6 +153,7 @@ struct compiler_unit {
 	PyObject *u_names; // all names
 	PyObject *u_varnames; // local variables
   PyObject *u_cellvars;
+  PyObject *u_freevars;
 
 	int u_firstlineno;
 	int u_lineno; // the lineno for the current stmt
@@ -160,6 +161,8 @@ struct compiler_unit {
   PyObject *u_private; // for private name mangling
 
   Py_ssize_t u_argcount;
+  Py_ssize_t u_posonlyargcount;
+  Py_ssize_t u_kwonlyargcount;
 
   int u_nfblocks;
   struct fblockinfo u_fblock[CO_MAXBLOCKS];
@@ -420,6 +423,52 @@ compiler_set_qualname(struct compiler *c) {
 
 #define CAPSULE_NAME "compile.c compiler unit"
 
+static PyObject *
+dictbytype(PyObject *src, int scope_type, int flag, Py_ssize_t offset) {
+  Py_ssize_t i = offset, scope, num_keys, key_i;
+  PyObject *k, *v, *dest = PyDict_New();
+  PyObject *sorted_keys;
+
+  assert(offset >= 0);
+  if (dest == NULL)
+    return NULL;
+
+  sorted_keys = PyDict_Keys(src);
+  if (sorted_keys == NULL)
+    return NULL;
+  if (PyList_Sort(sorted_keys) != 0) {
+    Py_DECREF(sorted_keys);
+    return NULL;
+  }
+  num_keys = PyList_GET_SIZE(sorted_keys);
+
+  for (key_i = 0; key_i < num_keys; key_i++) {
+    long vi;
+    k = PyList_GET_ITEM(sorted_keys, key_i);
+    v = PyDict_GetItemWithError(src, k);
+    assert(v && PyLong_Check(v));
+    vi = PyLong_AS_LONG(v);
+    scope = (vi >> SCOPE_OFFSET) & SCOPE_MASK;
+
+    if (scope == scope_type || vi & flag) {
+      PyObject *item = PyLong_FromSsize_t(i);
+      if (item == NULL) {
+        assert(false);
+      }
+      i++;
+      if (PyDict_SetItem(dest, k, item) < 0) {
+        Py_DECREF(sorted_keys);
+        Py_DECREF(item);
+        Py_DECREF(dest);
+        return NULL;
+      }
+      Py_DECREF(item);
+    }
+  }
+  Py_DECREF(sorted_keys);
+  return dest;
+}
+
 static int
 compiler_enter_scope(struct compiler *c, identifier name,
 		int scope_type, void *key, int lineno) {
@@ -432,6 +481,9 @@ compiler_enter_scope(struct compiler *c, identifier name,
 		assert(false);
 	}
 	u->u_scope_type = scope_type;
+  u->u_argcount = 0;
+  u->u_posonlyargcount = 0;
+  u->u_kwonlyargcount = 0;
 
 	// printf("sym table %p\n", PySymtable_Lookup(c->c_st, key));
 	u->u_ste = PySymtable_Lookup(c->c_st, key);
@@ -441,12 +493,21 @@ compiler_enter_scope(struct compiler *c, identifier name,
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
-  #if 0
-  // TODO follow cpy
+  #if 1
   u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0, 0);
   #else
   u->u_cellvars = PyDict_New();
   #endif
+
+  if (!u->u_varnames || !u->u_cellvars) {
+    assert(false);
+  }
+
+  u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, DEF_FREE_CLASS,
+      PyDict_GET_SIZE(u->u_cellvars));
+  if (!u->u_freevars) {
+    assert(false);
+  }
 
   u->u_nfblocks = 0;
 	u->u_consts = PyDict_New();
@@ -714,10 +775,12 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx) {
 	op = 0;
 	optype = OP_NAME;
 	scope = _PyST_GetScope(c->u->u_ste, mangled);
-	// printf("scope for %s is %d\n", PyUnicode_1BYTE_DATA(mangled), scope);
+	printf("scope for %s is %d\n", PyUnicode_1BYTE_DATA(mangled), scope);
 	switch (scope) {
   case FREE:
-    assert(false);
+    dict = c->u->u_freevars;
+    optype = OP_DEREF;
+    break;
   case CELL:
     assert(false);
   case LOCAL:
@@ -737,6 +800,17 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx) {
 	}
 
 	switch (optype) {
+  case OP_DEREF:
+    switch (ctx) {
+    case Load:
+      op = (c->u->u_ste->ste_type == ClassBlock) ? LOAD_CLASSDEREF : LOAD_DEREF;
+      break;
+    case Store:
+      assert(false);
+    case Del:
+      assert(false);
+    }
+    break;
   case OP_GLOBAL:
     switch (ctx) {
     case Load: op = LOAD_GLOBAL; break;
@@ -1292,6 +1366,28 @@ compiler_decorators(struct compiler *c, asdl_expr_seq *decos) {
 }
 
 static int
+get_ref_type(struct compiler *c, PyObject *name) {
+  int scope;
+  if (c->u->u_scope_type == COMPILER_SCOPE_CLASS &&
+      _PyUnicode_EqualToASCIIString(name, "__class__"))
+    return CELL;
+  scope = _PyST_GetScope(c->u->u_ste, name);
+  if (scope == 0) {
+    assert(false);
+  }
+  return scope;
+}
+
+static int
+compiler_lookup_arg(PyObject *dict, PyObject *name) {
+  PyObject *v;
+  v = PyDict_GetItemWithError(dict, name);
+  if (v == NULL)
+    return -1;
+  return PyLong_AS_LONG(v);
+}
+
+static int
 compiler_make_closure(struct compiler *c, PyCodeObject *co, Py_ssize_t flags,
     PyObject *qualname) {
   Py_ssize_t i, free = PyCode_GetNumFree(co);
@@ -1299,7 +1395,25 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, Py_ssize_t flags,
     qualname = co->co_name;
 
   if (free) {
-    assert(false);
+    for (i = 0; i < free; ++i) {
+      PyObject *name = PyTuple_GET_ITEM(co->co_freevars, i);
+      int reftype = get_ref_type(c, name);
+      if (reftype == -1) {
+        return 0;
+      }
+      int arg;
+      if (reftype == CELL) {
+        arg = compiler_lookup_arg(c->u->u_cellvars, name);
+      } else {
+        assert(false);
+      }
+      if (arg == -1) {
+        assert(false);
+      }
+      ADDOP_I(c, LOAD_CLOSURE, arg);
+    }
+    flags |= 0x08;
+    ADDOP_I(c, BUILD_TUPLE, free);
   }
   ADDOP_LOAD_CONST(c, (PyObject*) co);
   ADDOP_LOAD_CONST(c, qualname);
@@ -2060,26 +2174,30 @@ makecode(struct compiler *c, struct assembler *a, PyObject *consts)
 	PyObject *names = NULL;
 	PyObject *varnames = NULL;
   PyObject *freevars = NULL;
-	// PyObject *cellvars = NULL;
+	PyObject *cellvars = NULL;
   Py_ssize_t nlocals;
   int nlocals_int;
   int flags;
-  int maxdepth;
+  int posorkeywordargcount, posonlyargcount, kwonlyargcount, maxdepth;
 
 	names = dict_keys_inorder(c->u->u_names, 0);
 	varnames = dict_keys_inorder(c->u->u_varnames, 0);
 	if (!names || !varnames) {
 		assert(false);
 	}
-	// cellvars = dict_keys_inorder(c->u->u_cellvars, 0);
+	cellvars = dict_keys_inorder(c->u->u_cellvars, 0);
+  if (!cellvars)
+    assert(false);
 
-  freevars = PyTuple_New(0); // TODO follow cpy
+  freevars = dict_keys_inorder(c->u->u_freevars, PyTuple_GET_SIZE(cellvars));
   if (!freevars) {
     assert(false);
   }
 
 	if (!merge_const_one(c, &names) ||
-			!merge_const_one(c, &varnames)) {
+			!merge_const_one(c, &varnames) ||
+      !merge_const_one(c, &cellvars) ||
+      !merge_const_one(c, &freevars)) {
 	  assert(false);
 	}
 
@@ -2100,21 +2218,30 @@ makecode(struct compiler *c, struct assembler *a, PyObject *consts)
     assert(false);
   }
 
+  // printf("c->u->u_argcount = %d\n", c->u->u_argcount);
+
+  posonlyargcount = c->u->u_posonlyargcount;
+  posorkeywordargcount = c->u->u_argcount;
+  kwonlyargcount = c->u->u_kwonlyargcount;
+
   maxdepth = stackdepth(c);
   if (maxdepth < 0) {
     assert(false);
   }
 
   co = PyCode_NewWithPosOnlyArgs(
+    posonlyargcount + posorkeywordargcount,
+    posonlyargcount,
+    kwonlyargcount,
     nlocals_int, maxdepth, flags, a->a_bytecode, consts,
-    names, varnames, freevars, c->u->u_name,
+    names, varnames, freevars, cellvars, c->u->u_name,
     c->u->u_firstlineno, a->a_lnotab);
   Py_DECREF(consts);
   Py_XDECREF(names);
   Py_XDECREF(varnames);
   // Py_XDECREF(name);
-  // Py_XDECREF(freevars);
-  // Py_XDECREF(cellvars);
+  Py_XDECREF(freevars);
+  Py_XDECREF(cellvars);
 
   return co;
 }

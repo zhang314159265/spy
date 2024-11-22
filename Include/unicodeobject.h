@@ -728,3 +728,24 @@ PyUnicode_FromFormat(const char *format, ...) {
   va_end(vargs);
   return ret;
 }
+
+int unicode_eq(PyObject *aa, PyObject *bb);
+
+int
+_PyUnicode_EQ(PyObject *aa, PyObject *bb) {
+  return unicode_eq(aa, bb);
+}
+
+int PyUnicode_Compare(PyObject *left, PyObject *right) {
+  if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
+    if (PyUnicode_READY(left) == -1 ||
+        PyUnicode_READY(right) == -1)
+      return -1;
+
+    if (left == right)
+      return 0;
+
+    return unicode_compare(left, right);
+  }
+  assert(false);
+}

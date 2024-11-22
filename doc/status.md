@@ -8,12 +8,8 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 # Scratch
 
-Quest x: <+++++++++++++
-- generator / yield
-
-Quest 5:
+Quest 5: <+++++++
 - closure
-
 
 Quest:
 - decorators

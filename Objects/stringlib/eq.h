@@ -1,3 +1,5 @@
+#pragma once
+
 /* Fast unicode equal function optimized for dictobject.c and setobject.c */
 
 /* Return 1 if two unicode objects are equal, 0 if not.

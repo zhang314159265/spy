@@ -1,6 +1,9 @@
 #pragma once
 
 #include <math.h>
+#include <stdbool.h>
+
+#define CO_CELL_NOT_AN_ARG (-1)
 
 typedef struct PyCodeObject PyCodeObject;
 
@@ -13,6 +16,8 @@ typedef struct PyCodeObject PyCodeObject;
 
 #define CO_OPTIMIZED 0x0001
 #define CO_NEWLOCALS 0x0002
+#define CO_VARARGS 0x0004
+#define CO_VARKEYWORDS 0x0008
 #define CO_NOFREE 0x0040
 #define CO_ASYNC_GENERATOR 0x0200
 
@@ -97,14 +102,17 @@ intern_string_constants(PyObject *tuple, int *modified) {
 }
 
 PyCodeObject *
-PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
+PyCode_NewWithPosOnlyArgs(int argcount,
+    int posonlyargcount, int kwonlyargcount,
+    int nlocals, int stacksize, int flags,
     PyObject *code, PyObject *consts,
     PyObject *names, PyObject *varnames,
-    PyObject *freevars,
+    PyObject *freevars, PyObject *cellvars,
     PyObject *name, int firstlineno,
     PyObject *linetable) {
   PyCodeObject *co;
-  Py_ssize_t n_varnames;
+  Py_ssize_t *cell2arg = NULL;
+  Py_ssize_t i, n_cellvars, n_varnames, total_args;
 
   if (freevars == NULL || !PyTuple_Check(freevars)) {
     assert(false);
@@ -125,6 +133,10 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
     return NULL;
   }
 
+  if (intern_strings(cellvars) < 0) {
+    return NULL;
+  }
+
   if (intern_string_constants(consts, NULL) < 0) {
     return NULL;
   }
@@ -133,14 +145,64 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
     assert(false);
   }
 
-  flags |= CO_NOFREE;
+  // check for any inner or outer closure references
+  n_cellvars = PyTuple_GET_SIZE(cellvars);
+  if (!n_cellvars && !PyTuple_GET_SIZE(freevars)) {
+    flags |= CO_NOFREE;
+  } else {
+    flags &= ~CO_NOFREE;
+  }
   
   n_varnames = PyTuple_GET_SIZE(varnames);
+  if (argcount <= n_varnames && kwonlyargcount <= n_varnames) {
+    total_args = (Py_ssize_t) argcount + (Py_ssize_t) kwonlyargcount +
+        ((flags & CO_VARARGS) != 0) + ((flags & CO_VARKEYWORDS) != 0);
+  } else {
+    total_args = n_varnames + 1;
+  }
+  if (total_args > n_varnames) {
+    assert(false);
+  }
+
+  // printf("create code object, nfree %ld, ncell %ld\n", PyTuple_GET_SIZE(freevars), PyTuple_GET_SIZE(cellvars));
+
+  if (n_cellvars) {
+    bool used_cell2arg = false;
+    cell2arg = PyMem_NEW(Py_ssize_t, n_cellvars);
+    if (cell2arg == NULL) {
+      assert(false);
+    }
+    // Find cells which are also arguments
+    for (i = 0; i < n_cellvars; i++) {
+      Py_ssize_t j;
+      PyObject *cell = PyTuple_GET_ITEM(cellvars, i);
+      cell2arg[i] = CO_CELL_NOT_AN_ARG;
+      for (j = 0; j < total_args; j++) {
+        PyObject *arg = PyTuple_GET_ITEM(varnames, j);
+        int cmp = PyUnicode_Compare(cell, arg);
+        if (cmp == -1 && PyErr_Occurred()) {
+          assert(false);
+        }
+        if (cmp == 0) {
+          cell2arg[i] = j;
+          used_cell2arg = true;
+          break;
+        }
+      }
+    }
+    if (!used_cell2arg) {
+      PyMem_Free(cell2arg);
+      cell2arg = NULL;
+    }
+  }
 
   co = PyObject_New(PyCodeObject, &PyCode_Type);
   if (co == NULL) {
     assert(false);
   }
+  co->co_argcount = argcount;
+  co->co_posonlyargcount = posonlyargcount;
+  co->co_kwonlyargcount = kwonlyargcount;
   co->co_nlocals = nlocals;
   co->co_stacksize = stacksize;
   co->co_flags = flags;
@@ -154,6 +216,9 @@ PyCode_NewWithPosOnlyArgs(int nlocals, int stacksize, int flags,
   co->co_varnames = varnames;
   Py_INCREF(freevars);
   co->co_freevars = freevars;
+  Py_INCREF(cellvars);
+  co->co_cellvars = cellvars;
+  co->co_cell2arg = cell2arg;
   Py_INCREF(name);
   co->co_name = name;
   co->co_firstlineno = firstlineno;

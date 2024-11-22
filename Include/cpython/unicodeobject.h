@@ -201,6 +201,57 @@ unicode_compare_eq(PyObject *str1, PyObject *str2)
 
 PyObject *PyBool_FromLong(long ok);
 
+static int
+unicode_compare(PyObject *str1, PyObject *str2) {
+  int kind1, kind2;
+  const void *data1, *data2;
+  Py_ssize_t len1, len2, len;
+
+  kind1 = PyUnicode_KIND(str1);
+  kind2 = PyUnicode_KIND(str2);
+  data1 = PyUnicode_DATA(str1);
+  data2 = PyUnicode_DATA(str2);
+  len1 = PyUnicode_GET_LENGTH(str1);
+  len2 = PyUnicode_GET_LENGTH(str2);
+  len = Py_MIN(len1, len2);
+
+  switch (kind1) {
+  case PyUnicode_1BYTE_KIND: {
+    switch (kind2) {
+    case PyUnicode_1BYTE_KIND:
+    {
+      int cmp = memcmp(data1, data2, len);
+      if (cmp < 0)
+        return -1;
+      if (cmp > 0)
+        return 1;
+      break;
+    }
+    default:
+      assert(false);
+    }
+    break;
+  }
+  default:
+    assert(false);
+  }
+
+  if (len1 == len2)
+    return 0;
+  if (len1 < len2)
+    return -1;
+  else
+    return 1;
+}
+
+
+extern struct _longobject _Py_FalseStruct;
+extern struct _longobject _Py_TrueStruct;
+#define Py_False ((PyObject *) &_Py_FalseStruct)
+#define Py_True ((PyObject *) &_Py_TrueStruct)
+#define Py_RETURN_TRUE return Py_NewRef(Py_True)
+#define Py_RETURN_FALSE return Py_NewRef(Py_False)
+
 PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op) {
   int result;
 
@@ -218,6 +269,7 @@ PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op) {
     result ^= (op == Py_NE);
     return PyBool_FromLong(result);
   } else {
-    assert(false);
+    result = unicode_compare(left, right);
+    Py_RETURN_RICHCOMPARE(result, 0, op);
   }
 }
