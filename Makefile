@@ -13,7 +13,7 @@ PREFIX :=
 endif
 
 TUTOR=tutor/misc.py
-TUTOR=tutor/func_decorator.py
+TUTOR=tutor/property.py
 
 first: mine
 # first: pegen

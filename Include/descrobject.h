@@ -142,6 +142,56 @@ PyTypeObject PyGetSetDescr_Type = {
   .tp_descr_set = (descrsetfunc) getset_set,
 };
 
+typedef struct {
+  PyObject_HEAD
+  PyObject *prop_get;
+  PyObject *prop_set;
+  PyObject *prop_del;
+  PyObject *prop_doc;
+  PyObject *prop_name;
+  int getter_doc;
+} propertyobject;
+
+static void property_dealloc(PyObject *self);
+
+static PyGetSetDef property_getsetlist[] = {
+  {NULL}
+};
+
+static PyObject *property_descr_get(PyObject *self, PyObject *obj, PyObject *type);
+static int property_descr_set(PyObject *self, PyObject *obj, PyObject *value);
+static int property_init(PyObject *self, PyObject *args, PyObject *kwargs);
+
+static PyObject *
+property_setter(PyObject *self, PyObject *setter) {
+  assert(false);
+}
+
+PyDoc_STRVAR(setter_doc, "");
+
+static PyMethodDef property_methods[] = {
+  {"setter", property_setter, METH_O, setter_doc},
+  {0}
+};
+
+PyTypeObject PyProperty_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "property",
+  .tp_basicsize = sizeof(propertyobject),
+  .tp_dealloc = property_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+      Py_TPFLAGS_BASETYPE,
+  .tp_getset = property_getsetlist,
+  .tp_descr_get = property_descr_get,
+  .tp_descr_set = property_descr_set,
+  .tp_init = property_init,
+  .tp_alloc = PyType_GenericAlloc,
+  .tp_new = PyType_GenericNew,
+  .tp_free = PyObject_GC_Del,
+  .tp_methods = property_methods,
+};
+
 static PyDescrObject *
 descr_new(PyTypeObject *descrtype, PyTypeObject *type, const char *name) {
 	PyDescrObject *descr;
@@ -289,3 +339,20 @@ static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject 
 static int getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value) {
   assert(false);
 }
+
+static void property_dealloc(PyObject *self) {
+  assert(false);
+}
+
+static PyObject *property_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
+  assert(false);
+}
+
+static int property_descr_set(PyObject *self, PyObject *obj, PyObject *value) {
+  assert(false);
+}
+
+// defined in cpy/Objects/clinic/descrobject.c.h
+static int property_init(PyObject *self, PyObject *args, PyObject *kwargs);
+
+
