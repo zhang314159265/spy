@@ -7,79 +7,82 @@ statements[asdl_stmt_seq*]: a=statement+ { (asdl_stmt_seq*) _PyPegen_seq_flatten
 statement[asdl_stmt_seq*]: a=compound_stmt { (asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) } | a[asdl_stmt_seq*]=simple_stmts {a}
 
 compound_stmt[stmt_ty]:
-	| &'def' function_def
-	| &'if' if_stmt
-	| &'for' for_stmt
-	| &'while' while_stmt
-	| &('class' | '@') class_def
+  | &('def' | '@') function_def
+  | &'if' if_stmt
+  | &'for' for_stmt
+  | &'while' while_stmt
+  | &('class' | '@') class_def
 
 class_def[stmt_ty]:
-	| class_def_raw
+  | class_def_raw
 
 class_def_raw[stmt_ty]:
-	| 'class' a=NAME ':' c=block  {
-		_PyAST_ClassDef(a->v.Name.id,
-			NULL, NULL,
-			c, NULL)
-	}
+  | 'class' a=NAME ':' c=block  {
+    _PyAST_ClassDef(a->v.Name.id,
+      NULL, NULL,
+      c, NULL)
+  }
 
 while_stmt[stmt_ty]:
-	| 'while' a=named_expression ':' b=block c=[else_block] { _PyAST_While(a, b, c) }
+  | 'while' a=named_expression ':' b=block c=[else_block] { _PyAST_While(a, b, c) }
 
 if_stmt[stmt_ty]:
-	| 'if' a=named_expression ':' b=block c=[else_block] {
-		_PyAST_If(a, b, c)
-	}
+  | 'if' a=named_expression ':' b=block c=[else_block] {
+    _PyAST_If(a, b, c)
+  }
 
 else_block[asdl_stmt_seq*]:
-	| 'else' &&':' b=block {b}
+  | 'else' &&':' b=block {b}
 
 named_expression[expr_ty]:
-	| expression !':='
+  | expression !':='
 
 for_stmt[stmt_ty]:
-	| 'for' t=star_targets 'in' ~ ex=star_expressions ':' b=block {
-		_PyAST_For(t, ex, b, NULL);
-	}
+  | 'for' t=star_targets 'in' ~ ex=star_expressions ':' b=block {
+    _PyAST_For(t, ex, b, NULL);
+  }
 
 function_def[stmt_ty]:
-	| function_def_raw
+  | d=decorators f=function_def_raw { _PyPegen_function_def_decorators(p, d, f) }
+  | function_def_raw
+
+decorators[asdl_expr_seq*]: a[asdl_expr_seq*]=('@' f=named_expression NEWLINE { f })+ {a}
 
 function_def_raw[stmt_ty]:
-	| 'def' n=NAME '(' params=[params] ')' ':' b=block {
-			_PyAST_FunctionDef(n->v.Name.id,
-				(params) ? params : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, NULL, NULL)
-	}
+  | 'def' n=NAME '(' params=[params] ')' ':' b=block {
+      _PyAST_FunctionDef(n->v.Name.id,
+        (params) ? params : CHECK(arguments_ty, _PyPegen_empty_arguments(p)), b, NULL, NULL)
+  }
 
 block[asdl_stmt_seq*] (memo):
-	| NEWLINE INDENT a=statements DEDENT {a}
+  | NEWLINE INDENT a=statements DEDENT {a}
 
 params[arguments_ty]:
-	| parameters
+  | parameters
 
 parameters[arguments_ty]:
-	| a[asdl_arg_seq*]=param_no_default+ {
-		_PyPegen_make_arguments(p, NULL, NULL, a, NULL, NULL)
-	}
+  | a[asdl_arg_seq*]=param_no_default+ {
+    _PyPegen_make_arguments(p, NULL, NULL, a, NULL, NULL)
+  }
 
 param_no_default[arg_ty]:
-	| a=param ',' { _PyPegen_add_type_comment_to_arg(p, a, NULL) }
-	| a=param &')' {
-		_PyPegen_add_type_comment_to_arg(p, a, NULL) }
+  | a=param ',' { _PyPegen_add_type_comment_to_arg(p, a, NULL) }
+  | a=param &')' {
+    _PyPegen_add_type_comment_to_arg(p, a, NULL) }
 
 param[arg_ty]: a=NAME {
-	_PyAST_arg(a->v.Name.id, NULL, NULL) }
+  _PyAST_arg(a->v.Name.id, NULL, NULL) }
 
 simple_stmts[asdl_stmt_seq*]: a=simple_stmt !';' NEWLINE {
-	(asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) }
+  (asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) }
 
 simple_stmt[stmt_ty] (memo):
-	| assignment
-	| &'return' return_stmt
-	| e=primary { _PyAST_Expr(e) }
-	| 'break' { _PyAST_Break() }
-	| &'del' del_stmt
-	| &'yield' yield_stmt
+  | assignment
+  | &'return' return_stmt
+  | e=primary { _PyAST_Expr(e) }
+  | 'break' { _PyAST_Break() }
+  | &'del' del_stmt
+  | &'yield' yield_stmt
 
 yield_stmt[stmt_ty]: y=yield_expr { _PyAST_Expr(y) }
 
@@ -87,55 +90,55 @@ yield_expr[expr_ty]:
     | 'yield' a=[star_expressions] { _PyAST_Yield(a) }
 
 del_stmt[stmt_ty]:
-	| 'del' a=del_targets &(';' | NEWLINE) { _PyAST_Delete(a) }
+  | 'del' a=del_targets &(';' | NEWLINE) { _PyAST_Delete(a) }
 
 del_targets[asdl_expr_seq*]: a[asdl_expr_seq*]=','.del_target+ [','] { a}
 
 del_target[expr_ty] (memo):
-	| del_t_atom
+  | del_t_atom
 
 del_t_atom[expr_ty]:
-	| a=NAME { _PyPegen_set_expr_context(p, a, Del) }
+  | a=NAME { _PyPegen_set_expr_context(p, a, Del) }
 
 return_stmt[stmt_ty]:
-	| 'return' a=[star_expressions] { _PyAST_Return(a) }
+  | 'return' a=[star_expressions] { _PyAST_Return(a) }
 
 star_expressions[expr_ty]:
-	| star_expression
+  | star_expression
 
 star_expression[expr_ty] (memo):
-	| expression
+  | expression
 
 # TODO follow cpy
 expression[expr_ty] (memo):
-	| disjunction
+  | disjunction
 
 disjunction[expr_ty] (memo):
-	| conjunction
+  | conjunction
 
 conjunction[expr_ty] (memo):
-	| inversion
+  | inversion
 
 inversion[expr_ty] (memo):
-	| 'not' a=inversion { _PyAST_UnaryOp(Not, a) }
-	| comparison
+  | 'not' a=inversion { _PyAST_UnaryOp(Not, a) }
+  | comparison
 
 comparison[expr_ty]:
-	| a=bitwise_or b=compare_op_bitwise_or_pair+ {
-		_PyAST_Compare(
-			a,
-			CHECK(asdl_int_seq*, _PyPegen_get_cmpops(p, b)),
-			CHECK(asdl_expr_seq*, _PyPegen_get_exprs(p, b)))
-	}
-	| bitwise_or
+  | a=bitwise_or b=compare_op_bitwise_or_pair+ {
+    _PyAST_Compare(
+      a,
+      CHECK(asdl_int_seq*, _PyPegen_get_cmpops(p, b)),
+      CHECK(asdl_expr_seq*, _PyPegen_get_exprs(p, b)))
+  }
+  | bitwise_or
 
 compare_op_bitwise_or_pair[CmpopExprPair*]:
-	| eq_bitwise_or
-	| lt_bitwise_or
-	| is_bitwise_or
-	| isnot_bitwise_or
-	| in_bitwise_or
-	| notin_bitwise_or
+  | eq_bitwise_or
+  | lt_bitwise_or
+  | is_bitwise_or
+  | isnot_bitwise_or
+  | in_bitwise_or
+  | notin_bitwise_or
 
 eq_bitwise_or[CmpopExprPair*]: '==' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Eq, a) }
 
@@ -148,153 +151,153 @@ isnot_bitwise_or[CmpopExprPair*]: 'is' 'not' a=bitwise_or { _PyPegen_cmpop_expr_
 is_bitwise_or[CmpopExprPair*]: 'is' a=bitwise_or { _PyPegen_cmpop_expr_pair(p, Is, a) }
 
 bitwise_or[expr_ty]:
-	| a=bitwise_or '|' b=bitwise_xor { _PyAST_BinOp(a, BitOr, b) }
-	| bitwise_xor
+  | a=bitwise_or '|' b=bitwise_xor { _PyAST_BinOp(a, BitOr, b) }
+  | bitwise_xor
 
 bitwise_xor[expr_ty]:
-	| a=bitwise_xor '^' b=bitwise_and { _PyAST_BinOp(a, BitXor, b) }
-	| bitwise_and
+  | a=bitwise_xor '^' b=bitwise_and { _PyAST_BinOp(a, BitXor, b) }
+  | bitwise_and
 
 bitwise_and[expr_ty]:
-	| a=bitwise_and '&' b=shift_expr { _PyAST_BinOp(a, BitAnd, b) }
-	| shift_expr
+  | a=bitwise_and '&' b=shift_expr { _PyAST_BinOp(a, BitAnd, b) }
+  | shift_expr
 
 shift_expr[expr_ty]:
-	| a=shift_expr '<<' b=sum { _PyAST_BinOp(a, LShift, b) }
-	| a=shift_expr '>>' b=sum { _PyAST_BinOp(a, RShift, b) }
-	| sum
+  | a=shift_expr '<<' b=sum { _PyAST_BinOp(a, LShift, b) }
+  | a=shift_expr '>>' b=sum { _PyAST_BinOp(a, RShift, b) }
+  | sum
 
 sum[expr_ty]:
-	| a=sum '+' b=term { _PyAST_BinOp(a, Add, b) }
-	| a=sum '-' b=term { _PyAST_BinOp(a, Sub, b) }
-	| term
+  | a=sum '+' b=term { _PyAST_BinOp(a, Add, b) }
+  | a=sum '-' b=term { _PyAST_BinOp(a, Sub, b) }
+  | term
 
 term[expr_ty]:
-	| a=term '*' b=factor { _PyAST_BinOp(a, Mult, b) }
-	| a=term '%' b=factor { _PyAST_BinOp(a, Mod, b) }
-	| a=term '/' b=factor { _PyAST_BinOp(a, Div, b) }
-	| a=term '//' b=factor { _PyAST_BinOp(a, FloorDiv, b) }
-	| factor
+  | a=term '*' b=factor { _PyAST_BinOp(a, Mult, b) }
+  | a=term '%' b=factor { _PyAST_BinOp(a, Mod, b) }
+  | a=term '/' b=factor { _PyAST_BinOp(a, Div, b) }
+  | a=term '//' b=factor { _PyAST_BinOp(a, FloorDiv, b) }
+  | factor
 
 factor[expr_ty] (memo):
-	| '+' a=factor { _PyAST_UnaryOp(UAdd, a) }
-	| '-' a=factor { _PyAST_UnaryOp(USub, a) }
-	| '~' a=factor { _PyAST_UnaryOp(Invert, a) }
-	| power
+  | '+' a=factor { _PyAST_UnaryOp(UAdd, a) }
+  | '-' a=factor { _PyAST_UnaryOp(USub, a) }
+  | '~' a=factor { _PyAST_UnaryOp(Invert, a) }
+  | power
 
 power[expr_ty]:
-	| a=primary '**' b=factor { _PyAST_BinOp(a, Pow, b) }
-	| primary
+  | a=primary '**' b=factor { _PyAST_BinOp(a, Pow, b) }
+  | primary
 
 assignment[stmt_ty]:
-	| a[asdl_expr_seq*]=(z=star_targets '=' {z})+ b=star_expressions !'=' {
-			_PyAST_Assign(a, b, NULL)
-		}
-	| a=single_target b=augassign ~ c=star_expressions {
-		_PyAST_AugAssign(a, b->kind, c);
-	}
+  | a[asdl_expr_seq*]=(z=star_targets '=' {z})+ b=star_expressions !'=' {
+      _PyAST_Assign(a, b, NULL)
+    }
+  | a=single_target b=augassign ~ c=star_expressions {
+    _PyAST_AugAssign(a, b->kind, c);
+  }
 
 single_target[expr_ty]:
-	| single_subscript_attribute_target
-	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
+  | single_subscript_attribute_target
+  | a=NAME { _PyPegen_set_expr_context(p, a, Store) }
 
 single_subscript_attribute_target[expr_ty]:
-	| a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
+  | a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
 
 augassign[AugOperator*]:
-	| '+=' { _PyPegen_augoperator(p, Add) }
-	| '-=' { _PyPegen_augoperator(p, Sub) }
-	| '&=' { _PyPegen_augoperator(p, BitAnd) }
-	| '|=' { _PyPegen_augoperator(p, BitOr) }
-	| '^=' { _PyPegen_augoperator(p, BitXor) }
-	| '%=' { _PyPegen_augoperator(p, Mod) }
-	| '*=' { _PyPegen_augoperator(p, Mult) }
-	| '/=' { _PyPegen_augoperator(p, Div) }
-	| '//=' { _PyPegen_augoperator(p, FloorDiv) }
-	| '<<=' { _PyPegen_augoperator(p, LShift) }
-	| '>>=' { _PyPegen_augoperator(p, RShift) }
-	| '**=' { _PyPegen_augoperator(p, Pow) }
+  | '+=' { _PyPegen_augoperator(p, Add) }
+  | '-=' { _PyPegen_augoperator(p, Sub) }
+  | '&=' { _PyPegen_augoperator(p, BitAnd) }
+  | '|=' { _PyPegen_augoperator(p, BitOr) }
+  | '^=' { _PyPegen_augoperator(p, BitXor) }
+  | '%=' { _PyPegen_augoperator(p, Mod) }
+  | '*=' { _PyPegen_augoperator(p, Mult) }
+  | '/=' { _PyPegen_augoperator(p, Div) }
+  | '//=' { _PyPegen_augoperator(p, FloorDiv) }
+  | '<<=' { _PyPegen_augoperator(p, LShift) }
+  | '>>=' { _PyPegen_augoperator(p, RShift) }
+  | '**=' { _PyPegen_augoperator(p, Pow) }
 
 star_targets[expr_ty]:
-	| a=star_target !',' {a}
-	| a=star_target b=(',' c=star_target { c})* [','] {
-	  _PyAST_Tuple(CHECK(asdl_expr_seq*, _PyPegen_seq_insert_in_front(p, a, b)), Store)
-	}
+  | a=star_target !',' {a}
+  | a=star_target b=(',' c=star_target { c})* [','] {
+    _PyAST_Tuple(CHECK(asdl_expr_seq*, _PyPegen_seq_insert_in_front(p, a, b)), Store)
+  }
 
 star_target[expr_ty] (memo):
-	| target_with_star_atom
+  | target_with_star_atom
 
 target_with_star_atom[expr_ty] (memo):
-	| a=t_primary '.' b=NAME !t_lookahead { _PyAST_Attribute(a, b->v.Name.id, Store) }
-	| a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
-	| star_atom
+  | a=t_primary '.' b=NAME !t_lookahead { _PyAST_Attribute(a, b->v.Name.id, Store) }
+  | a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Store) }
+  | star_atom
 
 slices[expr_ty]:
-	| a=slice !',' {a}
+  | a=slice !',' {a}
 
 slice[expr_ty]:
-	| a=[expression] ':' b=[expression] c=[':' d=[expression] {d}] { _PyAST_Slice(a, b, c) }
-	| a=named_expression {a}
+  | a=[expression] ':' b=[expression] c=[':' d=[expression] {d}] { _PyAST_Slice(a, b, c) }
+  | a=named_expression {a}
 
 t_primary[expr_ty]:
-	| a=atom &t_lookahead { a}
+  | a=atom &t_lookahead { a}
 
 t_lookahead: '(' | '[' | '.'
 
 star_atom[expr_ty]:
-	| a=NAME { _PyPegen_set_expr_context(p, a, Store) }
+  | a=NAME { _PyPegen_set_expr_context(p, a, Store) }
 
 primary[expr_ty]:
-	| a=primary '.' b=NAME { _PyAST_Attribute(a, b->v.Name.id, Load) }
-	| a=primary '(' b=[arguments] ')' {
-		_PyAST_Call(a,
-			(b) ? ((expr_ty) b)->v.Call.args : NULL,
-			(b) ? ((expr_ty) b)->v.Call.keywords : NULL) }
-	| a=primary '[' b=slices ']' { _PyAST_Subscript(a, b, Load) }
-	| atom
+  | a=primary '.' b=NAME { _PyAST_Attribute(a, b->v.Name.id, Load) }
+  | a=primary '(' b=[arguments] ')' {
+    _PyAST_Call(a,
+      (b) ? ((expr_ty) b)->v.Call.args : NULL,
+      (b) ? ((expr_ty) b)->v.Call.keywords : NULL) }
+  | a=primary '[' b=slices ']' { _PyAST_Subscript(a, b, Load) }
+  | atom
 
 arguments[expr_ty]: a[asdl_expr_seq*]=','.expression+ {
-		_PyPegen_collect_call_seqs(p, a, NULL);
-	}
+    _PyPegen_collect_call_seqs(p, a, NULL);
+  }
 
 atom[expr_ty]:
-	| NAME
-	| 'True' { _PyAST_Constant(Py_True) }
-	| NUMBER
-	| a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
-	| &'(' (tuple | group)
-	| &'[' list
-	| &'{' (dict | set)
+  | NAME
+  | 'True' { _PyAST_Constant(Py_True) }
+  | NUMBER
+  | a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
+  | &'(' (tuple | group)
+  | &'[' list
+  | &'{' (dict | set)
 
 set[expr_ty]: '{' a=star_named_expressions '}' { _PyAST_Set(a) }
 
 dict[expr_ty]:
-	| '{' a=[double_starred_kvpairs] '}' {
-		_PyAST_Dict(
-			CHECK(asdl_expr_seq*, _PyPegen_get_keys(p, a)),
-			CHECK(asdl_expr_seq*, _PyPegen_get_values(p, a))) }
+  | '{' a=[double_starred_kvpairs] '}' {
+    _PyAST_Dict(
+      CHECK(asdl_expr_seq*, _PyPegen_get_keys(p, a)),
+      CHECK(asdl_expr_seq*, _PyPegen_get_values(p, a))) }
 
 double_starred_kvpairs[asdl_seq*]: a=','.double_starred_kvpair+ [','] { a }
 
 double_starred_kvpair[KeyValuePair*]:
-	| '**' a=bitwise_or { _PyPegen_key_value_pair(p, NULL, a) }
-	| kvpair
+  | '**' a=bitwise_or { _PyPegen_key_value_pair(p, NULL, a) }
+  | kvpair
 
 kvpair[KeyValuePair*]: a=expression ':' b=expression { _PyPegen_key_value_pair(p, a, b) }
 
 list[expr_ty]:
-	| '[' a=[star_named_expressions] ']' { _PyAST_List(a, Load) }
+  | '[' a=[star_named_expressions] ']' { _PyAST_List(a, Load) }
 
 group[expr_ty]:
-	| '(' a=named_expression ')' { a }
+  | '(' a=named_expression ')' { a }
 
 tuple[expr_ty]:
-	| '(' a=[y=star_named_expression ',' z=[star_named_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
-		_PyAST_Tuple(a, Load)
-	}
+  | '(' a=[y=star_named_expression ',' z=[star_named_expressions] { _PyPegen_seq_insert_in_front(p, y, z) } ] ')' {
+    _PyAST_Tuple(a, Load)
+  }
 
 star_named_expressions[asdl_expr_seq*]: a[asdl_expr_seq*]=','.star_named_expression+ [','] { a}
 
 star_named_expression[expr_ty]:
-	| '*' a=bitwise_or { _PyAST_Starred(a, Load) }
-	| named_expression
+  | '*' a=bitwise_or { _PyAST_Starred(a, Load) }
+  | named_expression

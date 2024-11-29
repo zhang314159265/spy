@@ -7,20 +7,20 @@
 void dump_expr(expr_ty expr, int indent);
 void dump_stmt(stmt_ty stmt, int indent);
 
-void dump_stmt_seq(asdl_stmt_seq *stmt_seq, int indent) {
+void dump_stmt_seq(const char *tag, asdl_stmt_seq *stmt_seq, int indent) {
 	int l = asdl_seq_LEN(stmt_seq);
 	for (int i = 0; i < l; ++i) {
 		_INDENT();
-		fprintf(stderr, "stmt seq %d/%d\n", i + 1, l);
+		fprintf(stderr, "%sstmt seq %d/%d\n", tag ? tag : "", i + 1, l);
 		dump_stmt(asdl_seq_GET_UNTYPED(stmt_seq, i), indent + 2);
 	}
 }
 
-void dump_expr_seq(asdl_expr_seq *expr_seq, int indent) {
+void dump_expr_seq(const char *tag, asdl_expr_seq *expr_seq, int indent) {
 	int l = asdl_seq_LEN(expr_seq);
 	for (int i = 0; i < l; ++i) {
 		_INDENT();
-		fprintf(stderr, "expr seq %d/%d\n", i + 1, l);
+		fprintf(stderr, "%sexpr seq %d/%d\n", tag ? tag : "", i + 1, l);
 		dump_expr(asdl_seq_GET_UNTYPED(expr_seq, i), indent + 2);
 	}
 }
@@ -142,7 +142,7 @@ void dump_expr(expr_ty expr, int indent) {
 	case Call_kind:
 		fprintf(stderr, "Call:\n");	
 		dump_expr(expr->v.Call.func, indent + 2);
-		dump_expr_seq(expr->v.Call.args, indent + 2);
+		dump_expr_seq(NULL, expr->v.Call.args, indent + 2);
 		dump_keyword_seq(expr->v.Call.keywords, indent + 2);
 		break;
 	case Constant_kind: {
@@ -178,16 +178,16 @@ void dump_expr(expr_ty expr, int indent) {
 		fprintf(stderr, "Compare:\n");
 		dump_expr(expr->v.Compare.left, indent + 2);
 		dump_cmpop_seq(expr->v.Compare.ops, indent + 2);
-		dump_expr_seq(expr->v.Compare.comparators, indent + 2);
+		dump_expr_seq(NULL, expr->v.Compare.comparators, indent + 2);
 		break;
 	case Tuple_kind:
 		fprintf(stderr, "Tuple:\n");
-		dump_expr_seq(expr->v.Tuple.elts, indent + 2);
+		dump_expr_seq(NULL, expr->v.Tuple.elts, indent + 2);
 		dump_expr_context(expr->v.Tuple.ctx, indent + 2);
 		break;
 	case List_kind:
 		fprintf(stderr, "List:\n");
-		dump_expr_seq(expr->v.List.elts, indent + 2);
+		dump_expr_seq(NULL, expr->v.List.elts, indent + 2);
 		dump_expr_context(expr->v.List.ctx, indent + 2);
 		break;
 	case Starred_kind:
@@ -197,8 +197,8 @@ void dump_expr(expr_ty expr, int indent) {
 		break;
 	case Dict_kind:
 		fprintf(stderr, "Dict:\n");
-		dump_expr_seq(expr->v.Dict.keys, indent + 2);
-		dump_expr_seq(expr->v.Dict.values, indent + 2);
+		dump_expr_seq(NULL, expr->v.Dict.keys, indent + 2);
+		dump_expr_seq(NULL, expr->v.Dict.values, indent + 2);
 		break;
 	case Subscript_kind:
 		fprintf(stderr, "Subscript:\n");
@@ -208,7 +208,7 @@ void dump_expr(expr_ty expr, int indent) {
 		break;
 	case Set_kind:
 		fprintf(stderr, "Set:\n");
-		dump_expr_seq(expr->v.Set.elts, indent + 2);
+		dump_expr_seq(NULL, expr->v.Set.elts, indent + 2);
 		break;
 	case UnaryOp_kind:
 		fprintf(stderr, "UnaryOp:\n");
@@ -251,12 +251,12 @@ void dump_stmt(stmt_ty stmt, int indent) {
 	case FunctionDef_kind:
 		fprintf(stderr, "FunctionDef: %s\n", (char *) PyUnicode_DATA(stmt->v.FunctionDef.name));
 		dump_arguments_ty(stmt->v.FunctionDef.args, indent + 2);
-		dump_stmt_seq(stmt->v.FunctionDef.body, indent + 2);
-		// assert(false);
+		dump_stmt_seq(NULL, stmt->v.FunctionDef.body, indent + 2);
+    dump_expr_seq("Decorators ", stmt->v.FunctionDef.decorator_list, indent + 2);
 		break;
 	case Assign_kind:
 		fprintf(stderr, "Assign:\n");
-		dump_expr_seq(stmt->v.Assign.targets, indent + 2);
+		dump_expr_seq(NULL, stmt->v.Assign.targets, indent + 2);
 		dump_expr(stmt->v.Assign.value, indent + 2);
 		break;
 	case AugAssign_kind:
@@ -273,34 +273,34 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		fprintf(stderr, "For:\n");
 		dump_expr(stmt->v.For.target, indent + 2);
 		dump_expr(stmt->v.For.iter, indent + 2);
-		dump_stmt_seq(stmt->v.For.body, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.For.body, indent + 2);
 		assert(!stmt->v.For.orelse);
 		break;
 	case If_kind:
 		fprintf(stderr, "If:\n");
 		dump_expr(stmt->v.If.test, indent + 2);
-		dump_stmt_seq(stmt->v.If.body, indent + 2);
-		dump_stmt_seq(stmt->v.If.orelse, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.If.body, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.If.orelse, indent + 2);
 		break;
 	case While_kind:
 		fprintf(stderr, "While:\n");
 		dump_expr(stmt->v.While.test, indent + 2);
-		dump_stmt_seq(stmt->v.While.body, indent + 2);
-		dump_stmt_seq(stmt->v.While.orelse, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.While.body, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.While.orelse, indent + 2);
 		break;
 	case Break_kind:
 		fprintf(stderr, "Break\n");
 		break;
 	case Delete_kind:
 		fprintf(stderr, "Del\n");
-		dump_expr_seq(stmt->v.Delete.targets, indent + 2);
+		dump_expr_seq(NULL, stmt->v.Delete.targets, indent + 2);
 		break;
 	case ClassDef_kind:
 		fprintf(stderr, "ClassDef: %s\n", (char *) PyUnicode_DATA(stmt->v.ClassDef.name));
 		assert(!stmt->v.ClassDef.bases);
 		assert(!stmt->v.ClassDef.keywords);
-		dump_stmt_seq(stmt->v.ClassDef.body, indent + 2);
-		dump_expr_seq(stmt->v.ClassDef.decorator_list, indent + 2);
+		dump_stmt_seq(NULL, stmt->v.ClassDef.body, indent + 2);
+		dump_expr_seq(NULL, stmt->v.ClassDef.decorator_list, indent + 2);
 		break;	
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);

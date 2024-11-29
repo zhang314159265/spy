@@ -1208,3 +1208,26 @@ add_operators(PyTypeObject *type) {
   }
   return 0;
 }
+
+static int type_add_getset(PyTypeObject *type) {
+  PyGetSetDef *gsp = type->tp_getset;
+
+  if (gsp == NULL) {
+    return 0;
+  }
+
+  PyObject *dict = type->tp_dict;
+  for (; gsp->name != NULL; gsp++) {
+    PyObject *descr = PyDescr_NewGetSet(type, gsp);
+    if (descr == NULL) {
+      return -1;
+    }
+
+    if (PyDict_SetDefault(dict, PyDescr_NAME(descr), descr) == NULL) {
+      Py_DECREF(descr);
+      return -1;
+    }
+    Py_DECREF(descr);
+  }
+  return 0;
+}

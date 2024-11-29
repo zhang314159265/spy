@@ -775,7 +775,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx) {
 	op = 0;
 	optype = OP_NAME;
 	scope = _PyST_GetScope(c->u->u_ste, mangled);
-	printf("scope for %s is %d\n", PyUnicode_1BYTE_DATA(mangled), scope);
+	// printf("scope for %s is %d\n", PyUnicode_1BYTE_DATA(mangled), scope);
 	switch (scope) {
   case FREE:
     dict = c->u->u_freevars;
@@ -1360,9 +1360,15 @@ compiler_visit_stmt_expr(struct compiler *c, expr_ty value)
 
 static int
 compiler_decorators(struct compiler *c, asdl_expr_seq *decos) {
+  int i;
+
   if (!decos)
     return 1;
-  assert(false);
+
+  for (i = 0; i < asdl_seq_LEN(decos); i++) {
+    VISIT(c, expr, (expr_ty) asdl_seq_GET(decos, i));
+  }
+  return 1;
 }
 
 static int
@@ -1506,7 +1512,7 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async) {
 
   // decorators
   for (i = 0; i < asdl_seq_LEN(decos); i++) {
-    assert(false);
+    ADDOP_I(c, CALL_FUNCTION, 1);
   }
 
   return compiler_nameop(c, name, Store);

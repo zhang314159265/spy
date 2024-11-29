@@ -1,5 +1,7 @@
 #pragma once
 
+#include "descrobject.h"
+
 int _Py_SwappedOp[] = {
   Py_GT,
   Py_GE,
@@ -207,6 +209,7 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name) {
   } else if (tp->tp_getattr != NULL) {
     assert(false);
   } else {
+    printf("PyObject_GetAttr obj type %s\n", Py_TYPE(v)->tp_name);
     assert(false);
   }
   if (result == NULL) {
@@ -241,7 +244,16 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
 
   f = NULL;
   if (descr != NULL) {
-    assert(false);
+    Py_INCREF(descr);
+    f = Py_TYPE(descr)->tp_descr_get;
+    // printf("f %p, is data %d\n", f, PyDescr_IsData(descr));
+    if (f != NULL && PyDescr_IsData(descr)) {
+      res = f(descr, obj, (PyObject *) Py_TYPE(obj));
+      if (res == NULL) {
+        assert(false);
+      }
+      goto done;
+    }
   }
 
   if (dict == NULL) {

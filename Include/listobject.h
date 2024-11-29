@@ -598,6 +598,41 @@ merge_freemem(MergeState *ms) {
   }
 }
 
+static int
+binarysort(MergeState *ms, sortslice lo, PyObject **hi, PyObject **start) {
+  Py_ssize_t k;
+  PyObject **l, **p, **r;
+  PyObject *pivot;
+
+  assert(lo.keys <= start && start <= hi);
+  if (lo.keys == start)
+    ++start;
+  for (; start < hi; ++start) {
+    l = lo.keys;
+    r = start;
+    pivot = *r;
+    assert(l < r);
+    do {
+      p = l + ((r - l) >> 1);
+      IFLT(pivot, *p)
+        r = p;
+      else
+        l = p + 1;
+    } while (l < r);
+    assert(l == r);
+    for (p = start; p > l; --p)
+      *p = *(p - 1);
+    *l = pivot;
+    if (lo.values != NULL) {
+      assert(false);
+    }
+  }
+
+  return 0;
+fail:
+  return -1;
+}
+
 static PyObject *
 list_sort_impl(PyListObject *self, PyObject *keyfunc, int reverse) {
   MergeState ms;
@@ -716,7 +751,11 @@ list_sort_impl(PyListObject *self, PyObject *keyfunc, int reverse) {
     if (descending)
       reverse_sortslice(&lo, n);
     if (n < minrun) {
-      assert(false);
+      const Py_ssize_t force = nremaining <= minrun ?
+          nremaining : minrun;
+      if (binarysort(&ms, lo, lo.keys + force, lo.keys + n) < 0)
+        goto fail;
+      n = force;
     }
     assert(ms.n < MAX_MERGE_PENDING);
     ms.pending[ms.n].base = lo;

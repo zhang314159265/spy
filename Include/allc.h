@@ -18,3 +18,4 @@
 #include "Objects/listobject.c.h"
 #include "Objects/dictobject.c.h"
 #include "Python/getargs.c.h"
+#include "Objects/funcobject.c.h"

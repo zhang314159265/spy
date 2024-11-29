@@ -196,6 +196,7 @@ struct _expr {
 
 enum _stmt_kind {
 	FunctionDef_kind = 1,
+  AsyncFunctionDef_kind = 2,
 	ClassDef_kind = 3,
 	Return_kind = 4,
 	Delete_kind = 5,

@@ -664,3 +664,16 @@ _PyPegen_key_value_pair(Parser *p, expr_ty key, expr_ty value) {
 	a->value = value;
 	return a;
 }
+
+stmt_ty
+_PyPegen_function_def_decorators(Parser *p, asdl_expr_seq *decorators, stmt_ty function_def) {
+  assert(function_def != NULL);
+  if (function_def->kind == AsyncFunctionDef_kind) {
+    assert(false);
+  }
+  return _PyAST_FunctionDef(
+    function_def->v.FunctionDef.name, function_def->v.FunctionDef.args,
+    function_def->v.FunctionDef.body, decorators,
+    function_def->v.FunctionDef.returns
+  );
+}

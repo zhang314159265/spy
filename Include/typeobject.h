@@ -248,6 +248,8 @@ type_ready_inherit(PyTypeObject *type) {
 static int type_add_methods(PyTypeObject *type);
 static int add_operators(PyTypeObject *type);
 
+static int type_add_getset(PyTypeObject *type);
+
 static int
 type_ready_fill_dict(PyTypeObject *type) {
   if (add_operators(type) < 0) {
@@ -256,6 +258,9 @@ type_ready_fill_dict(PyTypeObject *type) {
 	if (type_add_methods(type) < 0) {
 		return -1;
 	}
+  if (type_add_getset(type) < 0) {
+    return -1;
+  }
 	return 0;
 }
 

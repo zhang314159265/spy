@@ -46,14 +46,16 @@ static inline PyFrameObject *
 frame_alloc(PyCodeObject *code) {
 	PyFrameObject *f = NULL;
 
-	Py_ssize_t extras = code->co_stacksize + code->co_nlocals;
+  Py_ssize_t ncells = PyTuple_GET_SIZE(code->co_cellvars);
+  Py_ssize_t nfrees = PyTuple_GET_SIZE(code->co_freevars);
+	Py_ssize_t extras = code->co_stacksize + code->co_nlocals + ncells + nfrees;
 
 	f = PyObject_GC_NewVar(PyFrameObject, &PyFrame_Type, extras);
 	if (f == NULL) {
 		return NULL;
 	}
 
-	extras = code->co_nlocals;
+	extras = code->co_nlocals + ncells + nfrees;
 	f->f_valuestack = f->f_localsplus + extras;
 	for (Py_ssize_t i = 0; i < extras; i++) {
 		f->f_localsplus[i] = NULL;

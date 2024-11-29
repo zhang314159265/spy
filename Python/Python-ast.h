@@ -44,9 +44,8 @@ _PyAST_Assign(asdl_expr_seq *targets, expr_ty value, string type_comment) {
 
 stmt_ty
 _PyAST_FunctionDef(identifier name, arguments_ty args, asdl_stmt_seq *body,
-		asdl_expr_seq *decorator_list, expr_ty  returns) {
+		asdl_expr_seq *decorator_list, expr_ty returns) {
 	stmt_ty p;
-	assert(!decorator_list);
 	assert(!returns);
 
 	if (!name) {

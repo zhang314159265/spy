@@ -49,6 +49,11 @@ typedef struct {
   void *d_wrapped;
 } PyWrapperDescrObject;
 
+typedef struct {
+  PyDescr_COMMON;
+  PyGetSetDef *d_getset;
+} PyGetSetDescrObject;
+
 typedef void (*funcptr)(void);
 
 static inline funcptr
@@ -116,6 +121,25 @@ PyTypeObject PyWrapperDescr_Type = {
   .tp_basicsize = sizeof(PyWrapperDescrObject),
   .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
       Py_TPFLAGS_METHOD_DESCRIPTOR,
+};
+
+static void descr_dealloc(PyDescrObject *descr) {
+  assert(false);
+}
+
+static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject *type);
+
+static int getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value);
+
+PyTypeObject PyGetSetDescr_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "getset_descriptor",
+  .tp_basicsize = sizeof(PyGetSetDescrObject),
+  .tp_dealloc = (destructor) descr_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+  .tp_descr_get = (descrgetfunc) getset_get,
+  .tp_descr_set = (descrsetfunc) getset_set,
 };
 
 static PyDescrObject *
@@ -227,4 +251,41 @@ PyDescr_NewWrapper(PyTypeObject *type, struct wrapperbase *base, void *wrapped) 
     descr->d_wrapped = wrapped;
   }
   return (PyObject *) descr;
+}
+
+PyObject *
+PyDescr_NewGetSet(PyTypeObject *type, PyGetSetDef *getset) {
+  // printf("PyDescr_NewGetSet for type %s\n", type->tp_name);
+  PyGetSetDescrObject *descr;
+
+  descr = (PyGetSetDescrObject *) descr_new(&PyGetSetDescr_Type,
+      type, getset->name);
+  if (descr != NULL)
+    descr->d_getset = getset;
+  return (PyObject *) descr;
+}
+
+static int
+descr_check(PyDescrObject *descr, PyObject *obj) {
+  if (!PyObject_TypeCheck(obj, descr->d_type)) {
+    assert(false);
+  }
+  return 0;
+}
+
+static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject *type) {
+  if (obj == NULL) {
+    assert(false);
+  }
+  if (descr_check((PyDescrObject *) descr, obj) < 0) {
+    return NULL;
+  }
+  if (descr->d_getset->get != NULL) {
+    return descr->d_getset->get(obj, descr->d_getset->closure);
+  }
+  assert(false);
+}
+
+static int getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value) {
+  assert(false);
 }

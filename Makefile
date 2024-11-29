@@ -13,16 +13,18 @@ PREFIX :=
 endif
 
 TUTOR=tutor/misc.py
-TUTOR=tutor/closure.py
+TUTOR=tutor/func_decorator.py
 
 first: mine
 # first: pegen
 
 PEGEN_FLAGS := -v
 
+EXTRA_ARGS :=
+
 # CPY_DBG_FLAGS := DBG_TOK_GET=1
 cpy:
-	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/$(PYEXE) $(TUTOR)
+	$(CPY_DBG_FLAGS) $(PREFIX) ../cpython/build/$(PYEXE) $(EXTRA_ARGS) $(TUTOR)
 
 pegen:
 	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/$(PYEXE) -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
@@ -30,4 +32,4 @@ pegen:
 CFLAGS := -IInclude -I.
 mine: pegen
 	gcc -g main.c $(CFLAGS)
-	$(PREFIX) ./a.out $(TUTOR)
+	$(PREFIX) ./a.out $(EXTRA_ARGS) $(TUTOR)

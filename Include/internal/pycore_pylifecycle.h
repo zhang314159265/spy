@@ -56,6 +56,7 @@ PyStatus _PyTypes_Init() {
   INIT_TYPE(PyTuple_Type);
   INIT_TYPE(PyDict_Type);
   INIT_TYPE(PySuper_Type);
+  INIT_TYPE(PyFunction_Type);
 
 	return _PyStatus_OK();
 

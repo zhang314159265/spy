@@ -1,5 +1,7 @@
 #pragma once
 
+// #include "descrobject.h"
+
 #define COMMON_FIELDS(PREFIX) \
 	PyObject *PREFIX ## globals; \
 	PyObject *PREFIX ## builtins; \
@@ -35,15 +37,10 @@ static void func_dealloc(PyFunctionObject *op);
 
 PyObject *PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *kwargs);
 
-PyTypeObject PyFunction_Type = {
-	PyVarObject_HEAD_INIT(&PyType_Type, 0)
-	.tp_name = "function",
-	.tp_basicsize = sizeof(PyFunctionObject),
-  .tp_dealloc = (destructor) func_dealloc,
-	.tp_flags = Py_TPFLAGS_HAVE_VECTORCALL | Py_TPFLAGS_METHOD_DESCRIPTOR,
-	.tp_call = PyVectorcall_Call,
-	.tp_vectorcall_offset = offsetof(PyFunctionObject, vectorcall),
-};
+static PyObject *func_get_name(PyFunctionObject *op, void *ignored);
+static int func_set_name(PyFunctionObject *op, PyObject *value, void *ignore);
+
+extern PyTypeObject PyFunction_Type;
 
 PyObject *_PyEval_BuiltinsFromGlobals(PyThreadState *tstate, PyObject *globals);
 
@@ -144,4 +141,13 @@ static void func_dealloc(PyFunctionObject *op) {
   }
   (void) func_clear(op);
   PyObject_GC_Del(op);
+}
+
+static PyObject *func_get_name(PyFunctionObject *op, void *ignored) {
+  Py_INCREF(op->func_name);
+  return op->func_name;
+}
+
+static int func_set_name(PyFunctionObject *op, PyObject *value, void *ignore) {
+  assert(false);
 }

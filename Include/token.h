@@ -47,6 +47,7 @@
 #define DOUBLESTAREQUAL 46
 #define DOUBLESLASH 47
 #define DOUBLESLASHEQUAL 48
+#define AT 49
 #define OP 54
 #define TYPE_IGNORE 57
 
@@ -82,6 +83,7 @@ PyToken_OneChar(int c1) {
 	case '-': return MINUS;
 	case '<': return LESS;
 	case '*': return STAR;
+  case '@': return AT;
 	case '[': return LSQB;
 	case ']': return RSQB;
 	case '{': return LBRACE;

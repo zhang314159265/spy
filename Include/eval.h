@@ -123,7 +123,7 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
     assert(false);
   }
 
-  printf("#cell %ld, #free %ld\n", PyTuple_GET_SIZE(co->co_cellvars), PyTuple_GET_SIZE(co->co_freevars));
+  // printf("#cell %ld, #free %ld\n", PyTuple_GET_SIZE(co->co_cellvars), PyTuple_GET_SIZE(co->co_freevars));
 
   for (i = 0; i < PyTuple_GET_SIZE(co->co_cellvars); ++i) {
     PyObject *c;
@@ -179,7 +179,7 @@ call_function(PyThreadState *tstate,
 
 void debug_eval(int opcode, int oparg, PyObject *top) {
   // dump op code and stack before process a opcode
-  printf("<opcode %d, oparg %d>\n", opcode, oparg);
+  printf("<opcode %s (%d), oparg %d>\n", opcode_to_str(opcode), opcode, oparg);
   if (top) {
     printf("  - type %s\n", Py_TYPE(top)->tp_name);
   }
@@ -264,6 +264,7 @@ main_loop:
 		}
     case TARGET(LOAD_DEREF): {
       PyObject *cell = freevars[oparg];
+      // printf("LOAD_DEREF cell type %s\n", Py_TYPE(cell)->tp_name);
       assert(PyCell_Check(cell));
       PyObject *value = PyCell_GET(cell);
       if (value == NULL) {

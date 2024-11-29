@@ -8,11 +8,17 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 
 # Scratch
 
-Quest 5: <+++++++
-- closure
+Quest:
+- decorators for func <=======
 
 Quest:
-- decorators
+- decorators for class
+
+Quest:
+- properties
+
+Quest:
+- static/class method
 
 Quest 1:
 - cover import <+++++++++++
