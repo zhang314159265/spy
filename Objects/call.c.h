@@ -158,3 +158,65 @@ PyObject *_PyObject_Call_Prepend(PyThreadState *tstate, PyObject *callable,
   }
   return result;
 }
+
+static PyObject *
+object_vacall(PyThreadState *tstate, PyObject *base,
+    PyObject *callable, va_list vargs)
+{
+  PyObject *small_stack[_PY_FASTCALL_SMALL_STACK];
+  PyObject **stack;
+  Py_ssize_t nargs;
+  PyObject *result;
+  Py_ssize_t i;
+  va_list countva;
+
+  if (callable == NULL) {
+    assert(false);
+  }
+
+  va_copy(countva, vargs);
+  nargs = base ? 1 : 0;
+  while (1) {
+    PyObject *arg = va_arg(countva, PyObject *);
+    if (arg == NULL) {
+      break;
+    }
+    nargs++;
+  }
+  va_end(countva);
+
+  if (nargs <= (Py_ssize_t) Py_ARRAY_LENGTH(small_stack)) {
+    stack = small_stack;
+  } else {
+    assert(false);
+  }
+
+  i = 0;
+  if (base) {
+    stack[i++] = base;
+  }
+  for (; i < nargs; ++i) {
+    stack[i] = va_arg(vargs, PyObject *);
+  }
+
+  result = _PyObject_VectorcallTstate(tstate, callable, stack, nargs, NULL);
+  if (stack != small_stack) {
+    PyMem_Free(stack);
+  }
+  return result;
+}
+
+PyObject *
+PyObject_CallFunctionObjArgs(PyObject *callable, ...) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  va_list vargs;
+  PyObject *result;
+
+  va_start(vargs, callable);
+  result = object_vacall(tstate, NULL, callable, vargs);
+  va_end(vargs);
+
+  return result;
+}
+
+

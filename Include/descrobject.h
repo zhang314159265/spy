@@ -95,6 +95,23 @@ classmethoddescr_call(PyMethodDescrObject *descr, PyObject *args,
   assert(false);
 }
 
+static int descr_check(PyDescrObject *descr, PyObject *obj);
+
+static PyObject *
+method_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type) {
+  if (obj == NULL) {
+    assert(false);
+  }
+  if (descr_check((PyDescrObject *) descr, obj) < 0) {
+    return NULL;
+  }
+  if (descr->d_method->ml_flags & METH_METHOD) {
+    assert(false);
+  } else {
+    return PyCFunction_NewEx(descr->d_method, obj, NULL);
+  }
+}
+
 PyTypeObject PyMethodDescr_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "method_descriptor",
@@ -102,6 +119,7 @@ PyTypeObject PyMethodDescr_Type = {
 	.tp_flags = Py_TPFLAGS_HAVE_VECTORCALL | Py_TPFLAGS_METHOD_DESCRIPTOR,
 	.tp_call = PyVectorcall_Call,
 	.tp_vectorcall_offset = offsetof(PyMethodDescrObject, vectorcall),
+  .tp_descr_get = (descrgetfunc) method_get,
 };
 
 static PyObject * classmethod_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type);
@@ -140,6 +158,58 @@ PyTypeObject PyGetSetDescr_Type = {
   .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
   .tp_descr_get = (descrgetfunc) getset_get,
   .tp_descr_set = (descrsetfunc) getset_set,
+};
+
+typedef struct {
+  PyObject_HEAD
+  PyObject *prop_get;
+  PyObject *prop_set;
+  PyObject *prop_del;
+  PyObject *prop_doc;
+  PyObject *prop_name;
+  int getter_doc;
+} propertyobject;
+
+static void property_dealloc(PyObject *self);
+
+static PyGetSetDef property_getsetlist[] = {
+  {NULL}
+};
+
+static PyObject *property_descr_get(PyObject *self, PyObject *obj, PyObject *type);
+static int property_descr_set(PyObject *self, PyObject *obj, PyObject *value);
+static int property_init(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *PyObject_CallFunctionObjArgs(PyObject *callable, ...);
+static PyObject *property_copy(PyObject *old, PyObject *get, PyObject *set, PyObject *del);
+
+static PyObject *
+property_setter(PyObject *self, PyObject *setter) {
+  return property_copy(self, NULL, setter, NULL);
+}
+
+PyDoc_STRVAR(setter_doc, "");
+
+static PyMethodDef property_methods[] = {
+  {"setter", property_setter, METH_O, setter_doc},
+  {0}
+};
+
+PyTypeObject PyProperty_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "property",
+  .tp_basicsize = sizeof(propertyobject),
+  .tp_dealloc = property_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+      Py_TPFLAGS_BASETYPE,
+  .tp_getset = property_getsetlist,
+  .tp_descr_get = property_descr_get,
+  .tp_descr_set = property_descr_set,
+  .tp_init = property_init,
+  .tp_alloc = PyType_GenericAlloc,
+  .tp_new = PyType_GenericNew,
+  .tp_free = PyObject_GC_Del,
+  .tp_methods = property_methods,
 };
 
 static PyDescrObject *
@@ -289,3 +359,92 @@ static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject 
 static int getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value) {
   assert(false);
 }
+
+static void property_dealloc(PyObject *self) {
+  propertyobject *gs = (propertyobject *) self;
+
+  Py_XDECREF(gs->prop_get);
+  Py_XDECREF(gs->prop_set);
+  Py_XDECREF(gs->prop_del);
+  Py_XDECREF(gs->prop_doc);
+  Py_XDECREF(gs->prop_name);
+  Py_TYPE(self)->tp_free(self);
+}
+
+static PyObject *property_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
+  if (obj == NULL || obj == Py_None) {
+    Py_INCREF(self);
+    return self;
+  }
+
+  propertyobject *gs = (propertyobject *) self;
+  if (gs->prop_get == NULL) {
+    assert(false);
+  }
+
+  return PyObject_CallOneArg(gs->prop_get, obj);
+}
+
+static int property_descr_set(PyObject *self, PyObject *obj, PyObject *value) {
+  propertyobject *gs = (propertyobject *) self;
+  PyObject *func, *res;
+
+  if (value == NULL)
+    func = gs->prop_del;
+  else
+    func = gs->prop_set;
+  if (func == NULL) {
+    assert(false);
+  }
+  if (value == NULL)
+    res = PyObject_CallOneArg(func, obj);
+  else
+    res = PyObject_CallFunctionObjArgs(func, obj, value, NULL);
+  if (res == NULL)
+    return -1;
+  Py_DECREF(res);
+  return 0;
+}
+
+// defined in cpy/Objects/clinic/descrobject.c.h
+static int property_init(PyObject *self, PyObject *args, PyObject *kwargs);
+
+static PyObject *
+property_copy(PyObject *old, PyObject *get, PyObject *set, PyObject *del) {
+  propertyobject *pold = (propertyobject *) old;
+  PyObject *new, *type, *doc;
+
+  type = PyObject_Type(old);
+  if (type == NULL)
+    return NULL;
+
+  if (get == NULL || get == Py_None) {
+    Py_XDECREF(get);
+    get = pold->prop_get ? pold->prop_get : Py_None;
+  }
+  if (set == NULL || set == Py_None) {
+    Py_XDECREF(set);
+    set = pold->prop_set ? pold->prop_set : Py_None;
+  }
+  if (del == NULL || del == Py_None) {
+    Py_XDECREF(del);
+    del = pold->prop_del ? pold->prop_del : Py_None;
+  }
+  if (pold->getter_doc && get != Py_None) {
+    doc = Py_None;
+  } else {
+    doc = pold->prop_doc ? pold->prop_doc : Py_None;
+  }
+
+  new = PyObject_CallFunctionObjArgs(type, get, set, del, doc, NULL);
+  Py_DECREF(type);
+  if (new == NULL)
+    return NULL;
+  if (PyObject_TypeCheck((new), &PyProperty_Type)) {
+    Py_XINCREF(pold->prop_name);
+    Py_XSETREF(((propertyobject *) new)->prop_name, pold->prop_name);
+  }
+  return new;
+}
+
+

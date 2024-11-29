@@ -145,6 +145,7 @@ _PyObject_GenericSetAttrWithDict(PyObject *obj, PyObject *name,
 
   PyTypeObject *tp = Py_TYPE(obj);
   PyObject *descr;
+  descrsetfunc f;
   PyObject **dictptr;
   int res = -1;
 
@@ -160,7 +161,12 @@ _PyObject_GenericSetAttrWithDict(PyObject *obj, PyObject *name,
   descr = _PyType_Lookup(tp, name);
 
   if (descr != NULL) {
-    assert(false);
+    Py_INCREF(descr);
+    f = Py_TYPE(descr)->tp_descr_set;
+    if (f != NULL) {
+      res = f(descr, obj, value);
+      goto done;
+    }
   }
 
   if (dict == NULL) {
@@ -281,11 +287,15 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
   }
 
   if (f != NULL) {
-    assert(false);
+    res = f(descr, obj, (PyObject *) Py_TYPE(obj));
+    assert(res);
+    goto done;
   }
 
   if (descr != NULL) {
-    assert(false);
+    res = descr;
+    descr = NULL;
+    goto done;
   }
 
   if (!suppress) {
@@ -400,7 +410,14 @@ int _PyObject_LookupAttr(PyObject *v, PyObject *name, PyObject **result) {
   }
 
   if (tp->tp_getattro == PyObject_GenericGetAttr) {
-    assert(false);
+    *result = _PyObject_GenericGetAttrWithDict(v, name, NULL, 1);
+    if (*result != NULL) {
+      return 1;
+    }
+    if (PyErr_Occurred()) {
+      return -1;
+    }
+    return 0;
   }
   if (tp->tp_getattro != NULL) {
     *result = (*tp->tp_getattro)(v, name);

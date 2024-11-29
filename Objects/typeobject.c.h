@@ -163,7 +163,6 @@ typedef struct {
   PyTypeObject *obj_type;
 } superobject;
 
-PyObject *PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 static int super_init(PyObject *self, PyObject *args, PyObject *kwds);
 static PyObject *super_getattro(PyObject *self, PyObject *name);

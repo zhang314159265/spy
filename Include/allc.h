@@ -19,3 +19,4 @@
 #include "Objects/dictobject.c.h"
 #include "Python/getargs.c.h"
 #include "Objects/funcobject.c.h"
+#include "Objects/descrobject.c.h"

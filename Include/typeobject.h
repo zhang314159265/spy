@@ -573,3 +573,5 @@ static PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds) 
   }
   return type->tp_alloc(type, 0);
 }
+
+PyObject *PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds);

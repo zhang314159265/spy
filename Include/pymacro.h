@@ -22,4 +22,7 @@
 #define PyDoc_VAR(name) static const char name[]
 #define PyDoc_STR(str) str
 
+#define Py_ARRAY_LENGTH(array) \
+  (sizeof(array) / sizeof((array)[0]))
+
 #endif

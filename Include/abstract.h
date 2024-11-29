@@ -681,4 +681,30 @@ PyObject *_PyObject_Call(PyThreadState *tstate, PyObject *callable, PyObject *ar
 
 #define _PY_FASTCALL_SMALL_STACK 5
 
+PyObject *
+PyObject_Type(PyObject *o) {
+  PyObject *v;
 
+  if (o == NULL) {
+    assert(false);
+  }
+
+  v = (PyObject *) Py_TYPE(o);
+  Py_INCREF(v);
+  return v;
+}
+
+static inline PyObject *
+PyObject_CallOneArg(PyObject *func, PyObject *arg) {
+  PyObject *_args[2];
+  PyObject **args;
+  PyThreadState *tstate;
+  size_t nargsf;
+
+  assert(arg != NULL);
+  args = _args + 1; // for PY_VECTORCALL_ARGUMENTS_OFFSET
+  args[0] = arg;
+  tstate = PyThreadState_Get();
+  nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
+  return _PyObject_VectorcallTstate(tstate, func, args, nargsf, NULL);
+}
