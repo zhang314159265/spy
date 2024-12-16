@@ -282,6 +282,42 @@ Py_ssize_t lookdict_split(PyDictObject *mp, PyObject *key,
 #define PyDict_GET_SIZE(mp) (assert(PyDict_Check(mp)), ((PyDictObject*) mp)->ma_used)
 
 static Py_ssize_t
+lookdict_unicode(PyDictObject *mp, PyObject *key,
+    Py_hash_t hash, PyObject **value_addr) {
+  assert(mp->ma_values == NULL);
+  if (!PyUnicode_CheckExact(key)) {
+    return lookdict(mp, key, hash, value_addr);
+  }
+
+  PyDictKeyEntry *ep0 = DK_ENTRIES(mp->ma_keys);
+  size_t mask = DK_MASK(mp->ma_keys);
+  size_t perturb = (size_t) hash;
+  size_t i = (size_t) hash & mask;
+
+  for (;;) {
+    Py_ssize_t ix = dictkeys_get_index(mp->ma_keys, i);
+    if (ix == DKIX_EMPTY) {
+      *value_addr = NULL;
+      return DKIX_EMPTY;
+    }
+    if (ix >= 0) {
+      PyDictKeyEntry *ep = &ep0[ix];
+      assert(ep->me_key != NULL);
+      assert(PyUnicode_CheckExact(ep->me_key));
+      if (ep->me_key == key ||
+          (ep->me_hash == hash && unicode_eq(ep->me_key, key))) {
+        *value_addr = ep->me_value;
+        return ix;
+      }
+    }
+    perturb >>= PERTURB_SHIFT;
+    i = mask & (i * 5 + perturb + 1);
+  }
+  assert(false); // can not reach here
+
+}
+
+static Py_ssize_t
 lookdict_unicode_nodummy(PyDictObject *mp, PyObject *key,
     Py_hash_t hash, PyObject **value_addr) {
   assert(mp->ma_values == NULL);
@@ -1027,6 +1063,11 @@ lookdict_index(PyDictKeysObject *k, Py_hash_t hash, Py_ssize_t index) {
   Py_UNREACHABLE();
 }
 
+#define ENSURE_ALLOWS_DELETIONS(d) \
+  if ((d)->ma_keys->dk_lookup == lookdict_unicode_nodummy) { \
+    (d)->ma_keys->dk_lookup = lookdict_unicode; \
+  }
+
 static int
 delitem_common(PyDictObject *mp, Py_hash_t hash, Py_ssize_t ix,
     PyObject *old_value) {
@@ -1040,6 +1081,7 @@ delitem_common(PyDictObject *mp, Py_hash_t hash, Py_ssize_t ix,
   mp->ma_version_tag = DICT_NEXT_VERSION();
   ep = &DK_ENTRIES(mp->ma_keys)[ix];
   dictkeys_set_index(mp->ma_keys, hashpos, DKIX_DUMMY);
+  ENSURE_ALLOWS_DELETIONS(mp);
   old_key = ep->me_key;
   ep->me_key = NULL;
   ep->me_value = NULL;
