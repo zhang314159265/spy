@@ -769,9 +769,41 @@ slotptr(PyTypeObject *type, int ioffset) {
   return (void **) ptr;
 }
 
+#define MAX_EQUIV 10
+
+static void **
+resolve_slotdups(PyTypeObject *type, PyObject *name) {
+  static PyObject *pname;
+  static slotdef *ptrs[MAX_EQUIV];
+  slotdef *p, **pp;
+  void **res, **ptr;
+
+  if (pname != name) {
+    pname = name;
+    pp = ptrs;
+    for (p = slotdefs; p->name_strobj; p++) {
+      if (p->name_strobj == name)
+        *pp++ = p;
+    }
+    *pp = NULL;
+  }
+
+  res = NULL;
+  for (pp = ptrs; *pp; pp++) {
+    ptr = slotptr(type, (*pp)->offset);
+    if (ptr == NULL || *ptr == NULL)
+      continue;
+    if (res != NULL)
+      return NULL;
+    res = ptr;
+  }
+  return res;
+}
+
 static slotdef *
 update_one_slot(PyTypeObject *type, slotdef *p) {
   PyObject *descr;
+  PyWrapperDescrObject *d;
   void *generic = NULL, *specific = NULL;
   int use_generic = 0;
   int offset = p->offset;
@@ -795,7 +827,19 @@ update_one_slot(PyTypeObject *type, slotdef *p) {
     }
     if (Py_IS_TYPE(descr, &PyWrapperDescr_Type) &&
         ((PyWrapperDescrObject *) descr)->d_base->name_strobj == p->name_strobj) {
-      assert(false);
+      void **tptr = resolve_slotdups(type, p->name_strobj);
+      if (tptr == NULL || tptr == ptr)
+        generic = p->function;
+      d = (PyWrapperDescrObject *) descr;
+      if ((specific == NULL || specific == d->d_wrapped) &&
+        d->d_base->wrapper == p->wrapper &&
+        PyType_IsSubtype(type, PyDescr_TYPE(d)))
+      {
+        specific = d->d_wrapped;
+      }
+      else {
+        use_generic = 1;
+      }
     } else if (Py_IS_TYPE(descr, &PyCFunction_Type) &&
         PyCFunction_GET_FUNCTION(descr) ==
         (PyCFunction)(void(*)(void))tp_new_wrapper &&
@@ -810,7 +854,7 @@ update_one_slot(PyTypeObject *type, slotdef *p) {
     }
   } while ((++p)->offset == offset);
   if (specific && !use_generic) {
-    assert(false);
+    *ptr = specific;
   } else {
     *ptr = generic;
   }

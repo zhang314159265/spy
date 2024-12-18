@@ -162,10 +162,16 @@ type_ready_set_bases(PyTypeObject *type) {
   return 0;
 }
 
+extern PyObject *PyExc_BaseException;
+
 static void
 inherit_special(PyTypeObject *type, PyTypeObject *base) {
 	if (type->tp_basicsize == 0)
 		type->tp_basicsize = base->tp_basicsize;
+
+  if (PyType_IsSubtype(base, (PyTypeObject*) PyExc_BaseException)) {
+    type->tp_flags |= Py_TPFLAGS_BASE_EXC_SUBCLASS;
+  }
 }
 
 static int
@@ -198,6 +204,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
     type->tp_getattro = base->tp_getattro;
   }
   if (type->tp_setattr == NULL && type->tp_setattro == NULL) {
+    printf("type %s inherits setattr from base %s\n", type->tp_name, base->tp_name);
     type->tp_setattr = base->tp_setattr;
     type->tp_setattro = base->tp_setattro;
   }
@@ -215,6 +222,14 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
 	}
   {
     COPYSLOT(tp_alloc);
+    if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) ==
+        (base->tp_flags & Py_TPFLAGS_HAVE_GC)) {
+      COPYSLOT(tp_free);
+    } else if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) &&
+        type->tp_free == NULL &&
+        base->tp_free == PyObject_Free) {
+      type->tp_free = PyObject_GC_Del;
+    }
   }
 	return 0;
 }

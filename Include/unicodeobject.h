@@ -613,6 +613,27 @@ unicode_fromformat_write_str(_PyUnicodeWriter *writer, PyObject *str,
   assert(false);
 }
 
+static int
+unicode_fromformat_write_cstr(_PyUnicodeWriter *writer, const char *str,
+    Py_ssize_t width, Py_ssize_t precision) {
+  Py_ssize_t length;
+  PyObject *unicode;
+  int res;
+
+  if (precision == -1) {
+    length = strlen(str);
+  } else {
+    assert(false);
+  }
+  unicode = PyUnicode_DecodeUTF8Stateful(str, length, "replace", NULL);
+  if (unicode == NULL)
+    return -1;
+
+  res = unicode_fromformat_write_str(writer, unicode, width, -1);
+  Py_DECREF(unicode);
+  return res;
+}
+
 static const char*
 unicode_fromformat_arg(_PyUnicodeWriter *writer,
     const char *f, va_list *vargs)
@@ -664,6 +685,13 @@ unicode_fromformat_arg(_PyUnicodeWriter *writer,
     assert(obj && _PyUnicode_CHECK(obj));
 
     if (unicode_fromformat_write_str(writer, obj, width, precision) == -1)
+      return NULL;
+    break;
+  }
+  case 's':
+  {
+    const char *s = va_arg(*vargs, const char *);
+    if (unicode_fromformat_write_cstr(writer, s, width, precision) < 0)
       return NULL;
     break;
   }

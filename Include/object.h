@@ -40,6 +40,7 @@ typedef enum {
 #define Py_TPFLAGS_BYTES_SUBCLASS (1UL << 27)
 #define Py_TPFLAGS_UNICODE_SUBCLASS (1UL << 28)
 #define Py_TPFLAGS_DICT_SUBCLASS (1UL << 29)
+#define Py_TPFLAGS_BASE_EXC_SUBCLASS (1UL << 30)
 #define Py_TPFLAGS_TYPE_SUBCLASS (1UL << 31)
 
 #define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION 0
@@ -331,3 +332,9 @@ PyObject *PyObject_SelfIter(PyObject *obj) {
 }
 
 int PyObject_CallFinalizerFromDealloc(PyObject *self);
+
+static inline int _PyType_CheckExact(PyObject *op) {
+  return Py_IS_TYPE(op, &PyType_Type);
+}
+
+#define PyType_CheckExact(op) _PyType_CheckExact(_PyObject_CAST(op))

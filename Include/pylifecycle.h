@@ -4,6 +4,8 @@
 
 // cpy does not have this header file. Put functions in cpy/Python/pylifecycle.c here
 
+PyStatus _PyExc_Init(PyInterpreterState *interp);
+
 static PyStatus
 pycore_init_types(PyInterpreterState *interp) {
 	PyStatus status;
@@ -14,6 +16,11 @@ pycore_init_types(PyInterpreterState *interp) {
 			return status;
 		}
 	}
+
+  status = _PyExc_Init(interp);
+  if (_PyStatus_EXCEPTION(status)) {
+    return status;
+  }
 	return _PyStatus_OK();
 }
 

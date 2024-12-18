@@ -25,6 +25,8 @@ int _PyLong_Init(PyInterpreterState *interp) {
 PyStatus _PyTypes_InitSlotDefs(void);
 
 extern PyTypeObject PySuper_Type;
+extern PyTypeObject PyStaticMethod_Type;
+extern PyTypeObject PyClassMethod_Type;
 
 // defined in cpy/Objects/object.c
 PyStatus _PyTypes_Init() {
@@ -57,6 +59,8 @@ PyStatus _PyTypes_Init() {
   INIT_TYPE(PyDict_Type);
   INIT_TYPE(PySuper_Type);
   INIT_TYPE(PyFunction_Type);
+  INIT_TYPE(PyStaticMethod_Type);
+  INIT_TYPE(PyClassMethod_Type);
 
 	return _PyStatus_OK();
 

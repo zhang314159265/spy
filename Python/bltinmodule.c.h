@@ -81,6 +81,7 @@ static struct PyModuleDef builtinsmodule = {
 };
 
 extern PyTypeObject PyProperty_Type;
+extern PyTypeObject PyStaticMethod_Type, PyClassMethod_Type;
 
 PyObject *
 _PyBuiltin_Init(PyInterpreterState *interp)
@@ -102,6 +103,8 @@ _PyBuiltin_Init(PyInterpreterState *interp)
 	SETBUILTIN("range", &PyRange_Type);
   SETBUILTIN("tuple", &PyTuple_Type);
   SETBUILTIN("property", &PyProperty_Type);
+  SETBUILTIN("staticmethod", &PyStaticMethod_Type);
+  SETBUILTIN("classmethod", &PyClassMethod_Type);
 
 	return mod;
 #undef ADD_TO_ALL

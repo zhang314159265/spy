@@ -1,6 +1,9 @@
 #pragma once
 
 #include "descrobject.h"
+#include "pyerrors.h"
+
+int PyErr_GivenExceptionMatches(PyObject *err, PyObject *exc);
 
 int _Py_SwappedOp[] = {
   Py_GT,
@@ -10,6 +13,8 @@ int _Py_SwappedOp[] = {
   Py_LT,
   Py_LE,
 };
+
+static inline int set_attribute_error_context(PyObject *v, PyObject *name);
 
 static PyObject *
 do_richcompare(PyThreadState *tstate, PyObject *v, PyObject *w, int op) {
@@ -86,6 +91,7 @@ int PyObject_RichCompareBool(PyObject *v, PyObject *w, int op) {
 
 int
 PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value) {
+  //  printf("PyObject_SetAttr for v of type %s\n", Py_TYPE(v)->tp_name);
   PyTypeObject *tp = Py_TYPE(v);
   int err;
 
@@ -219,9 +225,44 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name) {
     assert(false);
   }
   if (result == NULL) {
-    assert(false);
+    set_attribute_error_context(v, name);
   }
   return result;
+}
+
+int PyErr_ExceptionMatches(PyObject *exc);
+void PyErr_Fetch(PyObject **p_type, PyObject **p_value, PyObject **p_traceback);
+void PyErr_NormalizeException(PyObject **exc, PyObject **val, PyObject **tb);
+void PyErr_Restore(PyObject *type, PyObject *value, PyObject *traceback);
+
+static inline int
+set_attribute_error_context(PyObject *v, PyObject *name)
+{
+  assert(PyErr_Occurred());
+  _Py_IDENTIFIER(name);
+  _Py_IDENTIFIER(obj);
+  if (!PyErr_ExceptionMatches(PyExc_AttributeError)) {
+    return 0;
+  }
+  PyObject *type, *value, *traceback;
+  PyErr_Fetch(&type, &value, &traceback);
+  PyErr_NormalizeException(&type, &value, &traceback);
+  if (!PyErr_GivenExceptionMatches(value, PyExc_AttributeError)) {
+    goto restore;
+  }
+  PyAttributeErrorObject *the_exc = (PyAttributeErrorObject *) value;
+  if (the_exc->name || the_exc->obj) {
+    goto restore;
+  }
+
+  if (_PyObject_SetAttrId(value, &PyId_name, name) ||
+      _PyObject_SetAttrId(value, &PyId_obj, v)) {
+    return 1;
+  }
+
+restore:
+  PyErr_Restore(type, value, traceback);
+  return 0;
 }
 
 PyObject *
@@ -300,7 +341,12 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
 
   if (!suppress) {
     printf("'%s' object has no attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
-    assert(false);
+    PyErr_Format(PyExc_AttributeError,
+      // "'%.50s' object has no attribute '%U'",
+      "'%s' object has no attribute '%U'",
+      tp->tp_name, name);
+
+    set_attribute_error_context(obj, name);
   }
  done:
   Py_XDECREF(descr);
@@ -321,9 +367,11 @@ int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
 
   assert(*method == NULL);
 
+  // printf("Py_TYPE(obj)->tp_getattro %p, type %s, type name %s\n", Py_TYPE(obj)->tp_getattro, Py_TYPE(obj)->tp_name, Py_TYPE(name)->tp_name);
   if (Py_TYPE(obj)->tp_getattro != PyObject_GenericGetAttr
       || !PyUnicode_Check(name)) {
-    assert(false);
+    *method = PyObject_GetAttr(obj, name);
+    return 0;
   }
 
   if (tp->tp_dict == NULL && PyType_Ready(tp) < 0) {

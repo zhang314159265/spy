@@ -20,3 +20,6 @@
 #include "Python/getargs.c.h"
 #include "Objects/funcobject.c.h"
 #include "Objects/descrobject.c.h"
+#include "Objects/exceptions.c.h"
+#include "Python/errors.c.h"
+#include "Objects/classobject.c.h"

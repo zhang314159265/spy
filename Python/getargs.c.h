@@ -6,7 +6,15 @@
 
 #define STATIC_FREELIST_ENTRIES 8
 
+#define IS_END_OF_FORMAT(c) (c == '\0' || c == ';' || c == ':')
+
 typedef struct {
+} freelistentry_t;
+
+typedef struct {
+  freelistentry_t *entries;
+  int first_available;
+  int entries_malloced;
 } freelist_t;
 
 static const char *
@@ -231,4 +239,179 @@ _PyArg_CheckPositional(const char *name, Py_ssize_t nargs,
   }
 
   return 1;
+}
+
+static int
+unpack_stack(PyObject *const *args, Py_ssize_t nargs, const char *name,
+    Py_ssize_t min, Py_ssize_t max, va_list vargs)
+{
+  Py_ssize_t i;
+  PyObject **o;
+
+  if (!_PyArg_CheckPositional(name, nargs, min, max)) {
+    return 0;
+  }
+
+  for (i = 0; i < nargs; i++) {
+    o = va_arg(vargs, PyObject **);
+    *o = args[i];
+  }
+  return 1;
+}
+
+int PyArg_UnpackTuple(PyObject *args, const char *name, Py_ssize_t min, Py_ssize_t max, ...) {
+  PyObject **stack;
+  Py_ssize_t nargs;
+  int retval;
+  va_list vargs;
+
+  if (!PyTuple_Check(args)) {
+    assert(false);
+  }
+  stack = _PyTuple_ITEMS(args);
+  nargs = PyTuple_GET_SIZE(args);
+
+  va_start(vargs, max);
+  retval = unpack_stack(stack, nargs, name, min, max, vargs);
+  va_end(vargs);
+  return retval;
+}
+
+static int
+cleanreturn(int retval, freelist_t *freelist) {
+  if (retval == 0) {
+    // a failure ocurred
+    assert(false);
+  }
+  if (freelist->entries_malloced) {
+    PyMem_Free(freelist->entries);
+  }
+  return retval;
+}
+
+static int
+vgetargskeywords(PyObject *args, PyObject *kwargs, const char *format,
+    char **kwlist, va_list *p_va, int flags) {
+  const char *fname, *custom_msg;
+  int min = INT_MAX;
+  int max = INT_MAX;
+  int i, pos, len;
+  int skip = 0;
+  Py_ssize_t nargs, nkwargs;
+  PyObject *current_arg;
+  freelistentry_t static_entries[STATIC_FREELIST_ENTRIES];
+  freelist_t freelist;
+
+  freelist.entries = static_entries;
+  freelist.first_available = 0;
+  freelist.entries_malloced = 0;
+
+  fname = strchr(format, ':');
+  if (fname) {
+    fname++;
+    custom_msg = NULL;
+  } else {
+    custom_msg = strchr(format, ';');
+    if (custom_msg)
+      custom_msg++;
+  }
+
+  for (pos = 0; kwlist[pos] && !*kwlist[pos]; pos++) {
+  }
+  for (len = pos; kwlist[len]; len++) {
+    if (!*kwlist[len]) {
+      assert(false);
+    }
+  }
+
+  if (len > STATIC_FREELIST_ENTRIES) {
+    assert(false);
+  }
+
+  nargs = PyTuple_GET_SIZE(args);
+  nkwargs = (kwargs == NULL) ? 0 : PyDict_GET_SIZE(kwargs);
+  if (nargs + nkwargs > len) {
+    assert(false);
+  }
+  for (i = 0; i < len; i++) {
+    if (*format == '|') {
+      if (min != INT_MAX) {
+        assert(false);
+      }
+
+      min = i;
+      format++;
+
+      if (max != INT_MAX) {
+        assert(false);
+      }
+    }
+    if (*format == '$') {
+      if (max != INT_MAX) {
+        assert(false);
+      }
+
+      max = i;
+      format++;
+
+      // printf("max %d, pos %d\n", max, pos);
+    
+      if (max < pos) {
+        assert(false);
+      }
+      if (skip) {
+        break;
+      }
+      if (max < nargs) {
+        assert(false);
+      }
+    }
+    if (IS_END_OF_FORMAT(*format)) {
+      assert(false);
+    }
+    if (!skip) {
+      if (i < nargs) {
+        assert(false);
+      } else if (nkwargs && i >= pos) {
+        assert(false);
+      } else {
+        current_arg = NULL;
+      }
+
+      if (current_arg) {
+        assert(false);
+      }
+
+      if (i < min) {
+        assert(false);
+      }
+
+      if (!nkwargs && !skip) {
+        return cleanreturn(1, &freelist);
+      }
+    }
+    assert(false);
+  }
+  assert(false);
+}
+
+int PyArg_ParseTupleAndKeywords(PyObject *args,
+    PyObject *keywords,
+    const char *format,
+    char **kwlist, ...) {
+  int retval;
+  va_list va;
+
+  if ((args == NULL || !PyTuple_Check(args)) ||
+      (keywords != NULL && !PyDict_Check(keywords)) ||
+      format == NULL ||
+      kwlist == NULL)
+  {
+    assert(false);
+  }
+
+  va_start(va, kwlist);
+  retval = vgetargskeywords(args, keywords, format, kwlist, &va, 0);
+  va_end(va);
+  return retval;
 }

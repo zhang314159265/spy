@@ -708,3 +708,19 @@ PyObject_CallOneArg(PyObject *func, PyObject *arg) {
   nargsf = 1 | PY_VECTORCALL_ARGUMENTS_OFFSET;
   return _PyObject_VectorcallTstate(tstate, func, args, nargsf, NULL);
 }
+
+static int
+object_issubclass(PyThreadState *tstate, PyObject *derived, PyObject *cls) {
+  if (PyType_CheckExact(cls)) {
+    if (derived == cls)
+      return 1;
+    assert(false);
+  }
+  assert(false);
+}
+
+int
+PyObject_IsSubclass(PyObject *derived, PyObject *cls) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  return object_issubclass(tstate, derived, cls);
+}

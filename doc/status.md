@@ -9,13 +9,10 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 # Scratch
 
 Quest:
-- properties
-
-Quest:
-- decorators for class
-
-Quest:
 - static/class method
+
+Quest:
+- class decorator (an example is dataclass)
 
 Quest 1:
 - cover import <+++++++++++

@@ -22,4 +22,32 @@ PyObject *PyErr_Occurred(void) {
 	return _PyErr_Occurred(tstate);
 }
 
+extern PyObject *PyExc_AttributeError;
+
+PyObject *PyErr_Format(PyObject *exception, const char *format, ...);
+
+#define PyExceptionClass_Check(x) \
+  (PyType_Check((x)) && \
+    PyType_FastSubclass((PyTypeObject *) (x), Py_TPFLAGS_BASE_EXC_SUBCLASS))
+
+#define PyExceptionInstance_Check(x) \
+  PyType_FastSubclass(Py_TYPE(x), Py_TPFLAGS_BASE_EXC_SUBCLASS)
+
+#define PyExceptionInstance_Class(x) ((PyObject *) Py_TYPE(x))
+
+#define PyException_HEAD PyObject_HEAD PyObject *dict; \
+  PyObject *args; PyObject *traceback; \
+  PyObject *context; PyObject *cause; \
+  char suppress_context;
+
+typedef struct {
+  PyException_HEAD
+} PyBaseExceptionObject;
+
+typedef struct {
+  PyException_HEAD
+  PyObject *obj;
+  PyObject *name;
+} PyAttributeErrorObject;
+
 #endif

@@ -71,6 +71,14 @@ new_threadstate(PyInterpreterState *interp, int init) {
   tstate->frame = NULL;
 
 	tstate->curexc_type = NULL;
+  tstate->curexc_value = NULL;
+  tstate->curexc_traceback = NULL;
+
+  tstate->exc_state.exc_type = NULL;
+  tstate->exc_state.exc_value = NULL;
+  tstate->exc_state.exc_traceback = NULL;
+  tstate->exc_state.previous_item = NULL;
+  tstate->exc_info = &tstate->exc_state;
 
   if (init) {
     _PyThreadState_Init(tstate);

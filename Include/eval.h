@@ -258,7 +258,9 @@ main_loop:
 				SET_TOP(meth);
 				PUSH(obj); // self
 			} else {
-				assert(false);
+        SET_TOP(NULL);
+        Py_DECREF(obj);
+        PUSH(meth);
 			}
 			DISPATCH();
 		}
@@ -832,7 +834,9 @@ main_loop:
 
 			meth = PEEK(oparg + 2);
 			if (meth == NULL) {
-				assert(false);
+        res = call_function(tstate, &sp, oparg, NULL);
+        stack_pointer = sp;
+        (void) POP(); // POP the NULL
 			} else {
 				res = call_function(tstate, &sp, oparg + 1, NULL);
 				stack_pointer = sp;

@@ -126,6 +126,8 @@ struct _typeobject {
   struct PyGetSetDef *tp_getset;
 
   destructor tp_finalize;
+
+  const char *tp_doc;
 };
 
 // The *real* layout of a type object when allocated on the heap
