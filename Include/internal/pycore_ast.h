@@ -206,6 +206,7 @@ enum _stmt_kind {
 	While_kind = 11,
 	If_kind = 12,
 	Expr_kind = 23,
+  Pass_kind = 24,
 	Break_kind = 25,
 };
 

@@ -1,6 +1,11 @@
 #pragma once
 
 #include "descrobject.h"
+typedef struct wrapperbase slotdef;
+#define MAX_EQUIV 10
+static int slotdefs_initialized = 0;
+
+typedef int (*update_callback)(PyTypeObject *, void *);
 
 static int
 type_is_subtype_base_chain(PyTypeObject *a, PyTypeObject *b) {
@@ -123,6 +128,84 @@ type_getattro(PyTypeObject *type, PyObject *name) {
   assert(false);
 }
 
+static int
+is_dunder_name(PyObject *name) {
+  Py_ssize_t length = PyUnicode_GET_LENGTH(name);
+  int kind = PyUnicode_KIND(name);
+  if (length > 4 && kind == PyUnicode_1BYTE_KIND) {
+    const Py_UCS1 *characters = PyUnicode_1BYTE_DATA(name);
+    return (
+      characters[length - 2] == '_' && characters[length - 1] == '_' &&
+      characters[0] == '_' && characters[1] == '_'
+    );
+  }
+  return 0;
+}
+
+static int recurse_down_subclasses(PyTypeObject *type, PyObject *name,
+    update_callback callback, void *data);
+
+static int
+update_subclasses(PyTypeObject *type, PyObject *name,
+    update_callback callback, void *data) {
+  if (callback(type, data) < 0)
+    return -1;
+  return recurse_down_subclasses(type, name, callback, data);
+}
+
+static int recurse_down_subclasses(PyTypeObject *type, PyObject *name,
+    update_callback callback, void *data) {
+  PyObject *subclasses;
+
+  subclasses = type->tp_subclasses;
+  if (subclasses == NULL)
+    return 0;
+  assert(false);
+}
+
+static slotdef *update_one_slot(PyTypeObject *type, slotdef *p);
+
+static int
+update_slots_callback(PyTypeObject *type, void *data) {
+  slotdef **pp = (slotdef **) data;
+
+  for (; *pp; pp++) {
+    update_one_slot(type, *pp);
+  }
+  return 0;
+}
+
+static int update_slot(PyTypeObject *type, PyObject *name);
+
+static int
+type_setattro(PyTypeObject *type, PyObject *name, PyObject *value) {
+  int res;
+  if (type->tp_flags & Py_TPFLAGS_IMMUTABLETYPE) {
+    assert(false);
+  }
+  if (PyUnicode_Check(name)) {
+    if (PyUnicode_CheckExact(name)) {
+      if (PyUnicode_READY(name) == -1)
+        return -1;
+      Py_INCREF(name);
+    } else {
+      assert(false);
+    }
+  } else {
+    Py_INCREF(name);
+  }
+  res = _PyObject_GenericSetAttrWithDict((PyObject *) type, name, value, NULL);
+  if (res == 0) {
+    PyType_Modified(type);
+
+    if (is_dunder_name(name)) {
+      res = update_slot(type, name);
+    }
+  }
+  Py_DECREF(name);
+  return res;
+}
+
 static PyObject *
 type_prepare(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
     PyObject *kwnames) {
@@ -150,10 +233,12 @@ PyTypeObject PyType_Type = {
 	.tp_vectorcall_offset = offsetof(PyTypeObject, tp_vectorcall),
   .tp_getattr = 0,
   .tp_getattro = (getattrofunc) type_getattro,
+  .tp_setattro = (setattrofunc) type_setattro,
   .tp_methods = type_methods,
   .tp_vectorcall = type_vectorcall,
   .tp_new = type_new,
   .tp_init = type_init,
+  .tp_dictoffset = offsetof(PyTypeObject, tp_dict),
 };
 
 typedef struct {
@@ -634,7 +719,6 @@ type_new_set_attrs(const type_new_ctx *ctx, PyTypeObject *type) {
   return 0;
 }
 
-static int slotdefs_initialized = 0;
 
 #define TPSLOT(NAME, SLOT, FUNCTION, WRAPPER, DOC) \
   {NAME, offsetof(PyTypeObject, SLOT), (void *)(FUNCTION), WRAPPER, \
@@ -644,7 +728,6 @@ static int slotdefs_initialized = 0;
   {NAME, offsetof(PyTypeObject, SLOT), (void *)(FUNCTION), WRAPPER, \
     PyDoc_STR(DOC), FLAGS}
 
-typedef struct wrapperbase slotdef;
 PyObject *_PyType_LookupId(PyTypeObject *type, struct _Py_Identifier *name);
 
 static PyObject *
@@ -769,7 +852,6 @@ slotptr(PyTypeObject *type, int ioffset) {
   return (void **) ptr;
 }
 
-#define MAX_EQUIV 10
 
 static void **
 resolve_slotdups(PyTypeObject *type, PyObject *name) {
@@ -1016,6 +1098,7 @@ static PyObject *type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds
 
   type = type_new_impl(&ctx);
   Py_DECREF(ctx.bases);
+  // printf("tp_subclasses is %p\n", ((PyTypeObject *)type)->tp_subclasses);
   return type;
 }
 
@@ -1274,3 +1357,36 @@ static int type_add_getset(PyTypeObject *type) {
   }
   return 0;
 }
+
+static int update_slot(PyTypeObject *type, PyObject *name) {
+  slotdef *ptrs[MAX_EQUIV];
+  slotdef *p;
+  slotdef **pp;
+  int offset;
+
+  assert(PyUnicode_CheckExact(name));
+  assert(slotdefs_initialized);
+
+  pp = ptrs;
+  for (p = slotdefs; p->name; p++) {
+    assert(PyUnicode_CheckExact(p->name_strobj));
+    assert(PyUnicode_CheckExact(name));
+    if (p->name_strobj == name || _PyUnicode_EQ(p->name_strobj, name)) {
+      *pp++ = p;
+    }
+  }
+  *pp = NULL;
+  for (pp = ptrs; *pp; pp++) {
+    p = *pp;
+    offset = p->offset;
+    while (p > slotdefs && (p - 1)->offset == offset)
+      --p;
+    *pp = p;
+  }
+  if (ptrs[0] == NULL)
+    return 0;
+  return update_subclasses(type, name,
+      update_slots_callback, (void *) ptrs);
+}
+
+

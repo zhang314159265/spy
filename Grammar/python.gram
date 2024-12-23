@@ -14,6 +14,7 @@ compound_stmt[stmt_ty]:
   | &('class' | '@') class_def
 
 class_def[stmt_ty]:
+  | a=decorators b=class_def_raw { _PyPegen_class_def_decorators(p, a, b) }
   | class_def_raw
 
 class_def_raw[stmt_ty]:
@@ -83,6 +84,7 @@ simple_stmt[stmt_ty] (memo):
   | 'break' { _PyAST_Break() }
   | &'del' del_stmt
   | &'yield' yield_stmt
+  | 'pass' { _PyAST_Pass() }
 
 yield_stmt[stmt_ty]: y=yield_expr { _PyAST_Expr(y) }
 

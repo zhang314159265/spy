@@ -768,6 +768,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
   case Delete_kind:
     VISIT_SEQ(st, expr, s->v.Delete.targets);
     break;
+  case Pass_kind:
+    break;
   default:
     assert(false);
   }

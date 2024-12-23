@@ -1824,10 +1824,12 @@ compiler_class(struct compiler *c, stmt_ty s) {
 
 	if (!compiler_decorators(c, decos))
 		return 0;
-	
+
+  #if 0
 	if (asdl_seq_LEN(decos)) {
 		assert(false);
 	}
+  #endif
 
 	// 1. compile the class body into a code object
 	if (!compiler_enter_scope(c, s->v.ClassDef.name,
@@ -1888,7 +1890,7 @@ compiler_class(struct compiler *c, stmt_ty s) {
 
   // apply decorators
   for (i = 0; i < asdl_seq_LEN(decos); i++) {
-    assert(false);
+    ADDOP_I(c, CALL_FUNCTION, 1);
   }
 
   if (!compiler_nameop(c, s->v.ClassDef.name, Store))
@@ -1935,6 +1937,9 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 		break;
 	case ClassDef_kind:
 		return compiler_class(c, s);
+  case Pass_kind:
+    ADDOP(c, NOP);
+    break;
 	default:
 		assert(false);
 	}

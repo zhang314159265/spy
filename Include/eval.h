@@ -264,6 +264,9 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(NOP): {
+      DISPATCH();
+    }
     case TARGET(LOAD_DEREF): {
       PyObject *cell = freevars[oparg];
       // printf("LOAD_DEREF cell type %s\n", Py_TYPE(cell)->tp_name);

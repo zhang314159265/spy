@@ -128,6 +128,8 @@ struct _typeobject {
   destructor tp_finalize;
 
   const char *tp_doc;
+
+  PyObject *tp_subclasses;
 };
 
 // The *real* layout of a type object when allocated on the heap

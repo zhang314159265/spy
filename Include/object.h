@@ -15,6 +15,8 @@ typedef enum {
 
 #define Py_TPFLAGS_DISALLOW_INSTANTIATION (1UL << 7)
 
+#define Py_TPFLAGS_IMMUTABLETYPE (1UL << 8)
+
 // Set if the type object is dynamically allocated
 #define Py_TPFLAGS_HEAPTYPE (1UL << 9)
 
@@ -32,6 +34,7 @@ typedef enum {
 #define Py_TPFLAGS_HAVE_GC (1UL << 14)
 #define Py_TPFLAGS_METHOD_DESCRIPTOR (1UL << 17)
 
+#define Py_TPFLAGS_VALID_VERSION_TAG (1UL << 19)
 #define Py_TPFLAGS_IS_ABSTRACT (1UL << 20)
 
 #define Py_TPFLAGS_LONG_SUBCLASS (1UL << 24)

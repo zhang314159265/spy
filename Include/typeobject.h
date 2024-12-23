@@ -590,3 +590,10 @@ static PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds) 
 }
 
 PyObject *PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+void
+PyType_Modified(PyTypeObject *type) {
+  if (!_PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+    return;
+  assert(false);
+}

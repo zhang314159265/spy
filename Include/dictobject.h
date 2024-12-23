@@ -1166,7 +1166,8 @@ dict_keys(PyDictObject *mp) {
   }
   ep = DK_ENTRIES(mp->ma_keys);
   if (mp->ma_values) {
-    assert(false);
+    value_ptr = mp->ma_values;
+    offset = sizeof(PyObject *);
   } else {
     value_ptr = &ep[0].me_value;
     offset = sizeof(PyDictKeyEntry);

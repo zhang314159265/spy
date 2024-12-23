@@ -361,3 +361,13 @@ _PyAST_ClassDef(identifier name, asdl_expr_seq *bases, asdl_keyword_seq *keyword
 	p->v.ClassDef.decorator_list = decorator_list;
 	return p;
 }
+
+stmt_ty
+_PyAST_Pass() {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = Pass_kind;
+  return p;
+}

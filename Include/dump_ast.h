@@ -302,6 +302,9 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		dump_stmt_seq(NULL, stmt->v.ClassDef.body, indent + 2);
 		dump_expr_seq(NULL, stmt->v.ClassDef.decorator_list, indent + 2);
 		break;	
+  case Pass_kind:
+    fprintf(stderr, "Pass\n");
+    break;
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);
 		assert(false && "dump_stmt");

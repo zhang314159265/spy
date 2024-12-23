@@ -677,3 +677,11 @@ _PyPegen_function_def_decorators(Parser *p, asdl_expr_seq *decorators, stmt_ty f
     function_def->v.FunctionDef.returns
   );
 }
+
+stmt_ty
+_PyPegen_class_def_decorators(Parser *p, asdl_expr_seq *decorators, stmt_ty class_def) {
+  assert(class_def != NULL);
+  return _PyAST_ClassDef(
+    class_def->v.ClassDef.name, class_def->v.ClassDef.bases,
+    class_def->v.ClassDef.keywords, class_def->v.ClassDef.body, decorators);
+}
