@@ -119,9 +119,19 @@ builtin_abs(PyObject *module, PyObject *x) {
 static PyObject *
 update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs) {
   Py_ssize_t i;
-  PyObject *new_bases = NULL;
+  PyObject *base, *new_bases = NULL;
+  assert(PyTuple_Check(bases));
 
   for (i = 0; i < nargs; i++) {
+    base = args[i];
+    if (PyType_Check(base)) {
+      if (new_bases) {
+        if (PyList_Append(new_bases, base) < 0) {
+          assert(false);
+        }
+      }
+      continue;
+    }
     assert(false);
   }
   if (!new_bases) {
@@ -173,7 +183,8 @@ static PyObject *builtin___build_class__(PyObject *self, PyObject *const *args, 
     }
     // else get the type of the first base
     else {
-      assert(false);
+      PyObject *base0 = PyTuple_GET_ITEM(bases, 0);
+      meta = (PyObject *) Py_TYPE(base0);
     }
     Py_INCREF(meta);
     isclass = 1;

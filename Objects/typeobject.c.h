@@ -326,10 +326,20 @@ static int type_add_methods(PyTypeObject *type) {
 PyTypeObject *_PyType_CalculateMetaclass(PyTypeObject *metatype, PyObject *bases) {
   Py_ssize_t i, nbases;
   PyTypeObject *winner;
+  PyObject *tmp;
+  PyTypeObject *tmptype;
 
   nbases = PyTuple_GET_SIZE(bases);
   winner = metatype;
   for (i = 0; i < nbases; i++) {
+    tmp = PyTuple_GET_ITEM(bases, i);
+    tmptype = Py_TYPE(tmp);
+    if (PyType_IsSubtype(winner, tmptype))
+      continue;
+    if (PyType_IsSubtype(tmptype, winner)) {
+      winner = tmptype;
+      continue;
+    }
     assert(false);
   }
   return winner;
@@ -366,6 +376,85 @@ typedef struct {
 } type_new_ctx;
 
 static int
+extra_ivars(PyTypeObject *type, PyTypeObject *base) {
+  size_t t_size = type->tp_basicsize;
+  size_t b_size = base->tp_basicsize;
+
+  assert(t_size >= b_size);
+  if (type->tp_itemsize || base->tp_itemsize) {
+    assert(false);
+  }
+  if (type->tp_weaklistoffset && base->tp_weaklistoffset == 0 &&
+      type->tp_weaklistoffset + sizeof(PyObject *) == t_size &&
+      type->tp_flags & Py_TPFLAGS_HEAPTYPE)
+    t_size -= sizeof(PyObject *);
+  if (type->tp_dictoffset && base->tp_dictoffset == 0 &&
+    type->tp_dictoffset + sizeof(PyObject *) == t_size &&
+    type->tp_flags & Py_TPFLAGS_HEAPTYPE)
+    t_size -= sizeof(PyObject *);
+
+  return t_size != b_size;
+}
+
+static PyTypeObject *
+solid_base(PyTypeObject *type) {
+  PyTypeObject *base;
+
+  if (type->tp_base) {
+    base = solid_base(type->tp_base);
+  } else {
+    base = &PyBaseObject_Type;
+  }
+  if (extra_ivars(type, base))
+    return type;
+  else
+    return base;
+}
+
+static PyTypeObject *
+best_base(PyObject *bases) {
+  Py_ssize_t i, n;
+  PyTypeObject *base, *winner, *candidate, *base_i;
+  PyObject *base_proto;
+
+  assert(PyTuple_Check(bases));
+  n = PyTuple_GET_SIZE(bases);
+  assert(n > 0);
+  base = NULL;
+  winner = NULL;
+
+  for (i = 0; i < n; i++) {
+    base_proto = PyTuple_GET_ITEM(bases, i);
+    if (!PyType_Check(base_proto)) {
+      assert(false);
+    }
+    base_i = (PyTypeObject *) base_proto;
+    if (!_PyType_IsReady(base_i)) {
+      if (PyType_Ready(base_i) < 0)
+        return NULL;
+    }
+    if (!_PyType_HasFeature(base_i, Py_TPFLAGS_BASETYPE)) {
+      assert(false);
+    }
+    candidate = solid_base(base_i);
+    if (winner == NULL) {
+      winner = candidate;
+      base = base_i;
+    } else if (PyType_IsSubtype(winner, candidate))
+      ;
+    else if (PyType_IsSubtype(candidate, winner)) {
+      winner = candidate;
+      base = base_i;
+    } else {
+      assert(false);
+    }
+  }
+
+  assert(base != NULL);
+  return base;
+}
+
+static int
 type_new_get_bases(type_new_ctx *ctx, PyObject **type) {
   Py_ssize_t nbases = PyTuple_GET_SIZE(ctx->bases);
   if (nbases == 0) {
@@ -377,7 +466,33 @@ type_new_get_bases(type_new_ctx *ctx, PyObject **type) {
     ctx->bases = new_bases;
     return 0;
   }
-  assert(false);
+
+  for (Py_ssize_t i = 0; i < nbases; i++) {
+    PyObject *base = PyTuple_GET_ITEM(ctx->bases, i);
+    if (PyType_Check(base)) {
+      continue;
+    }
+    assert(false);
+  }
+
+  PyTypeObject *winner;
+  winner = _PyType_CalculateMetaclass(ctx->metatype, ctx->bases);
+  if (winner == NULL) {
+    return -1;
+  }
+
+  if (winner != ctx->metatype) {
+    assert(false);
+  }
+
+  PyTypeObject *base = best_base(ctx->bases);
+  if (base == NULL) {
+    return -1;
+  }
+
+  ctx->base = base;
+  ctx->bases = Py_NewRef(ctx->bases);
+  return 0;
 }
 
 static int
@@ -643,8 +758,12 @@ static void
 type_new_set_slots(const type_new_ctx *ctx, PyTypeObject *type) {
   if (type->tp_weaklistoffset && type->tp_dictoffset) {
     type->tp_getset = subtype_getsets_full;
-  } else {
+  } else if (type->tp_weaklistoffset && !type->tp_dictoffset) {
     assert(false);
+  } else if (!type->tp_weaklistoffset && type->tp_dictoffset) {
+    assert(false);
+  } else {
+    type->tp_getset = NULL;
   }
 
   // special case some slots

@@ -297,7 +297,7 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		break;
 	case ClassDef_kind:
 		fprintf(stderr, "ClassDef: %s\n", (char *) PyUnicode_DATA(stmt->v.ClassDef.name));
-		assert(!stmt->v.ClassDef.bases);
+    dump_expr_seq(NULL, stmt->v.ClassDef.bases, indent + 2);
 		assert(!stmt->v.ClassDef.keywords);
 		dump_stmt_seq(NULL, stmt->v.ClassDef.body, indent + 2);
 		dump_expr_seq(NULL, stmt->v.ClassDef.decorator_list, indent + 2);

@@ -18,9 +18,10 @@ class_def[stmt_ty]:
   | class_def_raw
 
 class_def_raw[stmt_ty]:
-  | 'class' a=NAME ':' c=block  {
+  | 'class' a=NAME b=['(' z=[arguments] ')' { z}] ':' c=block  {
     _PyAST_ClassDef(a->v.Name.id,
-      NULL, NULL,
+      (b) ? ((expr_ty) b)->v.Call.args : NULL,
+      (b) ? ((expr_ty) b)->v.Call.keywords : NULL,
       c, NULL)
   }
 
