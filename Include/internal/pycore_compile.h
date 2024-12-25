@@ -2175,7 +2175,11 @@ assemble_emit(struct assembler *a, struct instr *i) {
 	size = instrsize(arg);
 
 	if (a->a_offset + size >= len / (int) sizeof(_Py_CODEUNIT)) {
-		assert(false);
+    if (len > INT_MAX / 2) {
+      assert(false);
+    }
+    if (_PyBytes_Resize(&a->a_bytecode, len * 2) < 0)
+      return 0;
 	}
 	code = (_Py_CODEUNIT *) PyBytes_AS_STRING(a->a_bytecode) + a->a_offset;
 	a->a_offset += size;

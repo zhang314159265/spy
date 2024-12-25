@@ -150,10 +150,33 @@
 # 
 # test_build_const_key_map()
 
-def test_func_default_kwdefaults():
-    def f(a=3, *, b=5):
-        return a + b
+# def test_func_default_kwdefaults():
+#     def f(a=3, *, b=5):
+#         return a + b
+# 
+#     print(f())
+# 
+# test_func_default_kwdefaults()
 
-    print(f())
+def test_iter():
+    print("Tuple:")
+    l = (3, 5)
+    for v in l:
+        print(v)
 
-test_func_default_kwdefaults()
+    print("List:")
+    l = (3, 5)
+    for v in l:
+        print(v)
+
+    print("Set:")
+    s = {3, 5}
+    for v in s:
+        print(v)
+
+    print("Dict:")
+    d = {3: 1, 5: 2}
+    for v in d:
+        print(v)
+
+test_iter()

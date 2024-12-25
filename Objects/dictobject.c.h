@@ -68,8 +68,79 @@ PyDict_Update(PyObject *a, PyObject *b) {
 	return dict_merge(a, b, 1);
 }
 
+static PyObject *dictiter_new(PyDictObject *dict, PyTypeObject *itertype);
+typedef struct {
+  PyObject_HEAD
+  PyDictObject *di_dict;
+  Py_ssize_t di_used;
+  Py_ssize_t di_pos;
+  PyObject *di_result;
+  Py_ssize_t len;
+} dictiterobject;
+
+static void
+dictiter_dealloc(dictiterobject *di) {
+  Py_XDECREF(di->di_dict);
+  Py_XDECREF(di->di_result);
+  PyObject_GC_Del(di);
+}
+
+static PyObject *
+dictiter_iternextkey(dictiterobject *di) {
+  PyObject *key;
+  Py_ssize_t i;
+  PyDictKeysObject *k;
+  PyDictObject *d = di->di_dict;
+
+  if (d == NULL)
+    return NULL;
+  assert(PyDict_Check(d));
+
+  if (di->di_used != d->ma_used) {
+    assert(false);
+  }
+
+  i = di->di_pos;
+  k = d->ma_keys;
+  assert(i >= 0);
+  if (d->ma_values) {
+    assert(false);
+  } else {
+    Py_ssize_t n = k->dk_nentries;
+    PyDictKeyEntry *entry_ptr = &DK_ENTRIES(k)[i];
+    while (i < n && entry_ptr->me_value == NULL) {
+      entry_ptr++;
+      i++;
+    }
+    if (i >= n)
+      goto fail;
+    key = entry_ptr->me_key;
+  }
+  if (di->len == 0) {
+    assert(false);
+  }
+  di->di_pos = i + 1;
+  di->len--;
+  Py_INCREF(key);
+  return key;
+fail:
+  di->di_dict = NULL;
+  Py_DECREF(d);
+  return NULL;
+}
+
+PyTypeObject PyDictIterKey_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "dict_keyiterator",
+  .tp_basicsize = sizeof(dictiterobject),
+  .tp_dealloc = (destructor) dictiter_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_iter = PyObject_SelfIter,
+  .tp_iternext = (iternextfunc) dictiter_iternextkey,
+};
+
 static PyObject *dict_iter(PyDictObject *dict) {
-	assert(false);
+  return dictiter_new(dict, &PyDictIterKey_Type);
 }
 
 Py_ssize_t
@@ -142,3 +213,29 @@ PyObject *PyDict_Copy(PyObject *o) {
   }
   assert(false);
 }
+
+static PyObject *dictiter_new(PyDictObject *dict, PyTypeObject *itertype) {
+  dictiterobject *di;
+  di = PyObject_GC_New(dictiterobject, itertype);
+  if (di == NULL) {
+    return NULL;
+  }
+  Py_INCREF(dict);
+  di->di_dict = dict;
+  di->di_used = dict->ma_used;
+  di->len = dict->ma_used;
+  if (itertype == &PyDictIterKey_Type) {
+    di->di_pos = 0;
+  } else {
+    assert(false);
+  }
+
+  if (itertype == &PyDictIterKey_Type) {
+    di->di_result = NULL;
+  } else {
+    assert(false);
+  }
+  return (PyObject *) di;
+}
+
+

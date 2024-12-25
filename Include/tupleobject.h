@@ -8,6 +8,12 @@ typedef struct {
 	PyObject *ob_item[1];
 } PyTupleObject;
 
+typedef struct {
+  PyObject_HEAD
+  Py_ssize_t it_index;
+  PyTupleObject *it_seq;
+} tupleiterobject;
+
 static PyTupleObject *tuple_alloc(Py_ssize_t size);
 static inline void tuple_gc_track(PyTupleObject *op);
 
@@ -50,6 +56,7 @@ static PySequenceMethods tuple_as_sequence = {
 };
 
 static PyObject *tuple_new(PyTypeObject *type, PyObject *args, PyObject *kwargs);
+static PyObject *tuple_iter(PyObject *seq);
 
 PyTypeObject PyTuple_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -64,6 +71,7 @@ PyTypeObject PyTuple_Type = {
 	.tp_as_sequence = &tuple_as_sequence,
 	.tp_repr = (reprfunc) tuplerepr,
   .tp_new = tuple_new,
+  .tp_iter = tuple_iter,
 };
 
 static PyTupleObject *
@@ -248,3 +256,58 @@ static PyObject *tuplerepr(PyTupleObject *v) {
 PyObject *PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j);
 
 int _PyTuple_Resize(PyObject **pv, Py_ssize_t newsize);
+
+static PyObject *tupleiter_next(tupleiterobject *it);
+static void tupleiter_dealloc(tupleiterobject *it);
+
+PyTypeObject PyTupleIter_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "tuple_iterator",
+  .tp_basicsize = sizeof(tupleiterobject),
+  .tp_dealloc = (destructor) tupleiter_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_iter = PyObject_SelfIter,
+  .tp_iternext = (iternextfunc) tupleiter_next,
+};
+
+static PyObject *tuple_iter(PyObject *seq) {
+  tupleiterobject *it;
+
+  if (!PyTuple_Check(seq)) {
+    assert(false);
+  }
+  it = PyObject_GC_New(tupleiterobject, &PyTupleIter_Type);
+  if (it == NULL)
+    return NULL;
+  it->it_index = 0;
+  Py_INCREF(seq);
+  it->it_seq = (PyTupleObject *) seq;
+  return (PyObject *) it;
+}
+
+static PyObject *tupleiter_next(tupleiterobject *it) {
+  PyTupleObject *seq;
+  PyObject *item;
+
+  assert(it != NULL);
+  seq = it->it_seq;
+  if (seq == NULL)
+    return NULL;
+  assert(PyTuple_Check(seq));
+
+  if (it->it_index < PyTuple_GET_SIZE(seq)) {
+    item = PyTuple_GET_ITEM(seq, it->it_index);
+    ++it->it_index;
+    Py_INCREF(item);
+    return item;
+  }
+
+  it->it_seq = NULL;
+  Py_DECREF(seq);
+  return NULL;
+}
+
+static void tupleiter_dealloc(tupleiterobject *it) {
+  Py_XDECREF(it->it_seq);
+  PyObject_GC_Del(it);
+}
