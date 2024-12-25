@@ -1140,9 +1140,24 @@ compiler_list(struct compiler *c, expr_ty e) {
 static int
 compiler_subdict(struct compiler *c, expr_ty e, Py_ssize_t begin, Py_ssize_t end) {
 	Py_ssize_t i, n = end - begin;
+  PyObject *keys, *key;
 	int big = n * 2 > STACK_USE_GUIDELINE;
 	if (n > 1 && !big && are_all_items_const(e->v.Dict.keys, begin, end)) {
-		assert(false);
+    for (i = begin; i < end; i++) {
+      VISIT(c, expr, (expr_ty) asdl_seq_GET(e->v.Dict.values, i));
+    }
+    keys = PyTuple_New(n);
+    if (keys == NULL) {
+      return 0;
+    }
+    for (i = begin; i < end; i++) {
+      key = ((expr_ty) asdl_seq_GET(e->v.Dict.keys, i))->v.Constant.value;
+      Py_INCREF(key);
+      PyTuple_SET_ITEM(keys, i - begin, key);
+    }
+    ADDOP_LOAD_CONST_NEW(c, keys);
+    ADDOP_I(c, BUILD_CONST_KEY_MAP, n);
+    return 1;
 	}
 	if (big) {
 		assert(false);

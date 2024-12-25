@@ -264,6 +264,34 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(BUILD_CONST_KEY_MAP): {
+      Py_ssize_t i;
+      PyObject *map;
+      PyObject *keys = TOP();
+      if (!PyTuple_CheckExact(keys) ||
+        PyTuple_GET_SIZE(keys) != (Py_ssize_t) oparg) {
+        assert(false);
+      }
+      map = _PyDict_NewPresized((Py_ssize_t) oparg);
+      if (map == NULL) {
+        goto error;
+      }
+      for (i = oparg; i > 0; i--) {
+        int err;
+        PyObject *key = PyTuple_GET_ITEM(keys, oparg - i);
+        PyObject *value = PEEK(i + 1);
+        err = PyDict_SetItem(map, key, value);
+        if (err != 0) {
+          assert(false);
+        }
+      }
+      Py_DECREF(POP());
+      while (oparg--) {
+        Py_DECREF(POP());
+      }
+      PUSH(map);
+      DISPATCH();
+    }
     case TARGET(NOP): {
       DISPATCH();
     }

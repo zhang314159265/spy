@@ -137,9 +137,15 @@
 # 
 # test_unpack_set()
 
-def test_unpack_dict():
-	a = {3: 4}
-	b = {**a, 5:6}
-	print(b)
+# def test_unpack_dict():
+# 	a = {3: 4}
+# 	b = {**a, 5:6}
+# 	print(b)
+# 
+# test_unpack_dict()
 
-test_unpack_dict()
+def test_build_const_key_map():
+    a = {1: 2, 3: 4}
+    print(a)
+
+test_build_const_key_map()
