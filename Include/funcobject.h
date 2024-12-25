@@ -114,7 +114,6 @@ PyObject *PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject
 	op->vectorcall = _PyFunction_Vectorcall;
 
 	return (PyObject *) op;
-	assert(false);
 }
 
 static int

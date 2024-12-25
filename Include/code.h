@@ -203,6 +203,7 @@ PyCode_NewWithPosOnlyArgs(int argcount,
   co->co_argcount = argcount;
   co->co_posonlyargcount = posonlyargcount;
   co->co_kwonlyargcount = kwonlyargcount;
+  printf("kwonlyargcount is %d\n", kwonlyargcount);
   co->co_nlocals = nlocals;
   co->co_stacksize = stacksize;
   co->co_flags = flags;

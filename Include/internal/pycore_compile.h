@@ -1442,19 +1442,76 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, Py_ssize_t flags,
   return 1;
 }
 
+static int
+compiler_visit_defaults(struct compiler *c, arguments_ty args) {
+  VISIT_SEQ(c, expr, args->defaults);
+  ADDOP_I(c, BUILD_TUPLE, asdl_seq_LEN(args->defaults));
+  return 1;
+}
+
+static int
+compiler_visit_kwonlydefaults(struct compiler *c, asdl_arg_seq *kwonlyargs,
+    asdl_expr_seq *kw_defaults) {
+  int i;
+  PyObject *keys = NULL;
+
+  for (i = 0; i < asdl_seq_LEN(kwonlyargs); i++) {
+    arg_ty arg = asdl_seq_GET(kwonlyargs, i);
+    expr_ty default_ = asdl_seq_GET(kw_defaults, i);
+    if (default_) {
+      PyObject *mangled = _Py_Mangle(c->u->u_private, arg->arg);
+      if (!mangled) {
+        goto error;
+      }
+      if (keys == NULL) {
+        keys = PyList_New(1);
+        if (keys == NULL) {
+          Py_DECREF(mangled);
+          return 0;
+        }
+        PyList_SET_ITEM(keys, 0, mangled);
+      } else {
+        assert(false);
+      }
+      if (!compiler_visit_expr(c, default_)) {
+        goto error;
+      }
+    }
+  }
+  if (keys != NULL) {
+    Py_ssize_t default_count = PyList_GET_SIZE(keys);
+    PyObject *keys_tuple = PyList_AsTuple(keys);
+    Py_DECREF(keys);
+    ADDOP_LOAD_CONST_NEW(c, keys_tuple);
+    ADDOP_I(c, BUILD_CONST_KEY_MAP, default_count);
+    assert(default_count > 0);
+    return 1;
+  } else {
+    return -1;
+  }
+
+error:
+  Py_XDECREF(keys);
+  return 0;
+}
+
 static Py_ssize_t
 compiler_default_arguments(struct compiler *c, arguments_ty args) {
   Py_ssize_t funcflags = 0;
-  #if 0
   if (args->defaults && asdl_seq_LEN(args->defaults) > 0) {
-    assert(false);
+    if (!compiler_visit_defaults(c, args))
+      return -1;
+    funcflags |= 0x01;
   }
-  #endif
-  #if 0
   if (args->kwonlyargs) {
-    assert(false);
+    int res = compiler_visit_kwonlydefaults(c, args->kwonlyargs,
+      args->kw_defaults);
+    if (res == 0) {
+      return -1;
+    } else if (res > 0) {
+      funcflags |= 0x02;
+    }
   }
-  #endif
   return funcflags;
 }
 
@@ -1508,6 +1565,8 @@ compiler_function(struct compiler *c, stmt_ty s, int is_async) {
   }
 
   c->u->u_argcount = asdl_seq_LEN(args->args);
+  c->u->u_posonlyargcount = asdl_seq_LEN(args->posonlyargs);
+  c->u->u_kwonlyargcount = asdl_seq_LEN(args->kwonlyargs);
   for (i = docstring ? 1 : 0; i < asdl_seq_LEN(body); i++) {
     VISIT_IN_SCOPE(c, stmt, (stmt_ty) asdl_seq_GET(body, i));
   }

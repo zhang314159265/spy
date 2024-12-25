@@ -17,12 +17,20 @@ _PyAST_arg(identifier arg, expr_ty annotation, string type_comment) {
 }
 
 arguments_ty
-_PyAST_arguments(asdl_arg_seq *args) {
+_PyAST_arguments(asdl_arg_seq *posonlyargs, asdl_arg_seq *args, arg_ty vararg,
+    asdl_arg_seq *kwonlyargs, asdl_expr_seq *kw_defaults, arg_ty kwarg,
+    asdl_expr_seq *defaults, PyArena *arena) {
 	arguments_ty p;
 	p = (arguments_ty) malloc(sizeof(*p));
 	if (!p)
 		return NULL;
+  p->posonlyargs = posonlyargs;
 	p->args = args;
+  p->vararg = vararg;
+  p->kwonlyargs = kwonlyargs;
+  p->kw_defaults = kw_defaults;
+  p->kwarg = kwarg;
+  p->defaults = defaults;
 	return p;
 }
 

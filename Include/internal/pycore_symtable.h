@@ -678,7 +678,7 @@ symtable_visit_params(struct symtable *st, asdl_arg_seq *args) {
 	
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
 		arg_ty arg = (arg_ty) asdl_seq_GET(args, i);
-		// printf("arg name '%s'\n", (char *) PyUnicode_DATA(arg->arg));
+		printf("arg name '%s'\n", (char *) PyUnicode_DATA(arg->arg));
 		if (!symtable_add_def(st, arg->arg, DEF_PARAM, LOCATION(arg)))
 			return 0;
 	}
@@ -687,8 +687,18 @@ symtable_visit_params(struct symtable *st, asdl_arg_seq *args) {
 
 static int
 symtable_visit_arguments(struct symtable *st, arguments_ty a) {
+	if (a->posonlyargs && !symtable_visit_params(st, a->posonlyargs))
+		return 0;
 	if (a->args && !symtable_visit_params(st, a->args))
 		return 0;
+	if (a->kwonlyargs && !symtable_visit_params(st, a->kwonlyargs))
+		return 0;
+  if (a->vararg) {
+    assert(false);
+  }
+  if (a->kwarg) {
+    assert(false);
+  }
 	return 1;
 }
 

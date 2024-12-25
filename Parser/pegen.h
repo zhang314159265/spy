@@ -58,10 +58,23 @@ typedef struct {
 	int n_keyword_lists;
 } Parser;
 
+static asdl_arg_seq* _get_names(Parser *p, asdl_seq *names_with_defaults);
+
 typedef struct {
 	expr_ty key;
 	expr_ty value;
 } KeyValuePair;
+
+typedef struct {
+  arg_ty arg;
+  expr_ty value;
+} NameDefaultPair;
+
+typedef struct {
+  arg_ty vararg;
+  asdl_seq *kwonlyargs;
+  arg_ty kwarg;
+} StarEtc;
 
 // Generated function in parse.c - function definition in python.gram
 void *_PyPegen_parse(Parser *);
@@ -433,27 +446,149 @@ _make_posargs(Parser *p,
 		asdl_arg_seq *plain_names,
 		asdl_seq *names_with_default,
 		asdl_arg_seq **posargs) {
-	assert(plain_names);
-	assert(!names_with_default);
 
-	*posargs = plain_names;
+  if (plain_names != NULL && names_with_default != NULL) {
+    assert(false);
+  } else if (plain_names == NULL && names_with_default != NULL) {
+    *posargs = _get_names(p, names_with_default);
+  } else if (plain_names != NULL && names_with_default == NULL) {
+	  *posargs = plain_names;
+  } else {
+    *posargs = _Py_asdl_arg_seq_new(0, p->arena);
+  }
+
 	return *posargs == NULL ? -1 : 0;
 }
 
 typedef void *SlashWithDefault;
-typedef void *StarEtc;
+
+static int
+_make_posonlyargs(Parser *p,
+    asdl_arg_seq *slash_without_default,
+    SlashWithDefault *slash_with_default,
+    asdl_arg_seq **posonlyargs) {
+  if (slash_without_default != NULL) {
+    *posonlyargs = slash_without_default;
+  } else if (slash_with_default != NULL) {
+    assert(false);
+  } else {
+    *posonlyargs = _Py_asdl_arg_seq_new(0, p->arena);
+  }
+  return *posonlyargs == NULL ? -1 : 0;
+}
+
+static asdl_expr_seq *
+_get_defaults(Parser *p, asdl_seq *names_with_defaults) {
+  Py_ssize_t len = asdl_seq_LEN(names_with_defaults);
+  asdl_expr_seq *seq = _Py_asdl_expr_seq_new(len, p->arena);
+  if (!seq) {
+    return NULL;
+  }
+  for (Py_ssize_t i = 0; i < len; i++) {
+    NameDefaultPair *pair = asdl_seq_GET_UNTYPED(names_with_defaults, i);
+    asdl_seq_SET(seq, i, pair->value);
+  }
+  return seq;
+}
+
+static int
+_make_posdefaults(Parser *p,
+    SlashWithDefault *slash_with_default,
+    asdl_seq *names_with_default,
+    asdl_expr_seq **posdefaults) {
+  if (slash_with_default != NULL && names_with_default != NULL) {
+    assert(false);
+  } else if (slash_with_default == NULL && names_with_default != NULL) {
+    *posdefaults = _get_defaults(p, names_with_default);
+  } else if (slash_with_default != NULL && names_with_default == NULL) {
+    assert(false);
+  } else {
+    assert(false);
+  }
+  return *posdefaults == NULL ? -1 : 0;
+}
+
+static asdl_arg_seq*
+_get_names(Parser *p, asdl_seq *names_with_defaults) {
+  Py_ssize_t len = asdl_seq_LEN(names_with_defaults);
+  asdl_arg_seq *seq = _Py_asdl_arg_seq_new(len, p->arena);
+  if (!seq) {
+    return NULL;
+  }
+  for (Py_ssize_t i = 0; i < len; i++) {
+    NameDefaultPair *pair = asdl_seq_GET_UNTYPED(names_with_defaults, i);
+    asdl_seq_SET(seq, i, pair->arg);
+  }
+  return seq;
+}
+
+static int
+_make_kwargs(Parser *p, StarEtc *star_etc,
+    asdl_arg_seq **kwonlyargs,
+    asdl_expr_seq **kwdefaults) {
+  if (star_etc != NULL && star_etc->kwonlyargs != NULL) {
+    *kwonlyargs = _get_names(p, star_etc->kwonlyargs);
+  } else {
+    assert(false);
+  }
+
+  if (*kwonlyargs == NULL) {
+    return -1;
+  }
+
+  if (star_etc != NULL && star_etc->kwonlyargs != NULL) {
+    *kwdefaults = _get_defaults(p, star_etc->kwonlyargs);
+  } else {
+    assert(false);
+  }
+
+  if (*kwonlyargs == NULL) {
+    return -1;
+  }
+
+  return 0;
+}
 
 arguments_ty
 _PyPegen_make_arguments(Parser *p, asdl_arg_seq *slash_without_default,
 		SlashWithDefault *slash_with_default, asdl_arg_seq *plain_names,
 		asdl_seq *names_with_default, StarEtc *star_etc) {
-	
+  
+  asdl_arg_seq *posonlyargs;
+  if (_make_posonlyargs(p, slash_without_default, slash_with_default, &posonlyargs) == -1) {
+    return NULL;
+  }
+
 	asdl_arg_seq *posargs;
-	if (_make_posargs(p, plain_names, NULL, &posargs) == -1) {
+	if (_make_posargs(p, plain_names, names_with_default, &posargs) == -1) {
 		assert(false);
 		return NULL;
 	}
-	return _PyAST_arguments(posargs);
+
+  asdl_expr_seq *posdefaults;
+  if (_make_posdefaults(p, slash_with_default, names_with_default, &posdefaults) == -1) {
+    return NULL;
+  }
+
+  arg_ty vararg = NULL;
+  if (star_etc != NULL && star_etc->vararg != NULL) {
+    vararg = star_etc->vararg;
+  }
+
+  asdl_arg_seq *kwonlyargs;
+  asdl_expr_seq *kwdefaults;
+  if (_make_kwargs(p, star_etc, &kwonlyargs, &kwdefaults) == -1) {
+    return NULL;
+  }
+
+  arg_ty kwarg = NULL;
+  if (star_etc != NULL && star_etc->kwarg != NULL) {
+    kwarg = star_etc->kwarg;
+  }
+
+	return _PyAST_arguments(
+    posonlyargs, posargs, vararg, kwonlyargs,
+    kwdefaults, kwarg, posdefaults, p->arena);
 }
 
 static PyObject *
@@ -611,11 +746,41 @@ _PyPegen_get_exprs(Parser *p, asdl_seq *seq) {
 
 arguments_ty
 _PyPegen_empty_arguments(Parser *p) {
+  asdl_arg_seq *posonlyargs = _Py_asdl_arg_seq_new(0, p->arena);
+  if (!posonlyargs) {
+    return NULL;
+  }
+
 	asdl_arg_seq *posargs = _Py_asdl_arg_seq_new(0, p->arena);
 	if (!posargs) {
 		return NULL;
 	}
-	return _PyAST_arguments(posargs);
+
+  asdl_expr_seq *posdefaults = _Py_asdl_expr_seq_new(0, p->arena);
+  if (!posdefaults) {
+    return NULL;
+  }
+
+  asdl_arg_seq *kwonlyargs = _Py_asdl_arg_seq_new(0, p->arena);
+  if (!kwonlyargs) {
+    return NULL;
+  }
+
+  asdl_expr_seq *kwdefaults = _Py_asdl_expr_seq_new(0, p->arena);
+  if (!kwdefaults) {
+    return NULL;
+  }
+
+	return _PyAST_arguments(
+    posonlyargs,
+    posargs,
+    NULL,
+    kwonlyargs,
+    kwdefaults,
+    NULL,
+    posdefaults,
+    p->arena
+  );
 }
 
 asdl_expr_seq *
@@ -684,4 +849,27 @@ _PyPegen_class_def_decorators(Parser *p, asdl_expr_seq *decorators, stmt_ty clas
   return _PyAST_ClassDef(
     class_def->v.ClassDef.name, class_def->v.ClassDef.bases,
     class_def->v.ClassDef.keywords, class_def->v.ClassDef.body, decorators);
+}
+
+StarEtc *
+_PyPegen_star_etc(Parser *p, arg_ty vararg, asdl_seq *kwonlyargs, arg_ty kwarg) {
+  StarEtc *a = malloc(sizeof(StarEtc));
+  if (!a) {
+    return NULL;
+  }
+  a->vararg = vararg;
+  a->kwonlyargs = kwonlyargs;
+  a->kwarg = kwarg;
+  return a;
+}
+
+NameDefaultPair *
+_PyPegen_name_default_pair(Parser *p, arg_ty arg, expr_ty value, Token *tc) {
+  NameDefaultPair *a = malloc(sizeof(NameDefaultPair));
+  if (!a) {
+    return NULL;
+  }
+  a->arg = _PyPegen_add_type_comment_to_arg(p, arg, tc);
+  a->value = value;
+  return a;
 }

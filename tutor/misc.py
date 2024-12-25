@@ -144,8 +144,16 @@
 # 
 # test_unpack_dict()
 
-def test_build_const_key_map():
-    a = {1: 2, 3: 4}
-    print(a)
+# def test_build_const_key_map():
+#     a = {1: 2, 3: 4}
+#     print(a)
+# 
+# test_build_const_key_map()
 
-test_build_const_key_map()
+def test_func_default_kwdefaults():
+    def f(a=3, *, b=5):
+        return a + b
+
+    print(f())
+
+test_func_default_kwdefaults()

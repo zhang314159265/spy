@@ -232,11 +232,29 @@ void dump_expr(expr_ty expr, int indent) {
 }
 
 void dump_arguments_ty(arguments_ty args, int indent) {
-	int l = asdl_seq_LEN(args->args);
+  int l;
+
+  l = asdl_seq_LEN(args->posonlyargs);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "posonly param seq %d/%d: ", i + 1, l);
+		arg_ty arg = (arg_ty) asdl_seq_GET_UNTYPED(args->posonlyargs, i);
+		fprintf(stderr, "%s\n", (char *) PyUnicode_DATA(arg->arg));
+	}
+
+  l = asdl_seq_LEN(args->args);
 	for (int i = 0; i < l; ++i) {
 		_INDENT();
 		fprintf(stderr, "param seq %d/%d: ", i + 1, l);
 		arg_ty arg = (arg_ty) asdl_seq_GET_UNTYPED(args->args, i);
+		fprintf(stderr, "%s\n", (char *) PyUnicode_DATA(arg->arg));
+	}
+
+  l = asdl_seq_LEN(args->kwonlyargs);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "kwonly param seq %d/%d: ", i + 1, l);
+		arg_ty arg = (arg_ty) asdl_seq_GET_UNTYPED(args->kwonlyargs, i);
 		fprintf(stderr, "%s\n", (char *) PyUnicode_DATA(arg->arg));
 	}
 }

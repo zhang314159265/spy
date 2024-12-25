@@ -66,6 +66,22 @@ parameters[arguments_ty]:
   | a[asdl_arg_seq*]=param_no_default+ {
     _PyPegen_make_arguments(p, NULL, NULL, a, NULL, NULL)
   }
+  | a=param_with_default+ b=[star_etc] {
+    _PyPegen_make_arguments(p, NULL, NULL, NULL, a, b)
+  }
+
+star_etc[StarEtc*]:
+  | '*' ',' b=param_maybe_default+ {
+    _PyPegen_star_etc(p, NULL, b, NULL)
+  }
+
+param_with_default[NameDefaultPair*]:
+  | a=param c=default ',' { _PyPegen_name_default_pair(p, a, c, NULL) }
+
+param_maybe_default[NameDefaultPair*]:
+  | a=param c=default? &')' { _PyPegen_name_default_pair(p, a, c, NULL) }
+
+default[expr_ty]: '=' a=expression {a }
 
 param_no_default[arg_ty]:
   | a=param ',' { _PyPegen_add_type_comment_to_arg(p, a, NULL) }

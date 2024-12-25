@@ -116,11 +116,56 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
   }
 
   if (argcount < co->co_argcount) {
-    assert(false);
+    Py_ssize_t defcount = con->fc_defaults == NULL ? 0 : PyTuple_GET_SIZE(con->fc_defaults);
+    Py_ssize_t m = co->co_argcount - defcount;
+    Py_ssize_t missing = 0;
+    for (i = argcount; i < m; i++) {
+      if (GETLOCAL(i) == NULL) {
+        missing++;
+      }
+    }
+    if (missing) {
+      assert(false);
+    }
+    if (n > m)
+      i = n - m;
+    else
+      i = 0;
+    printf("argcount %ld, co->co_argcount %d, defcount %ld\n", argcount, co->co_argcount, defcount);
+    if (defcount) {
+      PyObject **defs = &PyTuple_GET_ITEM(con->fc_defaults, 0);
+      for (; i < defcount; i++) {
+        if (GETLOCAL(m + i) == NULL) {
+          PyObject *def = defs[i];
+          Py_INCREF(def);
+          printf("set local %p\n", def);
+          SETLOCAL(m + i, def);
+        }
+      }
+    }
   }
 
   if (co->co_kwonlyargcount > 0) {
-    assert(false);
+    Py_ssize_t missing = 0;
+    for (i = co->co_argcount; i < total_args; i++) {
+      if (GETLOCAL(i) != NULL)
+        continue;
+      PyObject *varname = PyTuple_GET_ITEM(co->co_varnames, i);
+      if (con->fc_kwdefaults != NULL) {
+        PyObject *def = PyDict_GetItemWithError(con->fc_kwdefaults, varname);
+        if (def) {
+          Py_INCREF(def);
+          SETLOCAL(i, def);
+          continue;
+        } else if (_PyErr_Occurred(tstate)) {
+          assert(false);
+        }
+      }
+      missing++;
+    }
+    if (missing) {
+      assert(false);
+    }
   }
 
   // printf("#cell %ld, #free %ld\n", PyTuple_GET_SIZE(co->co_cellvars), PyTuple_GET_SIZE(co->co_freevars));
@@ -1093,10 +1138,12 @@ main_loop:
 				assert(false);
 			}
 			if (oparg & 0x02) {
-				assert(false);
+        assert(PyDict_CheckExact(TOP()));
+        func->func_kwdefaults = POP();
 			}
 			if (oparg & 0x01) {
-				assert(false);
+        assert(PyTuple_CheckExact(TOP()));
+        func->func_defaults = POP();
 			}
 
 			PUSH((PyObject *) func);

@@ -59,7 +59,13 @@ struct _arg {
 };
 
 struct _arguments {
+  asdl_arg_seq *posonlyargs;
 	asdl_arg_seq *args;
+  arg_ty vararg;
+  asdl_arg_seq *kwonlyargs;
+  asdl_expr_seq *kw_defaults;
+  arg_ty kwarg;
+  asdl_expr_seq *defaults;
 };
 
 typedef struct {
