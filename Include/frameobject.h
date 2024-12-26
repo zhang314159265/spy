@@ -3,6 +3,12 @@
 #include "funcobject.h"
 // #include "pystate.h"
 
+typedef struct {
+  int b_type;
+  int b_handler;
+  int b_level;
+} PyTryBlock;
+
 enum _framestate {
 	FRAME_CREATED = -2,
   FRAME_SUSPENDED = -1,
@@ -27,7 +33,9 @@ struct _frame {
 
 	int f_lasti; // last instruction if called
 	PyFrameState f_state;
-	PyObject *f_localsplus[1]; // locals + stack
+  int f_iblock;
+  PyTryBlock f_blockstack[CO_MAXBLOCKS];
+	PyObject *f_localsplus[1]; // locals + stack, must be the very last field
 };
 
 typedef struct _frame PyFrameObject;
@@ -119,3 +127,6 @@ static inline int _PyFrame_IsExecuting(struct _frame *f) {
 static inline int _PyFrameHasCompleted(struct _frame *f) {
   return f->f_state > FRAME_EXECUTING;
 }
+
+void PyFrame_BlockSetup(PyFrameObject *f, int type, int handler, int level);
+PyTryBlock *PyFrame_BlockPop(PyFrameObject *f);

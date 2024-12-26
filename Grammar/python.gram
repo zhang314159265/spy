@@ -12,6 +12,15 @@ compound_stmt[stmt_ty]:
   | &'for' for_stmt
   | &'while' while_stmt
   | &('class' | '@') class_def
+  | &('with') with_stmt
+
+with_stmt[stmt_ty]:
+  | 'with' a[asdl_withitem_seq*]=','.with_item+ ':' b=block {
+    _PyAST_With(a, b, NULL) 
+  }
+
+with_item[withitem_ty]:
+  | e=expression { _PyAST_withitem(e, NULL)  }
 
 class_def[stmt_ty]:
   | a=decorators b=class_def_raw { _PyPegen_class_def_decorators(p, a, b) }

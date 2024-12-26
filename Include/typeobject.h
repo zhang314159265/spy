@@ -597,3 +597,5 @@ PyType_Modified(PyTypeObject *type) {
     return;
   assert(false);
 }
+
+PyObject *_PyObject_LookupSpecial(PyObject *self, _Py_Identifier *attrid);

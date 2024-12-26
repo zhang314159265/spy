@@ -38,9 +38,28 @@ method_vectorcall(PyObject *method, PyObject *const *args,
     if (totalargs == 0) {
       return _PyObject_VectorcallTstate(tstate, func, &self, 1, NULL);
     }
-    assert(false);
+
+    PyObject *newargs_stack[_PY_FASTCALL_SMALL_STACK];
+    PyObject **newargs;
+
+    if (totalargs <= (Py_ssize_t) Py_ARRAY_LENGTH(newargs_stack) - 1) {
+      newargs = newargs_stack;
+    } else {
+      newargs = PyMem_Malloc((totalargs + 1) * sizeof(PyObject *));
+      if (newargs == NULL) {
+        assert(false);
+      }
+    }
+    newargs[0] = self;
+    assert(args != NULL);
+    memcpy(newargs + 1, args, totalargs * sizeof(PyObject *));
+    result = _PyObject_VectorcallTstate(tstate, func,
+        newargs, nargs + 1, kwnames);
+    if (newargs != newargs_stack) {
+      PyMem_Free(newargs);
+    }
   }
-  assert(false);
+  return result;
 }
 
 PyObject *PyMethod_New(PyObject *func, PyObject *self) {

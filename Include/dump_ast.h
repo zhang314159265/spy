@@ -16,6 +16,17 @@ void dump_stmt_seq(const char *tag, asdl_stmt_seq *stmt_seq, int indent) {
 	}
 }
 
+void dump_withitem_seq(const char *tag, asdl_withitem_seq *seq, int indent) {
+	int l = asdl_seq_LEN(seq);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "%swithitem seq %d/%d\n", tag ? tag : "", i + 1, l);
+    withitem_ty item = (withitem_ty) asdl_seq_GET_UNTYPED(seq, i);
+    dump_expr(item->context_expr, indent + 2);
+    dump_expr(item->optional_vars, indent + 2);
+	}
+}
+
 void dump_expr_seq(const char *tag, asdl_expr_seq *expr_seq, int indent) {
 	int l = asdl_seq_LEN(expr_seq);
 	for (int i = 0; i < l; ++i) {
@@ -322,6 +333,11 @@ void dump_stmt(stmt_ty stmt, int indent) {
 		break;	
   case Pass_kind:
     fprintf(stderr, "Pass\n");
+    break;
+  case With_kind:
+    fprintf(stderr, "With\n");
+    dump_withitem_seq(NULL, stmt->v.With.items, indent + 2);
+    dump_stmt_seq(NULL, stmt->v.With.body, indent + 2);
     break;
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);

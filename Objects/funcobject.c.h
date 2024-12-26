@@ -7,6 +7,15 @@ static PyGetSetDef func_getsetlist[] = {
   {NULL}
 };
 
+static PyObject *
+func_descr_get(PyObject *func, PyObject *obj, PyObject *type) {
+  if (obj == Py_None || obj == NULL) {
+    Py_INCREF(func);
+    return func;
+  }
+  return PyMethod_New(func, obj);
+}
+
 PyTypeObject PyFunction_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "function",
@@ -16,6 +25,7 @@ PyTypeObject PyFunction_Type = {
 	.tp_call = PyVectorcall_Call,
 	.tp_vectorcall_offset = offsetof(PyFunctionObject, vectorcall),
   .tp_getset = func_getsetlist,
+  .tp_descr_get = func_descr_get,
 };
 
 typedef struct {

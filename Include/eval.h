@@ -6,6 +6,7 @@
 #include "sliceobject.h"
 #include "cellobject.h"
 #include "genobject.h"
+#include "typeobject.h"
 
 PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define GETLOCAL(i) (fastlocals[i])
@@ -117,6 +118,7 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 
   if (argcount < co->co_argcount) {
     Py_ssize_t defcount = con->fc_defaults == NULL ? 0 : PyTuple_GET_SIZE(con->fc_defaults);
+    printf("name %s, argcount %ld, co->co_argcount %d, defcount %ld\n", (char*) PyUnicode_DATA(con->fc_name), argcount, co->co_argcount, defcount);
     Py_ssize_t m = co->co_argcount - defcount;
     Py_ssize_t missing = 0;
     for (i = argcount; i < m; i++) {
@@ -131,7 +133,6 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
       i = n - m;
     else
       i = 0;
-    printf("argcount %ld, co->co_argcount %d, defcount %ld\n", argcount, co->co_argcount, defcount);
     if (defcount) {
       PyObject **defs = &PyTuple_GET_ITEM(con->fc_defaults, 0);
       for (; i < defcount; i++) {
@@ -239,6 +240,16 @@ unicode_concatenate(PyThreadState *tstate, PyObject *v, PyObject *w,
   }
   res = v;
   PyUnicode_Append(&res, w);
+  return res;
+}
+
+static PyObject *
+special_lookup(PyThreadState *tstate, PyObject *o, _Py_Identifier *id) {
+  PyObject *res;
+  res = _PyObject_LookupSpecial(o, id);
+  if (res == NULL && !_PyErr_Occurred(tstate)) {
+    assert(false);
+  }
   return res;
 }
 
@@ -1198,6 +1209,36 @@ main_loop:
       PyObject *cell = freevars[oparg];
       Py_INCREF(cell);
       PUSH(cell);
+      DISPATCH();
+    }
+    case TARGET(SETUP_WITH): {
+      _Py_IDENTIFIER(__enter__);
+      _Py_IDENTIFIER(__exit__);
+      PyObject *mgr = TOP();
+      PyObject *enter = special_lookup(tstate, mgr, &PyId___enter__);
+      PyObject *res;
+      if (enter == NULL) {
+        goto error;
+      }
+      PyObject *exit = special_lookup(tstate, mgr, &PyId___exit__);
+      if (exit == NULL) {
+        Py_DECREF(enter);
+        goto error;
+      }
+      SET_TOP(exit);
+      Py_DECREF(mgr);
+      res = _PyObject_CallNoArg(enter);
+      Py_DECREF(enter);
+      if (res == NULL)
+        goto error;
+
+      PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
+          STACK_LEVEL());
+      PUSH(res);
+      DISPATCH();
+    }
+    case TARGET(POP_BLOCK): {
+      PyFrame_BlockPop(f);
       DISPATCH();
     }
 		default:

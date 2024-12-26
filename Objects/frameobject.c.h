@@ -15,7 +15,28 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *l
 	f->f_stackdepth = 0;
   f->f_gen = NULL;
 	f->f_lasti = -1;
+  f->f_iblock = 0;
 	// f_valuestack is already initialized in frame_alloc
 	f->f_state = FRAME_CREATED;
 	return f;
+}
+
+void PyFrame_BlockSetup(PyFrameObject *f, int type, int handler, int level) {
+  PyTryBlock *b;
+  if (f->f_iblock >= CO_MAXBLOCKS) {
+    assert(false);
+  }
+  b = &f->f_blockstack[f->f_iblock++];
+  b->b_type = type;
+  b->b_level = level;
+  b->b_handler = handler;
+}
+
+PyTryBlock *PyFrame_BlockPop(PyFrameObject *f) {
+  PyTryBlock *b;
+  if (f->f_iblock <= 0) {
+    assert(false);
+  }
+  b = &f->f_blockstack[--f->f_iblock];
+  return b;
 }

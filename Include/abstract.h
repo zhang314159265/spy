@@ -724,3 +724,9 @@ PyObject_IsSubclass(PyObject *derived, PyObject *cls) {
   PyThreadState *tstate = _PyThreadState_GET();
   return object_issubclass(tstate, derived, cls);
 }
+
+static inline PyObject *
+_PyObject_CallNoArg(PyObject *func) {
+  PyThreadState *tstate = PyThreadState_Get();
+  return _PyObject_VectorcallTstate(tstate, func, NULL, 0, NULL);
+}

@@ -379,3 +379,30 @@ _PyAST_Pass() {
   p->kind = Pass_kind;
   return p;
 }
+
+stmt_ty
+_PyAST_With(asdl_withitem_seq *items, asdl_stmt_seq *body, string type_comment) {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = With_kind;
+  p->v.With.items = items;
+  p->v.With.body = body;
+  p->v.With.type_comment = type_comment;
+  return p;
+}
+
+withitem_ty
+_PyAST_withitem(expr_ty context_expr, expr_ty optional_vars) {
+  withitem_ty p;
+  if (!context_expr) {
+    assert(false);
+  }
+  p = (withitem_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->context_expr = context_expr;
+  p->optional_vars = optional_vars;
+  return p;
+}

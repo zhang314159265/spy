@@ -503,7 +503,7 @@ _make_posdefaults(Parser *p,
   } else if (slash_with_default != NULL && names_with_default == NULL) {
     assert(false);
   } else {
-    assert(false);
+    *posdefaults = _Py_asdl_expr_seq_new(0, p->arena);
   }
   return *posdefaults == NULL ? -1 : 0;
 }
@@ -529,7 +529,7 @@ _make_kwargs(Parser *p, StarEtc *star_etc,
   if (star_etc != NULL && star_etc->kwonlyargs != NULL) {
     *kwonlyargs = _get_names(p, star_etc->kwonlyargs);
   } else {
-    assert(false);
+    *kwonlyargs = _Py_asdl_arg_seq_new(0, p->arena);
   }
 
   if (*kwonlyargs == NULL) {
@@ -539,7 +539,7 @@ _make_kwargs(Parser *p, StarEtc *star_etc,
   if (star_etc != NULL && star_etc->kwonlyargs != NULL) {
     *kwdefaults = _get_defaults(p, star_etc->kwonlyargs);
   } else {
-    assert(false);
+    *kwdefaults = _Py_asdl_expr_seq_new(0, p->arena);
   }
 
   if (*kwonlyargs == NULL) {

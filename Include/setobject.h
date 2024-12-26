@@ -127,6 +127,82 @@ PyTypeObject PyFrozenSet_Type = {
   .tp_flags = 0,
 };
 
+#define LINEAR_PROBES 9
+
+#define PERTURB_SHIFT 5
+
+
+static void
+set_insert_clean(setentry *table, size_t mask, PyObject *key, Py_hash_t hash) {
+  setentry *entry;
+  size_t perturb = hash;
+  size_t i = (size_t) hash & mask;
+  size_t j;
+
+  while (1) {
+    entry = &table[i];
+    if (entry->key == NULL)
+      goto found_null;
+    if (i + LINEAR_PROBES <= mask) {
+      for (j = 0; j < LINEAR_PROBES; j++) {
+        entry++;
+        if (entry->key == NULL)
+          goto found_null;
+      }
+    }
+    perturb >>= PERTURB_SHIFT;
+    i = (i * 5 + 1 + perturb) & mask;
+  }
+found_null:
+  entry->key = key;
+  entry->hash = hash;
+}
+
+static int
+set_table_resize(PySetObject *so, Py_ssize_t minused) {
+  setentry *oldtable, *newtable, *entry;
+  Py_ssize_t oldmask = so->mask;
+  size_t newmask;
+  int is_oldtable_malloced;
+
+  assert(minused >= 0);
+  size_t newsize = PySet_MINSIZE;
+  while (newsize <= (size_t) minused) {
+    newsize <<= 1;
+  }
+
+  oldtable = so->table;
+  assert(oldtable != NULL);
+  is_oldtable_malloced = oldtable != so->smalltable;
+
+  if (newsize == PySet_MINSIZE) {
+    assert(false);
+  } else {
+    newtable = PyMem_New(setentry, newsize);
+    if (newtable == NULL) {
+      assert(false);
+    }
+  }
+  assert(newtable != oldtable);
+  memset(newtable, 0, sizeof(setentry) * newsize);
+  so->mask = newsize - 1;
+  so->table = newtable;
+
+  newmask = (size_t) so->mask;
+  if (so->fill == so->used) {
+    for (entry = oldtable; entry <= oldtable + oldmask; entry++) {
+      if (entry->key != NULL) {
+        set_insert_clean(newtable, newmask, entry->key, entry->hash);
+      }
+    }
+  } else {
+    assert(false);
+  }
+  if (is_oldtable_malloced)
+    PyMem_Free(oldtable);
+  return 0;
+}
+
 static int set_add_entry(PySetObject *so, PyObject *key, Py_hash_t hash);
 
 static int
@@ -147,7 +223,8 @@ set_merge(PySetObject *so, PyObject *otherset) {
 	
 	// printf("so used %ld, other used %ld\n", so->used, other->used);
 	if ((so->fill + other->used) * 5 >= so->mask * 3) {
-		assert(false);
+    if (set_table_resize(so, (so->used + other->used) * 2) != 0)
+      return -1;
 	}
 
 	so_entry = so->table;
@@ -231,10 +308,6 @@ make_new_set(PyTypeObject *type, PyObject *iterable) {
 PyObject *PySet_New(PyObject *iterable) {
 	return make_new_set(&PySet_Type, iterable);
 }
-
-#define LINEAR_PROBES 9
-
-#define PERTURB_SHIFT 5
 
 static setentry *
 set_lookkey(PySetObject *so, PyObject *key, Py_hash_t hash) {

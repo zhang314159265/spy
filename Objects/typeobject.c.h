@@ -532,8 +532,81 @@ type_new_slots(type_new_ctx *ctx, PyObject *dict) {
 }
 
 static void
-subtype_dealloc(PyObject *self) {
+clear_slots(PyTypeObject *type, PyObject *self) {
   assert(false);
+}
+
+static void
+subtype_dealloc(PyObject *self) {
+  PyTypeObject *type, *base;
+  destructor basedealloc;
+  int has_finalizer;
+
+  type = Py_TYPE(self);
+  assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
+
+  if (!_PyType_IS_GC(type)) {
+    assert(false);
+  }
+
+  base = type;
+  while ((base->tp_dealloc) == subtype_dealloc) {
+    base = base->tp_base;
+    assert(base);
+  }
+
+  // has_finalizer = type->tp_finalize || type->tp_del;
+  has_finalizer = type->tp_finalize || false;
+
+  if (type->tp_finalize) {
+    assert(false);
+  }
+
+  if (type->tp_weaklistoffset && !base->tp_weaklistoffset) {
+    // PyObject_ClearWeakRefs(self);
+    // TODO clear weak refs as cpy
+  }
+
+  #if 0
+  if (type->tp_del) {
+    assert(false);
+  }
+  #endif
+
+  if (has_finalizer) {
+    assert(false);
+  }
+
+  base = type;
+  while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
+    if (Py_SIZE(base))
+      clear_slots(base, self);
+    base = base->tp_base;
+    assert(base);
+  }
+
+  if (type->tp_dictoffset && !base->tp_dictoffset) {
+    PyObject **dictptr = _PyObject_GetDictPtr(self);
+    if (dictptr != NULL) {
+      PyObject *dict = *dictptr;
+      if (dict != NULL) {
+        Py_DECREF(dict);
+        *dictptr = NULL;
+      }
+    }
+  }
+
+  type = Py_TYPE(self);
+
+  int type_needs_decref = (type->tp_flags & Py_TPFLAGS_HEAPTYPE
+    && !(base->tp_flags & Py_TPFLAGS_HEAPTYPE));
+
+  assert(basedealloc);
+  basedealloc(self);;
+
+  if (type_needs_decref) {
+    Py_DECREF(type);
+  }
 }
 
 static int subtype_traverse(PyObject *self, visitproc visit, void *arg) {
@@ -1086,7 +1159,11 @@ _PyObject_LookupSpecial(PyObject *self, _Py_Identifier *attrid) {
 
   res = _PyType_LookupId(Py_TYPE(self), attrid);
   if (res != NULL) {
-    assert(false);
+    descrgetfunc f;
+    if ((f = Py_TYPE(res)->tp_descr_get) == NULL)
+      Py_INCREF(res);
+    else
+      res = f(res, self, (PyObject *) (Py_TYPE(self)));
   }
   return res;
 }

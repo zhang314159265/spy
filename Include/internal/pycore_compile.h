@@ -127,6 +127,7 @@ typedef struct basicblock_ {
 enum fblocktype {
   WHILE_LOOP,
   FOR_LOOP,
+  WITH,
 };
 
 struct fblockinfo {
@@ -1973,6 +1974,83 @@ compiler_class(struct compiler *c, stmt_ty s) {
 }
 
 static int
+compiler_call_exit_with_nones(struct compiler *c) {
+  ADDOP_LOAD_CONST(c, Py_None);
+  ADDOP(c, DUP_TOP);
+  ADDOP(c, DUP_TOP);
+  ADDOP_I(c, CALL_FUNCTION, 3);
+  return 1;
+}
+
+static int
+compiler_with_except_finish(struct compiler *c) {
+  basicblock *exit;
+  exit = compiler_new_block(c);
+  if (exit == NULL)
+    return 0;
+  ADDOP_JUMP(c, POP_JUMP_IF_TRUE, exit);
+  NEXT_BLOCK(c);
+  ADDOP_I(c, RERAISE, 1);
+  compiler_use_next_block(c, exit);
+  ADDOP(c, POP_TOP);
+  ADDOP(c, POP_TOP);
+  ADDOP(c, POP_TOP);
+  ADDOP(c, POP_EXCEPT);
+  ADDOP(c, POP_TOP);
+  return 1;
+}
+
+static int
+compiler_with(struct compiler *c, stmt_ty s, int pos) {
+  basicblock *block, *final, *exit;
+  withitem_ty item = asdl_seq_GET(s->v.With.items, pos);
+
+  assert(s->kind == With_kind);
+
+  block = compiler_new_block(c);
+  final = compiler_new_block(c);
+  exit = compiler_new_block(c);
+  if (!block || !final || !exit)
+    return 0;
+
+  VISIT(c, expr, item->context_expr);
+  ADDOP_JUMP(c, SETUP_WITH, final);
+
+  compiler_use_next_block(c, block);
+  if (!compiler_push_fblock(c, WITH, block, final, s)) {
+    return 0;
+  }
+
+  if (item->optional_vars) {
+    VISIT(c, expr, item->optional_vars);
+  } else {
+    ADDOP(c, POP_TOP);
+  }
+
+  pos++;
+  if (pos == asdl_seq_LEN(s->v.With.items))
+    VISIT_SEQ(c, stmt, s->v.With.body)
+  else if (!compiler_with(c, s, pos))
+    return 0;
+
+  ADDOP(c, POP_BLOCK);
+  compiler_pop_fblock(c, WITH, block);
+
+  if (!compiler_call_exit_with_nones(c))
+    return 0;
+
+  ADDOP(c, POP_TOP);
+  ADDOP_JUMP(c, JUMP_FORWARD, exit);
+
+  compiler_use_next_block(c, final);
+  ADDOP(c, WITH_EXCEPT_START);
+  compiler_with_except_finish(c);
+
+  compiler_use_next_block(c, exit);
+  return 1;
+}
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
 
@@ -2014,6 +2092,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
   case Pass_kind:
     ADDOP(c, NOP);
     break;
+  case With_kind:
+    return compiler_with(c, s, 0);
 	default:
 		assert(false);
 	}

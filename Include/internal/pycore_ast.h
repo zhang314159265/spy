@@ -13,6 +13,18 @@ typedef struct {
 
 typedef struct _arg *arg_ty;
 
+struct _withitem {
+  expr_ty context_expr;
+  expr_ty optional_vars;
+};
+
+typedef struct _withitem *withitem_ty;
+typedef struct {
+  _ASDL_SEQ_HEAD
+  withitem_ty typed_elements[1];
+} asdl_withitem_seq;
+
+
 typedef struct {
 	_ASDL_SEQ_HEAD
 	arg_ty typed_elements[1];
@@ -211,6 +223,7 @@ enum _stmt_kind {
 	For_kind = 9,
 	While_kind = 11,
 	If_kind = 12,
+  With_kind = 13,
 	Expr_kind = 23,
   Pass_kind = 24,
 	Break_kind = 25,
@@ -219,6 +232,11 @@ enum _stmt_kind {
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+    struct {
+      asdl_withitem_seq *items;
+      asdl_stmt_seq *body;
+      string type_comment;
+    } With;
 		struct {
 			identifier name;
 			asdl_expr_seq *bases;

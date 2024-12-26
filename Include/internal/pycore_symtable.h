@@ -703,6 +703,15 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a) {
 }
 
 static int
+symtable_visit_withitem(struct symtable *st, withitem_ty item) {
+  VISIT(st, expr, item->context_expr);
+  if (item->optional_vars) {
+    VISIT(st, expr, item->optional_vars);
+  }
+  return 1;
+}
+
+static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s) {
   switch (s->kind) {
 	case FunctionDef_kind:
@@ -779,6 +788,10 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
     VISIT_SEQ(st, expr, s->v.Delete.targets);
     break;
   case Pass_kind:
+    break;
+  case With_kind:
+    VISIT_SEQ(st, withitem, s->v.With.items);
+    VISIT_SEQ(st, stmt, s->v.With.body);
     break;
   default:
     assert(false);
