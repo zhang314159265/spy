@@ -158,25 +158,32 @@
 # 
 # test_func_default_kwdefaults()
 
-def test_iter():
-    print("Tuple:")
-    l = (3, 5)
-    for v in l:
-        print(v)
+# def test_iter():
+#     print("Tuple:")
+#     l = (3, 5)
+#     for v in l:
+#         print(v)
+# 
+#     print("List:")
+#     l = (3, 5)
+#     for v in l:
+#         print(v)
+# 
+#     print("Set:")
+#     s = {3, 5}
+#     for v in s:
+#         print(v)
+# 
+#     print("Dict:")
+#     d = {3: 1, 5: 2}
+#     for v in d:
+#         print(v)
+# 
+# test_iter()
 
-    print("List:")
-    l = (3, 5)
-    for v in l:
-        print(v)
-
-    print("Set:")
-    s = {3, 5}
-    for v in s:
-        print(v)
-
-    print("Dict:")
-    d = {3: 1, 5: 2}
-    for v in d:
-        print(v)
-
-test_iter()
+def test_str_add():
+    a = "hello"
+    b = " world"
+    print(a + b)
+ 
+test_str_add()

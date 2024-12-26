@@ -230,6 +230,18 @@ void debug_eval(int opcode, int oparg, PyObject *top) {
   }
 }
 
+static PyObject *
+unicode_concatenate(PyThreadState *tstate, PyObject *v, PyObject *w,
+    PyFrameObject *f, const _Py_CODEUNIT *next_instr) {
+  PyObject *res;
+  if (Py_REFCNT(v) == 2) {
+    assert(false);
+  }
+  res = v;
+  PyUnicode_Append(&res, w);
+  return res;
+}
+
 PyObject *
 _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag) {
 	PyObject **stack_pointer;
@@ -1033,7 +1045,7 @@ main_loop:
 			PyObject *left = TOP();
 			PyObject *sum;
 			if (PyUnicode_CheckExact(left) && PyUnicode_CheckExact(right)) {
-				assert(false);
+        sum = unicode_concatenate(tstate, left, right, f, next_instr);
 			} else {
 				sum = PyNumber_Add(left, right);
 				Py_DECREF(left);

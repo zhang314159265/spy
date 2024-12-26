@@ -777,3 +777,5 @@ int PyUnicode_Compare(PyObject *left, PyObject *right) {
   }
   assert(false);
 }
+
+void PyUnicode_Append(PyObject **p_left, PyObject *right);

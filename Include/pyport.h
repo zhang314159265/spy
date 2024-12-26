@@ -31,4 +31,6 @@ typedef size_t Py_uhash_t;
 #endif
 #endif
 
+#define PY_SSIZE_T_MAX ((Py_ssize_t)(((size_t) -1) >> 1))
+
 #endif

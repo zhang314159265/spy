@@ -157,3 +157,69 @@ int
 _PyUnicode_EqualToASCIIId(PyObject *left, _Py_Identifier *right) {
   assert(false);
 }
+
+static int
+unicode_modifiable(PyObject *unicode) {
+  assert(_PyUnicode_CHECK(unicode));
+  if (Py_REFCNT(unicode) != 1)
+    return 0;
+  assert(false);
+}
+
+void PyUnicode_Append(PyObject **p_left, PyObject *right) {
+  PyObject *left, *res;
+  Py_UCS4 maxchar, maxchar2;
+  Py_ssize_t left_len, right_len, new_len;
+
+  if (p_left == NULL) {
+    assert(false);
+  }
+  left = *p_left;
+  if (right == NULL || left == NULL
+      || !PyUnicode_Check(left) || !PyUnicode_Check(right)) {
+    assert(false);
+  }
+
+  if (PyUnicode_READY(left) == -1)
+    goto error;
+  if (PyUnicode_READY(right) == -1)
+    goto error;
+
+  PyObject *empty = unicode_get_empty();
+  if (left == empty) {
+    assert(false);
+  }
+  if (right == empty) {
+    return;
+  }
+
+  left_len = PyUnicode_GET_LENGTH(left);
+  right_len = PyUnicode_GET_LENGTH(right);
+  if (left_len > PY_SSIZE_T_MAX - right_len) {
+    assert(false);
+  }
+
+  new_len = left_len + right_len;
+  if (unicode_modifiable(left)
+      && PyUnicode_CheckExact(right)
+      && PyUnicode_KIND(right) <= PyUnicode_KIND(left)
+      && !(PyUnicode_IS_ASCII(left) && !PyUnicode_IS_ASCII(right)))
+  {
+    assert(false);
+  } else {
+    maxchar = PyUnicode_MAX_CHAR_VALUE(left);
+    maxchar2 = PyUnicode_MAX_CHAR_VALUE(right);
+    maxchar = Py_MAX(maxchar, maxchar2);
+
+    res = PyUnicode_New(new_len, maxchar);
+    if (res == NULL)
+      goto error;
+    _PyUnicode_FastCopyCharacters(res, 0, left, 0, left_len);
+    _PyUnicode_FastCopyCharacters(res, left_len, right, 0, right_len);
+    Py_DECREF(left);
+    *p_left = res;
+  }
+  return;
+error:
+  Py_CLEAR(*p_left);
+}
