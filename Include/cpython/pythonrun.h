@@ -3,6 +3,7 @@
 #include "internal/pycore_compile.h"
 #include "dump_ast.h"
 #include "eval.h"
+#include "compile.h"
 
 static PyObject *
 run_eval_code_obj(PyThreadState *tstate, PyCodeObject *co, PyObject *globals, PyObject *locals) {
@@ -43,3 +44,30 @@ PyObject *pyrun_file(FILE *fp, PyObject *globals, PyObject *locals) {
 	}
 	return ret;
 }
+
+
+// defined in cpy/Python/pythonrun.c
+const char *
+_Py_SourceAsString(PyObject *cmd, const char *funcname, const char *what, PyCompilerFlags *cf, PyObject **cmd_copy) {
+  const char *str;
+  Py_ssize_t size;
+
+  *cmd_copy = NULL;
+  if (PyUnicode_Check(cmd)) {
+    fail(0);
+  } else if (PyBytes_Check(cmd)) {
+    str = PyBytes_AS_STRING(cmd);
+    size = PyBytes_GET_SIZE(cmd);
+  } else {
+    fail(0);
+  }
+
+  if (strlen(str) != (size_t) size) {
+    fail("source code string cannot contains null bytes");
+  }
+  return str;
+}
+
+PyObject * Py_CompileStringObject(const char *str, PyObject *filename, int start, PyCompilerFlags *flags, int optimize);
+
+

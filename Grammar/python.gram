@@ -12,7 +12,20 @@ compound_stmt[stmt_ty]:
   | &'for' for_stmt
   | &'while' while_stmt
   | &('class' | '@') class_def
+  | &'try' try_stmt
   | &('with') with_stmt
+
+try_stmt[stmt_ty]:
+  | 'try' &&':' b=block ex[asdl_excepthandler_seq*]=except_block+ el=[else_block] f=[finally_block] { _PyAST_Try(b, ex, el, f) }
+
+except_block[excepthandler_ty]:
+  | 'except' ':' b=block { _PyAST_ExceptHandler(NULL, NULL, b) }
+  | 'except' e=expression t=['as' z=NAME { z}] ':' b=block {
+    _PyAST_ExceptHandler(e, (t) ? ((expr_ty) t)->v.Name.id : NULL, b)
+  }
+
+finally_block[asdl_stmt_seq*]:
+  | 'finally' &&':' a=block {a }
 
 with_stmt[stmt_ty]:
   | 'with' a[asdl_withitem_seq*]=','.with_item+ ':' b=block {
@@ -72,17 +85,22 @@ params[arguments_ty]:
   | parameters
 
 parameters[arguments_ty]:
-  | a[asdl_arg_seq*]=param_no_default+ {
-    _PyPegen_make_arguments(p, NULL, NULL, a, NULL, NULL)
+  | a[asdl_arg_seq*]=param_no_default+ b=param_with_default* c=[star_etc] {
+    _PyPegen_make_arguments(p, NULL, NULL, a, b, c)
   }
   | a=param_with_default+ b=[star_etc] {
     _PyPegen_make_arguments(p, NULL, NULL, NULL, a, b)
   }
+  | a=star_etc { _PyPegen_make_arguments(p, NULL, NULL, NULL, NULL, a) }
 
 star_etc[StarEtc*]:
+  | '*' a=param_no_default b=param_maybe_default* c=[kwds] {
+    _PyPegen_star_etc(p, a, b, c) }
   | '*' ',' b=param_maybe_default+ {
     _PyPegen_star_etc(p, NULL, b, NULL)
   }
+
+kwds[arg_ty]: '**' a=param_no_default { a }
 
 param_with_default[NameDefaultPair*]:
   | a=param c=default ',' { _PyPegen_name_default_pair(p, a, c, NULL) }
@@ -111,6 +129,33 @@ simple_stmt[stmt_ty] (memo):
   | &'del' del_stmt
   | &'yield' yield_stmt
   | 'pass' { _PyAST_Pass() }
+  | &('import' | 'from') import_stmt
+  | &'raise' raise_stmt
+
+raise_stmt[stmt_ty]:
+  | 'raise' a=expression b=['from' z=expression {z}] {_PyAST_Raise(a, b) }
+
+import_stmt[stmt_ty]: import_from
+
+import_from[stmt_ty]:
+  | 'from' a=('.' | '...')* b=dotted_name 'import' c=import_from_targets {
+    _PyAST_ImportFrom(b->v.Name.id, c, _PyPegen_seq_count_dots(a))
+  }
+
+dotted_name[expr_ty]:
+  | a=dotted_name '.' b=NAME { (assert(false), NULL) }
+  | NAME
+
+import_from_targets[asdl_alias_seq*]:
+  | import_from_as_names !','
+
+import_from_as_names[asdl_alias_seq*]:
+  | a[asdl_alias_seq*]=','.import_from_as_name+ {a}
+
+import_from_as_name[alias_ty]:
+  | a=NAME b=['as' z=NAME {z}] { 
+    _PyAST_alias(a->v.Name.id,
+      (b) ? ((expr_ty) b)->v.Name.id : NULL) }
 
 yield_stmt[stmt_ty]: y=yield_expr { _PyAST_Expr(y) }
 
@@ -123,6 +168,8 @@ del_stmt[stmt_ty]:
 del_targets[asdl_expr_seq*]: a[asdl_expr_seq*]=','.del_target+ [','] { a}
 
 del_target[expr_ty] (memo):
+  | a=t_primary '.' b=NAME !t_lookahead { _PyAST_Attribute(a, b->v.Name.id, Del) }
+  | a=t_primary '[' b=slices ']' !t_lookahead { _PyAST_Subscript(a, b, Del) }
   | del_t_atom
 
 del_t_atom[expr_ty]:
@@ -284,9 +331,28 @@ primary[expr_ty]:
   | a=primary '[' b=slices ']' { _PyAST_Subscript(a, b, Load) }
   | atom
 
-arguments[expr_ty]: a[asdl_expr_seq*]=','.expression+ {
-    _PyPegen_collect_call_seqs(p, a, NULL);
+arguments[expr_ty] (memo):
+  | a=args [','] &')' { a }
+
+starred_expression[expr_ty]:
+  | '*' a=expression { _PyAST_Starred(a, Load) }
+
+args[expr_ty]:
+  | a[asdl_expr_seq*]=','.(starred_expression | (expression !':=') !'=')+ b=[',' k=kwargs {k}] {
+    _PyPegen_collect_call_seqs(p, a, b);
   }
+
+kwargs[asdl_seq*]:
+  | ','.kwarg_or_starred+
+  | ','.kwarg_or_double_starred+
+
+kwarg_or_starred[KeywordOrStarred*]:
+  | a=NAME '=' b=expression {
+    _PyPegen_keyword_or_starred(p, CHECK(keyword_ty, _PyAST_keyword(a->v.Name.id, b)), 1)
+  }
+
+kwarg_or_double_starred[KeywordOrStarred*]:
+  | '**' a=expression { _PyPegen_keyword_or_starred(p, CHECK(keyword_ty, _PyAST_keyword(NULL, a)), 1) }
 
 atom[expr_ty]:
   | NAME

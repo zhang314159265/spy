@@ -38,6 +38,8 @@ PyInterpreterState *PyInterpreterState_New() {
   _PyRuntimeState *runtime = &_PyRuntime;
   interp->runtime = runtime;
 
+  PyConfig_InitPythonConfig(&interp->config);
+
 	interp->eval_frame = _PyEval_EvalFrameDefault;
 
 	struct pyinterpreters *interpreters = &runtime->interpreters;
@@ -80,6 +82,8 @@ new_threadstate(PyInterpreterState *interp, int init) {
   tstate->exc_state.previous_item = NULL;
   tstate->exc_info = &tstate->exc_state;
 
+  tstate->c_tracefunc = NULL;
+
   if (init) {
     _PyThreadState_Init(tstate);
   }
@@ -110,3 +114,21 @@ _PyThreadState_Swap(struct _gilstate_runtime_state *gilstate, PyThreadState *new
 PyThreadState *PyThreadState_Swap(PyThreadState *newts) {
   return _PyThreadState_Swap(&_PyRuntime.gilstate, newts);
 }
+
+const PyConfig *
+_PyInterpreterState_GetConfig(PyInterpreterState *interp) {
+  return &interp->config;
+}
+
+const PyConfig *
+_Py_GetConfig(void) {
+  // assert(PyGILState_Check()); // TODO follow cpy
+  PyThreadState *tstate = _PyThreadState_GET();
+  return _PyInterpreterState_GetConfig(tstate->interp);
+}
+
+struct PyModuleDef;
+
+int
+_PyState_AddModule(PyThreadState *tstate, PyObject *module, struct PyModuleDef *def);
+

@@ -6,3 +6,5 @@ a.out.dSYM/
 
 # skip generated file
 Parser/parser.c
+
+__pycache__/

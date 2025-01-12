@@ -341,3 +341,40 @@ static inline int _PyType_CheckExact(PyObject *op) {
 }
 
 #define PyType_CheckExact(op) _PyType_CheckExact(_PyObject_CAST(op))
+
+int PyObject_GenericSetDict(PyObject *obj, PyObject *value, void *context);
+
+#define PyType_SUPPORTS_WEAKREFS(t) ((t)->tp_weaklistoffset > 0)
+
+static inline PyObject **
+_PyObject_GET_WEAKREFS_LISTPTR(PyObject *op) {
+  Py_ssize_t offset = Py_TYPE(op)->tp_weaklistoffset;
+  return (PyObject **) ((char *) op + offset);
+}
+
+PyObject *
+PyObject_GetAttrString(PyObject *v, const char *name);
+
+void PyErr_Fetch(PyObject **p_type, PyObject **p_value, PyObject **p_traceback);
+void PyErr_Restore(PyObject *type, PyObject *value, PyObject *traceback);
+
+typedef struct {
+  int slot;
+  void *pfunc;
+} PyType_Slot;
+
+typedef struct {
+  const char *name;
+  int basicsize;
+  int itemsize;
+  unsigned int flags;
+  PyType_Slot *slots;
+} PyType_Spec;
+
+PyObject *PyType_FromSpec(PyType_Spec*);
+
+PyObject *PyObject_Bytes(PyObject *v);
+
+int PyObject_HasAttr(PyObject *v, PyObject *name);
+
+int PyObject_CallFinalizerFromDealloc(PyObject *self);

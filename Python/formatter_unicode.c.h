@@ -1,5 +1,17 @@
 #pragma once
 
+int _PyUnicode_FormatAdvancedWriter(_PyUnicodeWriter *writer, PyObject *obj, PyObject *format_spec, Py_ssize_t start, Py_ssize_t end) {
+  assert(PyUnicode_Check(obj));
+
+  if (start == end) {
+    if (PyUnicode_CheckExact(obj))
+      return _PyUnicodeWriter_WriteStr(writer, obj);
+    else
+      fail(0);
+  }
+  fail(0);
+}
+
 int _PyLong_FormatAdvancedWriter(_PyUnicodeWriter *writer,
 		PyObject *obj,
 		PyObject *format_spec,

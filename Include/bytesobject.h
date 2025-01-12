@@ -6,11 +6,14 @@
 #include "objimpl.h"
 #include "internal/pycore_object.h"
 
+int PyObject_GetBuffer(PyObject *obj, Py_buffer *view, int flags);
+
 #define PyBytesObject_SIZE (offsetof(PyBytesObject, ob_sval) + 1)
 
 #define PyBytes_Check(op) \
 	PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_BYTES_SUBCLASS)
 
+extern PyTypeObject PyBytes_Type;
 #define PyBytes_CheckExact(op) Py_IS_TYPE(op, &PyBytes_Type)
 
 #define PyBytes_GET_SIZE(op) (assert(PyBytes_Check(op)), Py_SIZE(op))
@@ -19,16 +22,24 @@
 		(((PyBytesObject *)(op))->ob_sval))
 
 static Py_hash_t bytes_hash(PyBytesObject *a);
+static PyObject *bytes_concat(PyObject *a, PyObject *b);
 
-// defined in cpy/Objects/bytesobject.c
-PyTypeObject PyBytes_Type = {
-	PyVarObject_HEAD_INIT(&PyType_Type, 0)
-	.tp_name = "bytes",
-  .tp_basicsize = PyBytesObject_SIZE,
-	.tp_flags = Py_TPFLAGS_BYTES_SUBCLASS,
-	.tp_hash = (hashfunc) bytes_hash,
-	.tp_free = PyObject_Del,
+static PySequenceMethods bytes_as_sequence = {
+  .sq_concat = (binaryfunc) bytes_concat,
 };
+
+int PyBuffer_FillInfo(Py_buffer *view, PyObject *obj, void *buf, Py_ssize_t len, int readonly, int flags);
+
+static int
+bytes_buffer_getbuffer(PyBytesObject *self, Py_buffer *view, int flags) {
+  return PyBuffer_FillInfo(view, (PyObject *) self, (void *) self->ob_sval, Py_SIZE(self), 1, flags);
+}
+
+static PyBufferProcs bytes_as_buffer = {
+  .bf_getbuffer = (getbufferproc) bytes_buffer_getbuffer,
+};
+
+extern PyTypeObject PyBytes_Type;
 
 static PyObject *
 _PyBytes_FromSize(Py_ssize_t size, int use_calloc) {

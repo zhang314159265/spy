@@ -7,6 +7,9 @@
 
 #define STACK_USE_GUIDELINE 30
 
+struct compiler;
+static int compiler_addop_load_const(struct compiler *c, PyObject *o);
+
 // defined in cpy/Python/compile.c
 // privateobj can be the class name
 PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
@@ -70,8 +73,18 @@ PyObject *_Py_Mangle(PyObject *privateobj, PyObject *ident) {
 		return 0; \
 }
 
+#define ADDOP_NOLINE(C, OP) { \
+  if (!compiler_addop_noline((C), (OP))) \
+    return 0; \
+}
+
 #define ADDOP_JUMP(C, OP, O) { \
   if (!compiler_addop_j((C), (OP), (O))) \
+    return 0; \
+}
+
+#define ADDOP_JUMP_NOLINE(C, OP, O) { \
+  if (!compiler_addop_j_noline((C), (OP), (O))) \
     return 0; \
 }
 
@@ -127,7 +140,12 @@ typedef struct basicblock_ {
 enum fblocktype {
   WHILE_LOOP,
   FOR_LOOP,
+  TRY_EXCEPT,
+  FINALLY_TRY,
+  FINALLY_END,
   WITH,
+  HANDLER_CLEANUP,
+  EXCEPTION_HANDLER,
 };
 
 struct fblockinfo {
@@ -263,6 +281,8 @@ astfold_stmt(stmt_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
 	case ClassDef_kind:
     // TODO follow cpy
 		break;
+  case ImportFrom_kind:
+    break;
 	default:
 		fprintf(stderr, "stmt kind %d\n", node_->kind);
 		assert(false);
@@ -586,6 +606,12 @@ static int compiler_visit_stmt(struct compiler *c, stmt_ty s);
 
 static int compiler_visit_expr(struct compiler *c, expr_ty e);
 
+static int
+compiler_visit_keyword(struct compiler *c, keyword_ty k) {
+  VISIT(c, expr, k->value);
+  return 1;
+}
+
 // shared code between compiler_call and compiler_class
 static int
 compiler_call_helper(struct compiler *c,
@@ -593,11 +619,25 @@ compiler_call_helper(struct compiler *c,
 		asdl_expr_seq *args,
 		asdl_keyword_seq *keywords)
 {
-	Py_ssize_t i, nelts, nkwelts;
+	Py_ssize_t i, nseen, nelts, nkwelts;
 
 	nelts = asdl_seq_LEN(args);
 	nkwelts = asdl_seq_LEN(keywords);
 	// printf("nelts %ld, nkwelts %ld\n", nelts, nkwelts);
+
+  for (i = 0; i < nelts; i++) {
+    expr_ty elt = asdl_seq_GET(args, i);
+    if (elt->kind == Starred_kind) {
+      goto ex_call;
+    }
+  }
+
+  for (i = 0; i < nkwelts; i++) {
+    keyword_ty kw = asdl_seq_GET(keywords, i);
+    if (kw->arg == NULL) {
+      goto ex_call;
+    }
+  }
 
 	// No * or ** args, so can use faster calling sequence
 	for (i = 0; i < nelts; i++) {
@@ -606,12 +646,60 @@ compiler_call_helper(struct compiler *c,
 		VISIT(c, expr, elt);
 	}
 	if (nkwelts) {
-		assert(false);
+    PyObject *names;
+    VISIT_SEQ(c, keyword, keywords);
+    names = PyTuple_New(nkwelts);
+    if (names == NULL) {
+      return 0;
+    }
+    for (i = 0; i < nkwelts; i++) {
+      keyword_ty kw = asdl_seq_GET(keywords, i);
+      Py_INCREF(kw->arg);
+      PyTuple_SET_ITEM(names, i, kw->arg);
+    }
+    ADDOP_LOAD_CONST_NEW(c, names);
+    ADDOP_I(c, CALL_FUNCTION_KW, n + nelts + nkwelts);
+    return 1;
 	} else {
 		ADDOP_I(c, CALL_FUNCTION, n + nelts);
 		return 1;
 	}
-	assert(false);
+
+ex_call:
+  if (n == 0 && nelts == 1 && ((expr_ty) asdl_seq_GET(args, 0))->kind == Starred_kind) {
+    VISIT(c, expr, ((expr_ty) asdl_seq_GET(args, 0))->v.Starred.value); 
+  } else {
+    fail(0);
+  }
+
+  if (nkwelts) {
+    int have_dict = 0;
+
+    nseen = 0;
+
+    for (i = 0; i < nkwelts; i++) {
+      keyword_ty kw = asdl_seq_GET(keywords, i);
+      if (kw->arg == NULL) {
+        if (nseen) {
+          fail(0);
+        }
+        if (!have_dict) {
+          ADDOP_I(c, BUILD_MAP, 0);
+          have_dict = 1;
+        }
+        VISIT(c, expr, kw->value);
+        ADDOP_I(c, DICT_MERGE, 1);
+      } else {
+        nseen++;
+      }
+    }
+    if (nseen) {
+      fail(0);
+    }
+    assert(have_dict);
+  }
+  ADDOP_I(c, CALL_FUNCTION_EX, nkwelts > 0);
+  return 1;
 }
 
 // Return 1 if the method call was optimized, -1 if not and 0 on error
@@ -728,6 +816,11 @@ static int add_jump_to_block(basicblock *b, int opcode, int lineno, basicblock *
 }
 
 static int
+compiler_addop_j_noline(struct compiler *c, int opcode, basicblock *b) {
+  return add_jump_to_block(c->u->u_curblock, opcode, -1, b);
+}
+
+static int
 compiler_addop_j(struct compiler *c, int opcode, basicblock *b) {
   return add_jump_to_block(c->u->u_curblock, opcode, c->u->u_lineno, b);
 }
@@ -735,6 +828,11 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b) {
 static int
 compiler_addop(struct compiler *c, int opcode) {
 	return compiler_addop_line(c, opcode, c->u->u_lineno);
+}
+
+static int
+compiler_addop_noline(struct compiler *c, int opcode) {
+  return compiler_addop_line(c, opcode, -1);
 }
 
 // Add an opcode with an integer argument.
@@ -1231,8 +1329,7 @@ compiler_subscript(struct compiler *c, expr_ty e) {
   switch (ctx) {
   case Load: op = BINARY_SUBSCR; break;
   case Store: op = STORE_SUBSCR; break;
-  default:
-    assert(false);
+  case Del: op = DELETE_SUBSCR; break;
   }
   assert(op);
   VISIT(c, expr, e->v.Subscript.value);
@@ -2051,6 +2148,200 @@ compiler_with(struct compiler *c, stmt_ty s, int pos) {
 }
 
 static int
+compiler_from_import(struct compiler *c, stmt_ty s) {
+  Py_ssize_t i, n = asdl_seq_LEN(s->v.ImportFrom.names);
+  PyObject *names;
+  static PyObject *empty_string;
+
+  if (!empty_string) {
+    empty_string = PyUnicode_FromString("");
+    if (!empty_string)
+      return 0;
+  }
+
+  ADDOP_LOAD_CONST_NEW(c, PyLong_FromLong(s->v.ImportFrom.level));
+
+  names = PyTuple_New(n);
+  if (!names)
+    return 0;
+
+  for (i = 0; i < n; i++) {
+    alias_ty alias = (alias_ty) asdl_seq_GET(s->v.ImportFrom.names, i);
+    Py_INCREF(alias->name);
+    PyTuple_SET_ITEM(names, i, alias->name);
+  }
+
+  ADDOP_LOAD_CONST_NEW(c, names);
+
+  if (s->v.ImportFrom.module) {
+    ADDOP_NAME(c, IMPORT_NAME, s->v.ImportFrom.module, names);
+  } else {
+    assert(false);
+  }
+  for (i = 0; i < n; i++) {
+    alias_ty alias = (alias_ty) asdl_seq_GET(s->v.ImportFrom.names, i);
+    identifier store_name;
+
+    if (i == 0 && PyUnicode_READ_CHAR(alias->name, 0) == '*') {
+      assert(false);
+    }
+
+    ADDOP_NAME(c, IMPORT_FROM, alias->name, names);
+    store_name = alias->name;
+    if (alias->asname)
+      store_name = alias->asname;
+
+    if (!compiler_nameop(c, store_name, Store)) {
+      return 0;
+    }
+  }
+  ADDOP(c, POP_TOP);
+  return 1;
+}
+
+static int
+compiler_try_except(struct compiler *c, stmt_ty s) {
+  basicblock *body, *orelse, *except, *end;
+  Py_ssize_t i, n;
+
+  body = compiler_new_block(c);
+  except = compiler_new_block(c);
+  orelse = compiler_new_block(c);
+  end = compiler_new_block(c);
+  if (body == NULL || except == NULL || orelse == NULL || end == NULL)
+    return 0;
+  ADDOP_JUMP(c, SETUP_FINALLY, except);
+  compiler_use_next_block(c, body);
+  if (!compiler_push_fblock(c, TRY_EXCEPT, body, NULL, NULL))
+    return 0;
+  VISIT_SEQ(c, stmt, s->v.Try.body);
+  compiler_pop_fblock(c, TRY_EXCEPT, body);
+  ADDOP_NOLINE(c, POP_BLOCK);
+  ADDOP_JUMP_NOLINE(c, JUMP_FORWARD, orelse);
+  n = asdl_seq_LEN(s->v.Try.handlers);
+  compiler_use_next_block(c, except);
+  if (!compiler_push_fblock(c, EXCEPTION_HANDLER, NULL, NULL, NULL))
+    return 0;
+  for (i = 0; i < n; i++) {
+    excepthandler_ty handler = (excepthandler_ty) asdl_seq_GET(
+        s->v.Try.handlers, i);
+    if (!handler->v.ExceptHandler.type && i < n - 1)
+      fail("default 'except:' must be last");
+    except = compiler_new_block(c);
+    if (except == NULL)
+      return 0;
+    if (handler->v.ExceptHandler.type) {
+      ADDOP(c, DUP_TOP);
+      VISIT(c, expr, handler->v.ExceptHandler.type);
+      ADDOP_JUMP(c, JUMP_IF_NOT_EXC_MATCH, except);
+      NEXT_BLOCK(c);
+    }
+    ADDOP(c, POP_TOP);
+    if (handler->v.ExceptHandler.name) {
+      basicblock *cleanup_end, *cleanup_body;
+
+      cleanup_end = compiler_new_block(c);
+      cleanup_body = compiler_new_block(c);
+      if (cleanup_end == NULL || cleanup_body == NULL) {
+        return 0;
+      }
+
+      compiler_nameop(c, handler->v.ExceptHandler.name, Store);
+      ADDOP(c, POP_TOP);
+
+      ADDOP_JUMP(c, SETUP_FINALLY, cleanup_end);
+      compiler_use_next_block(c, cleanup_body);
+      if (!compiler_push_fblock(c, HANDLER_CLEANUP, cleanup_body, NULL, handler->v.ExceptHandler.name))
+        return 0;
+
+      VISIT_SEQ(c, stmt, handler->v.ExceptHandler.body);
+      compiler_pop_fblock(c, HANDLER_CLEANUP, cleanup_body);
+      ADDOP(c, POP_BLOCK);
+      ADDOP(c, POP_EXCEPT);
+      ADDOP_LOAD_CONST(c, Py_None);
+      compiler_nameop(c, handler->v.ExceptHandler.name, Store);
+      compiler_nameop(c, handler->v.ExceptHandler.name, Del);
+      ADDOP_JUMP(c, JUMP_FORWARD, end);
+
+      compiler_use_next_block(c, cleanup_end);
+
+      ADDOP_LOAD_CONST(c, Py_None);
+      compiler_nameop(c, handler->v.ExceptHandler.name, Store);
+      compiler_nameop(c, handler->v.ExceptHandler.name, Del);
+
+      ADDOP_I(c, RERAISE, 1);
+    } else {
+      basicblock *cleanup_body;
+
+      cleanup_body = compiler_new_block(c);
+      if (!cleanup_body)
+        return 0;
+
+      ADDOP(c, POP_TOP);
+      ADDOP(c, POP_TOP);
+      compiler_use_next_block(c, cleanup_body);
+      if (!compiler_push_fblock(c, HANDLER_CLEANUP, cleanup_body, NULL, NULL))
+        return 0;
+      VISIT_SEQ(c, stmt, handler->v.ExceptHandler.body);
+      compiler_pop_fblock(c, HANDLER_CLEANUP, cleanup_body);
+      ADDOP(c, POP_EXCEPT);
+      ADDOP_JUMP(c, JUMP_FORWARD, end);
+    }
+    compiler_use_next_block(c, except);
+  }
+  compiler_pop_fblock(c, EXCEPTION_HANDLER, NULL);
+  ADDOP_I(c, RERAISE, 0);
+  compiler_use_next_block(c, orelse);
+  VISIT_SEQ(c, stmt, s->v.Try.orelse);
+  compiler_use_next_block(c, end);
+  return 1;
+}
+
+static int
+compiler_try_finally(struct compiler *c, stmt_ty s) {
+  basicblock *body, *end, *exit;
+  
+  body = compiler_new_block(c);
+  end = compiler_new_block(c);
+  exit = compiler_new_block(c);
+  if (body == NULL || end == NULL || exit == NULL)
+    return 0;
+
+  // try block
+  ADDOP_JUMP(c, SETUP_FINALLY, end);
+  compiler_use_next_block(c, body);
+  if (!compiler_push_fblock(c, FINALLY_TRY, body, end, s->v.Try.finalbody))
+    return 0;
+  if (s->v.Try.handlers && asdl_seq_LEN(s->v.Try.handlers)) {
+    if (!compiler_try_except(c, s))
+      return 0;
+  } else {
+    VISIT_SEQ(c, stmt, s->v.Try.body);
+  }
+  ADDOP_NOLINE(c, POP_BLOCK);
+  compiler_pop_fblock(c, FINALLY_TRY, body);
+  VISIT_SEQ(c, stmt, s->v.Try.finalbody);
+  ADDOP_JUMP_NOLINE(c, JUMP_FORWARD, exit);
+  compiler_use_next_block(c, end);
+  if (!compiler_push_fblock(c, FINALLY_END, end, NULL, NULL))
+    return 0;
+  VISIT_SEQ(c, stmt, s->v.Try.finalbody);
+  compiler_pop_fblock(c, FINALLY_END, end);
+  ADDOP_I(c, RERAISE, 0);
+  compiler_use_next_block(c, exit);
+  return 1;
+}
+
+static int
+compiler_try(struct compiler *c, stmt_ty s) {
+  if (s->v.Try.finalbody && asdl_seq_LEN(s->v.Try.finalbody)) {
+    return compiler_try_finally(c, s);
+  } else {
+    return compiler_try_except(c, s);
+  }
+}
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
 
@@ -2094,6 +2385,23 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s) {
     break;
   case With_kind:
     return compiler_with(c, s, 0);
+  case ImportFrom_kind:
+    return compiler_from_import(c, s);
+  case Try_kind:
+    return compiler_try(c, s);
+  case Raise_kind:
+    n = 0;
+    if (s->v.Raise.exc) {
+      VISIT(c, expr, s->v.Raise.exc);
+      n++;
+      if (s->v.Raise.cause) {
+        VISIT(c, expr, s->v.Raise.cause);
+        n++;
+      }
+    }
+    ADDOP_I(c, RAISE_VARARGS, (int) n);
+    NEXT_BLOCK(c);
+    break;
 	default:
 		assert(false);
 	}
@@ -2323,6 +2631,10 @@ compute_code_flags(struct compiler *c) {
     if (ste->ste_generator && !ste->ste_coroutine) {
       flags |= CO_GENERATOR;
     }
+    if (ste->ste_varargs)
+      flags |= CO_VARARGS;
+    if (ste->ste_varkeywords)
+      flags |= CO_VARKEYWORDS;
   }
   return flags;
 }

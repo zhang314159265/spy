@@ -16,6 +16,7 @@ PyTypeObject PyBool_Type = {
 	.tp_name = "bool",
 	.tp_basicsize = sizeof(struct _longobject),
   .tp_repr = bool_repr,
+  .tp_base = &PyLong_Type,
 };
 
 struct _longobject _Py_FalseStruct = {

@@ -6,6 +6,7 @@
 
 void dump_expr(expr_ty expr, int indent);
 void dump_stmt(stmt_ty stmt, int indent);
+void dump_alias(alias_ty alias, int indent);
 
 void dump_stmt_seq(const char *tag, asdl_stmt_seq *stmt_seq, int indent) {
 	int l = asdl_seq_LEN(stmt_seq);
@@ -33,6 +34,25 @@ void dump_expr_seq(const char *tag, asdl_expr_seq *expr_seq, int indent) {
 		_INDENT();
 		fprintf(stderr, "%sexpr seq %d/%d\n", tag ? tag : "", i + 1, l);
 		dump_expr(asdl_seq_GET_UNTYPED(expr_seq, i), indent + 2);
+	}
+}
+
+void dump_exception_handler(excepthandler_ty ex_handler, int indent);
+void dump_excepthandler_seq(const char *tag, asdl_excepthandler_seq *ex_seq, int indent) {
+  int l = asdl_seq_LEN(ex_seq);
+  for (int i = 0; i < l; ++i) {
+    _INDENT();
+    fprintf(stderr, "%sex handler seq %d/%d\n", tag ? tag : "", i + 1, l);
+    dump_exception_handler(asdl_seq_GET_UNTYPED(ex_seq, i), indent + 2); 
+  }
+}
+
+void dump_alias_seq(const char *tag, asdl_alias_seq *alias_seq, int indent) {
+	int l = asdl_seq_LEN(alias_seq);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "%salias seq %d/%d\n", tag ? tag : "", i + 1, l);
+		dump_alias(asdl_seq_GET_UNTYPED(alias_seq, i), indent + 2);
 	}
 }
 
@@ -68,10 +88,14 @@ void dump_cmpop_seq(asdl_int_seq *cmpop_seq, int indent) {
 }
 
 void dump_identifier(identifier id, int indent) {
+	_INDENT();
+  if (!id) {
+    fprintf(stderr, "NULL Identifier\n");
+    return;  
+  }
 	assert(PyUnicode_Check(id));
 	assert(PyUnicode_KIND(id) == PyUnicode_1BYTE_KIND);
 	const char *data = PyUnicode_DATA(id);
-	_INDENT();
 	fprintf(stderr, "id[%s]\n", data);
 }
 
@@ -86,8 +110,16 @@ void dump_expr_context(expr_context_ty ctx, int indent) {
 	}
 }
 
-void dump_keyword_seq(asdl_keyword_seq *keyword_seq, int indent) {
-	assert(!keyword_seq);
+void dump_keyword_seq(const char *tag, asdl_keyword_seq *keyword_seq, int indent) {
+  int l = asdl_seq_LEN(keyword_seq);
+	for (int i = 0; i < l; ++i) {
+		_INDENT();
+		fprintf(stderr, "%skeywod seq %d/%d\n", tag ? tag : "", i + 1, l);
+
+    keyword_ty kw = asdl_seq_GET_UNTYPED(keyword_seq, i);
+    dump_identifier(kw->arg, indent + 2);
+    dump_expr(kw->value, indent + 2);
+	}
 }
 
 void dump_operator_ty(operator_ty op, int indent) {
@@ -138,6 +170,15 @@ void dump_unaryop_ty(unaryop_ty op, int indent) {
 	}
 }
 
+void dump_exception_handler(excepthandler_ty ex_handler, int indent) {
+  _INDENT();
+  fprintf(stderr, "Except handler\n");
+
+  dump_expr(ex_handler->v.ExceptHandler.type, indent + 2);
+  dump_identifier(ex_handler->v.ExceptHandler.name, indent + 2);
+  dump_stmt_seq(NULL, ex_handler->v.ExceptHandler.body, indent + 2);
+}
+
 void dump_expr(expr_ty expr, int indent) {
 	_INDENT();
 	if (!expr) {
@@ -154,7 +195,7 @@ void dump_expr(expr_ty expr, int indent) {
 		fprintf(stderr, "Call:\n");	
 		dump_expr(expr->v.Call.func, indent + 2);
 		dump_expr_seq(NULL, expr->v.Call.args, indent + 2);
-		dump_keyword_seq(expr->v.Call.keywords, indent + 2);
+		dump_keyword_seq(NULL, expr->v.Call.keywords, indent + 2);
 		break;
 	case Constant_kind: {
 		PyObject *o = expr->v.Constant.value;
@@ -268,7 +309,22 @@ void dump_arguments_ty(arguments_ty args, int indent) {
 		arg_ty arg = (arg_ty) asdl_seq_GET_UNTYPED(args->kwonlyargs, i);
 		fprintf(stderr, "%s\n", (char *) PyUnicode_DATA(arg->arg));
 	}
+
+  if (args->vararg) {
+    _INDENT();
+    fprintf(stderr, "vararg %s\n", (char *) PyUnicode_DATA(args->vararg->arg));
+  }
+  if (args->kwarg) {
+    _INDENT();
+    fprintf(stderr, "kwarg %s\n", (char *) PyUnicode_DATA(args->kwarg->arg));
+  }
 }
+
+void dump_alias(alias_ty alias, int indent) {
+  _INDENT();
+  fprintf(stderr, "%s as %s\n", (char*) PyUnicode_DATA(alias->name), alias->asname ? (char *) PyUnicode_DATA(alias->asname) : "ITSELF");
+}
+
 
 void dump_stmt(stmt_ty stmt, int indent) {
 	_INDENT();
@@ -338,6 +394,22 @@ void dump_stmt(stmt_ty stmt, int indent) {
     fprintf(stderr, "With\n");
     dump_withitem_seq(NULL, stmt->v.With.items, indent + 2);
     dump_stmt_seq(NULL, stmt->v.With.body, indent + 2);
+    break;
+  case ImportFrom_kind:
+    fprintf(stderr, "ImportFrom %s %d\n", (char *) PyUnicode_DATA(stmt->v.ImportFrom.module), stmt->v.ImportFrom.level);
+    dump_alias_seq(NULL, stmt->v.ImportFrom.names, indent + 2);
+    break;
+  case Try_kind:
+    fprintf(stderr, "Try\n");
+    dump_stmt_seq(NULL, stmt->v.Try.body, indent + 2);
+    dump_excepthandler_seq(NULL, stmt->v.Try.handlers, indent + 2);
+    dump_stmt_seq(NULL, stmt->v.Try.orelse, indent + 2);
+    dump_stmt_seq(NULL, stmt->v.Try.finalbody, indent + 2);
+    break;
+  case Raise_kind:
+    fprintf(stderr, "Raise\n");
+    dump_expr(stmt->v.Raise.exc, indent + 2);
+    dump_expr(stmt->v.Raise.cause, indent + 2);
     break;
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);

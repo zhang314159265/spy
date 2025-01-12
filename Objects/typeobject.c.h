@@ -1,5 +1,8 @@
 #pragma once
 
+#include "typeslots.h"
+#include "cellobject.h"
+
 #include "descrobject.h"
 typedef struct wrapperbase slotdef;
 #define MAX_EQUIV 10
@@ -75,7 +78,9 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds) {
   if (type->tp_init != NULL) {
     int res = type->tp_init(obj, args, kwds);
     if (res < 0) {
-      assert(false);
+      assert(_PyErr_Occurred(tstate));
+      Py_DECREF(obj);
+      obj = NULL;
     } else {
       assert(!_PyErr_Occurred(tstate));
     }
@@ -125,7 +130,18 @@ type_getattro(PyTypeObject *type, PyObject *name) {
     }
     return attribute;
   }
-  assert(false);
+  if (meta_get != NULL) {
+    fail(0);
+  }
+
+  if (meta_attribute != NULL) {
+    return meta_attribute;
+  }
+
+  PyErr_Format(PyExc_AttributeError,
+      "type object '%s' has no attribute '%U'",
+      type->tp_name, name);
+  return NULL;
 }
 
 static int
@@ -225,10 +241,47 @@ static int type_init(PyObject *cls, PyObject *args, PyObject *kwds);
 
 static PyObject *type_repr(PyTypeObject *type);
 
+static PyObject *
+object_get_class(PyObject *self, void *closure) {
+  Py_INCREF(Py_TYPE(self));
+  return (PyObject *) (Py_TYPE(self));
+}
+
+static int
+object_set_class(PyObject *self, PyObject *value, void *closure) {
+  fail(0);
+}
+
+static PyGetSetDef object_getsets[] = {
+  {"__class__", object_get_class, object_set_class, ""},
+  {0},
+};
+
+// defined in cpy/Objects/typeobject.c
+PyTypeObject PyBaseObject_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "object",
+  .tp_basicsize = sizeof(PyObject),
+	.tp_dealloc = object_dealloc,
+	.tp_free = PyObject_Del,
+	.tp_hash = (hashfunc) _Py_HashPointer,
+  .tp_alloc = PyType_GenericAlloc,
+  .tp_methods = object_methods,
+  .tp_new = object_new,
+  .tp_init = object_init,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_setattro = PyObject_GenericSetAttr,
+  .tp_getset = object_getsets,
+  .tp_flags = Py_TPFLAGS_BASETYPE,
+};
+
+
+
 PyTypeObject PyType_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "type",
   .tp_basicsize = sizeof(PyHeapTypeObject),
+  .tp_itemsize = sizeof(PyMemberDef),
   .tp_flags = Py_TPFLAGS_TYPE_SUBCLASS
     | Py_TPFLAGS_HAVE_VECTORCALL,
 	.tp_call = (ternaryfunc) type_call,
@@ -388,7 +441,8 @@ extra_ivars(PyTypeObject *type, PyTypeObject *base) {
 
   assert(t_size >= b_size);
   if (type->tp_itemsize || base->tp_itemsize) {
-    assert(false);
+    return t_size != b_size ||
+      type->tp_itemsize != base->tp_itemsize;
   }
   if (type->tp_weaklistoffset && base->tp_weaklistoffset == 0 &&
       type->tp_weaklistoffset + sizeof(PyObject *) == t_size &&
@@ -753,7 +807,24 @@ type_new_set_doc(PyTypeObject *type) {
     }
     return 0;
   }
-  assert(false);
+  if (!PyUnicode_Check(doc)) {
+    return 0;
+  }
+
+  const char *doc_str = PyUnicode_AsUTF8(doc);
+  if (doc_str == NULL) {
+    return -1;
+  }
+
+  Py_ssize_t size = strlen(doc_str) + 1;
+  char *tp_doc = (char *) PyObject_Malloc(size);
+  if (tp_doc == NULL) {
+    assert(false);
+  }
+
+  memcpy(tp_doc, doc_str, size);
+  type->tp_doc = tp_doc;
+  return 0;
 }
 
 static int
@@ -833,12 +904,18 @@ static PyGetSetDef subtype_getsets_full[] = {
   {0}
 };
 
+static PyGetSetDef subtype_getsets_weakref_only[] = {
+  {"__weakref__", subtype_getweakref, NULL,
+    PyDoc_STR("")},
+  {0}
+};
+
 static void
 type_new_set_slots(const type_new_ctx *ctx, PyTypeObject *type) {
   if (type->tp_weaklistoffset && type->tp_dictoffset) {
     type->tp_getset = subtype_getsets_full;
   } else if (type->tp_weaklistoffset && !type->tp_dictoffset) {
-    assert(false);
+    type->tp_getset = subtype_getsets_weakref_only;
   } else if (!type->tp_weaklistoffset && type->tp_dictoffset) {
     assert(false);
   } else {
@@ -869,7 +946,16 @@ type_new_set_classcell(PyTypeObject *type) {
     } 
     return 0;
   }
-  assert(false);
+
+  if (!PyCell_Check(cell)) {
+    fail(0);
+  }
+
+  (void) PyCell_Set(cell, (PyObject *) type);
+  if (_PyDict_DelItemId(type->tp_dict, &PyId___classcell__) < 0) {
+    return -1;
+  }
+  return 0;
 }
 
 static int
@@ -1364,7 +1450,7 @@ PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems) {
   if (type->tp_itemsize == 0) {
     _PyObject_Init(obj, type);
   } else {
-    assert(false);
+    _PyObject_InitVar((PyVarObject *) obj, type, nitems);
   }
 
   if (_PyType_IS_GC(type)) {
@@ -1591,6 +1677,27 @@ static int update_slot(PyTypeObject *type, PyObject *name) {
       update_slots_callback, (void *) ptrs);
 }
 
+static int type_add_members(PyTypeObject *type) {
+  PyMemberDef *memb = type->tp_members;
+  if (memb == NULL) {
+    return 0;
+  }
+
+  PyObject *dict = type->tp_dict;
+  for (; memb->name != NULL; memb++) {
+    PyObject *descr = PyDescr_NewMember(type, memb);
+    if (descr == NULL)
+      return -1;
+
+    if (PyDict_SetDefault(dict, PyDescr_NAME(descr), descr) == NULL) {
+      Py_DECREF(descr);
+      return -1;
+    }
+    Py_DECREF(descr);
+  }
+  return 0;
+}
+
 
 static PyObject *type_repr(PyTypeObject *type) {
   PyObject *rtn;
@@ -1599,4 +1706,237 @@ static PyObject *type_repr(PyTypeObject *type) {
 
   rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
   return rtn;
+}
+
+_Py_IDENTIFIER(__module__);
+
+typedef struct PySlot_Offset {
+  short subslot_offset;
+  short slot_offset;
+} PySlot_Offset;
+
+static const PySlot_Offset pyslot_offsets[] = {
+  {0, 0},
+#include "Copied/typeslots.inc"
+};
+
+_Py_IDENTIFIER(__doc__);
+
+static const char *
+_PyType_DocWithoutSignature(const char *name, const char *internal_doc) {
+  // TODO follow cpy
+  return internal_doc;
+}
+
+PyObject *
+PyType_FromModuleAndSpec(PyObject *module, PyType_Spec *spec, PyObject *bases) {
+  PyHeapTypeObject *res;
+  PyObject *modname;
+  PyTypeObject *type, *base;
+  int r;
+
+  const PyType_Slot *slot;
+  Py_ssize_t nmembers, weaklistoffset, dictoffset, vectorcalloffset;
+  char *res_start;
+  short slot_offset, subslot_offset;
+
+  nmembers = weaklistoffset = dictoffset = vectorcalloffset = 0;
+  for (slot = spec->slots; slot->slot; slot++) {
+    if (slot->slot == Py_tp_members) {
+      nmembers = 0;
+      for (const PyMemberDef *memb = slot->pfunc; memb->name != NULL; memb++) {
+        nmembers++;
+        if (strcmp(memb->name, "__weaklistoffset__") == 0) {
+          fail(0);
+        }
+        if (strcmp(memb->name, "__dictoffset__") == 0) {
+          fail(0);
+        }
+        if (strcmp(memb->name, "__vectorcalloffset__") == 0) {
+          fail(0);
+        }
+      }
+    }
+  }
+
+  res = (PyHeapTypeObject *) PyType_GenericAlloc(&PyType_Type, nmembers);
+  if (res == NULL)
+    return NULL;
+
+  res_start = (char *) res;
+
+  if (spec->name == NULL) {
+    fail(0);
+  }
+
+  const char *s = strrchr(spec->name, '.');
+  if (s == NULL)
+    s = spec->name;
+  else
+    s++;
+
+  type = &res->ht_type;
+  type->tp_flags = spec->flags | Py_TPFLAGS_HEAPTYPE;
+  res->ht_name = PyUnicode_FromString(s);
+  if (!res->ht_name) {
+    fail(0);
+  }
+  res->ht_qualname = res->ht_name;
+  Py_INCREF(res->ht_qualname);
+  type->tp_name = spec->name;
+
+  Py_XINCREF(module);
+  res->ht_module = module;
+
+  if (!bases) {
+    base = &PyBaseObject_Type;
+    for (slot = spec->slots; slot->slot; slot++) {
+      if (slot->slot == Py_tp_base) {
+        fail(0);
+      } else if (slot->slot == Py_tp_bases) {
+        fail(0);
+      }
+    }
+    if (!bases) {
+      bases = PyTuple_Pack(1, base);
+      if (!bases)
+        fail(0);
+    } else if (!PyTuple_Check(bases)) {
+      fail(0);
+    } else {
+      fail(0);
+    }
+  } else if (!PyTuple_Check(bases)) {
+    bases = PyTuple_Pack(1, bases);
+    if (!bases) {
+      fail(0);
+    }
+  } else {
+    fail(0);
+  }
+
+  base = best_base(bases);
+  if (base == NULL) {
+    fail(0);
+  }
+  if (!_PyType_HasFeature(base, Py_TPFLAGS_BASETYPE)) {
+    fail(0);
+  }
+
+  // Initialize essential fields
+  type->tp_as_async = &res->as_async;
+  type->tp_as_number = &res->as_number;
+  type->tp_as_sequence = &res->as_sequence;
+  type->tp_as_mapping = &res->as_mapping;
+  type->tp_as_buffer = &res->as_buffer;
+
+  type->tp_bases = bases;
+  Py_INCREF(base);
+  type->tp_base = base;
+
+  type->tp_basicsize = spec->basicsize;
+  type->tp_itemsize = spec->itemsize;
+
+  for (slot = spec->slots; slot->slot; slot++) {
+    if (slot->slot < 0
+        || (size_t) slot->slot >= Py_ARRAY_LENGTH(pyslot_offsets)) {
+      fail(0);
+    } else if (slot->slot == Py_tp_base || slot->slot == Py_tp_bases) {
+      fail(0);
+    } else if (slot->slot == Py_tp_doc) {
+      if (slot->pfunc == NULL) {
+        type->tp_doc = NULL;
+        continue;
+      }
+      size_t len = strlen(slot->pfunc) + 1;
+      char *tp_doc = PyObject_Malloc(len);
+      if (tp_doc == NULL) {
+        fail(0);
+      }
+      memcpy(tp_doc, slot->pfunc, len);
+      type->tp_doc = tp_doc;
+    } else if (slot->slot == Py_tp_members) {
+      size_t len = Py_TYPE(type)->tp_itemsize * nmembers;
+      memcpy(PyHeapType_GET_MEMBERS(res), slot->pfunc, len);
+      type->tp_members = PyHeapType_GET_MEMBERS(res);
+    } else {
+      // Copy other slots directly
+      PySlot_Offset slotoffsets = pyslot_offsets[slot->slot];
+      slot_offset = slotoffsets.slot_offset;
+      if (slotoffsets.subslot_offset == -1) {
+        *(void **)((char *) res_start + slot_offset) = slot->pfunc;
+      } else {
+        fail(0);
+      }
+    }
+  }
+
+  if (type->tp_dealloc == NULL) {
+    type->tp_dealloc = subtype_dealloc;
+  }
+
+  if (vectorcalloffset) {
+    fail(0);
+  }
+
+  if (PyType_Ready(type) < 0) {
+    fail(0);
+  }
+
+  if (type->tp_dictoffset) {
+    fail(0);
+  }
+
+  if (type->tp_doc) {
+    PyObject *__doc__ = PyUnicode_FromString(_PyType_DocWithoutSignature(type->tp_name, type->tp_doc));
+    if (!__doc__)
+      fail(0);
+    r = _PyDict_SetItemId(type->tp_dict, &PyId___doc__, __doc__);
+    Py_DECREF(__doc__);
+    if (r < 0)
+      fail(0);
+  }
+
+  if (weaklistoffset) {
+    fail(0);
+  }
+
+  if (dictoffset) {
+    fail(0);
+  }
+
+  // Set type.__module__
+  r = _PyDict_ContainsId(type->tp_dict, &PyId___module__);
+  if (r < 0) {
+    fail(0);
+  }
+  if (r == 0) {
+    s = strrchr(spec->name, '.');
+    if (s != NULL) {
+      modname = PyUnicode_FromStringAndSize(
+          spec->name, (Py_ssize_t) (s - spec->name));
+      if (modname == NULL) {
+        fail(0);
+      }
+      r = _PyDict_SetItemId(type->tp_dict, &PyId___module__, modname);
+      Py_DECREF(modname);
+      if (r != 0)
+        fail(0);
+    } else {
+      // fail(0);
+      // TODO print a warning
+    }
+  }
+
+  return (PyObject *) res;
+}
+
+PyObject *
+PyType_FromSpecWithBases(PyType_Spec *spec, PyObject *bases) {
+  return PyType_FromModuleAndSpec(NULL, spec, bases);
+}
+
+PyObject *
+PyType_FromSpec(PyType_Spec *spec) {
+  return PyType_FromSpecWithBases(spec, NULL);
 }

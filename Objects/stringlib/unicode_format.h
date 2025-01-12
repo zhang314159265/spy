@@ -71,6 +71,23 @@ parse_field(SubString *str, SubString *field_name, SubString *format_spec,
 	field_name->end = str->start - 1;
 
 	if (c == '!' || c == ':') {
+    Py_ssize_t count;
+
+    if (c == '!') {
+      if (str->start >= str->end) {
+        fail(0);
+      }
+      *conversion = PyUnicode_READ_CHAR(str->str, str->start++);
+
+      if (str->start < str->end) {
+        c = PyUnicode_READ_CHAR(str->str, str->start++);
+        if (c == '}')
+          return 1;
+        if (c != ':') {
+          fail(0);
+        }
+      }
+    }
 		assert(false);
 	} else if (c != '}') {
 		assert(false);
@@ -252,6 +269,9 @@ get_field_object(SubString *input, PyObject *args, PyObject *kwargs, AutoNumber 
 	assert(false);
 }
 
+
+int _PyUnicode_FormatAdvancedWriter(_PyUnicodeWriter *writer, PyObject *obj, PyObject *format_spec, Py_ssize_t start, Py_ssize_t end);
+
 static int
 render_field(PyObject *fieldobj, SubString *format_spec, _PyUnicodeWriter *writer) {
 	int (*formatter)(_PyUnicodeWriter *, PyObject *, PyObject *, Py_ssize_t, Py_ssize_t) = NULL;
@@ -261,7 +281,9 @@ render_field(PyObject *fieldobj, SubString *format_spec, _PyUnicodeWriter *write
 
 	// If we know the type exactly, skip the lookup of __format__ and just
 	// call the formatter directly
-	if (PyLong_CheckExact(fieldobj)) {
+  if (PyUnicode_CheckExact(fieldobj))
+    formatter = _PyUnicode_FormatAdvancedWriter;
+	else if (PyLong_CheckExact(fieldobj)) {
 		formatter = _PyLong_FormatAdvancedWriter;
 	} else if (PyFloat_CheckExact(fieldobj)) {
 		formatter = _PyFloat_FormatAdvancedWriter;
@@ -277,6 +299,17 @@ render_field(PyObject *fieldobj, SubString *format_spec, _PyUnicodeWriter *write
 		assert(false);
 	}
 	assert(false);
+}
+
+// do the !r or !s conversion on obj
+static PyObject *
+do_conversion(PyObject *obj, Py_UCS4 conversion) {
+  switch (conversion) {
+  case 'r':
+    return PyObject_Repr(obj);
+  default:
+    fail(0);
+  }
 }
 
 static int
@@ -295,7 +328,13 @@ output_markup(SubString *field_name, SubString *format_spec,
 		assert(false);
 	
 	if (conversion != '\0') {
-		assert(false);
+    tmp = do_conversion(fieldobj, conversion);
+    if (tmp == NULL || PyUnicode_READY(tmp) == -1)
+      goto done;
+
+    Py_DECREF(fieldobj);
+    fieldobj = tmp;
+    tmp = NULL;
 	}
 
 	if (format_spec_needs_expanding) {

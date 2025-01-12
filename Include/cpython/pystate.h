@@ -9,6 +9,8 @@ typedef struct _err_stackitem {
   struct _err_stackitem *previous_item;
 } _PyErr_StackItem;
 
+typedef int (*Py_tracefunc)(PyObject *, PyFrameObject *, int, PyObject *);
+
 // The PyThreadState typedef is in Include/pystate.h
 struct _ts {
   PyInterpreterState *interp;
@@ -21,6 +23,7 @@ struct _ts {
 
   _PyErr_StackItem exc_state;
   _PyErr_StackItem *exc_info;
+  Py_tracefunc c_tracefunc;
 };
 
 typedef PyObject *(*_PyFrameEvalFunction)(PyThreadState *tstate, PyFrameObject *, int);

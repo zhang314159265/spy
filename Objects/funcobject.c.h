@@ -1,9 +1,81 @@
 #pragma once
 
 #include "classobject.h"
+#include "structmember.h"
+
+static PyObject *
+func_get_qualname(PyFunctionObject *op, void *ignored) {
+  Py_INCREF(op->func_qualname);
+  return op->func_qualname;
+}
+
+static int
+func_set_qualname(PyFunctionObject *op, PyObject *value, void *ignored) {
+  if (value == NULL || !PyUnicode_Check(value)) {
+    assert(false);
+  }
+  Py_INCREF(value);
+  Py_XSETREF(op->func_qualname, value);
+  return 0;
+}
+
+static PyObject *
+func_get_annotation_dict(PyFunctionObject *op) {
+  if (op->func_annotations == NULL) {
+    return NULL;
+  }
+  if (PyTuple_CheckExact(op->func_annotations)) {
+    assert(false);
+  }
+  assert(PyDict_Check(op->func_annotations));
+  return op->func_annotations;
+}
+
+static PyObject *
+func_get_annotations(PyFunctionObject *op, void *ignored) {
+  if (op->func_annotations == NULL) {
+    op->func_annotations = PyDict_New();
+    if (op->func_annotations == NULL) {
+      return NULL;
+    }
+  }
+  PyObject *d = func_get_annotation_dict(op);
+  if (d) {
+    Py_INCREF(d);
+  }
+  return d;
+}
+
+static int
+func_set_annotations(PyFunctionObject *op, PyObject *value, void *ignored) {
+  assert(false);
+}
+
+static PyObject *
+func_get_code(PyFunctionObject *op, void *ignored) {
+  Py_INCREF(op->func_code);
+  return op->func_code;
+}
+
+static int
+func_set_code(PyFunctionObject *op, PyObject *value, void *ignored) {
+  fail(0);
+}
 
 static PyGetSetDef func_getsetlist[] = {
   {"__name__", (getter) func_get_name, (setter) func_set_name},
+  {"__dict__", PyObject_GenericGetDict, PyObject_GenericSetDict},
+  {"__qualname__", (getter) func_get_qualname, (setter) func_set_qualname},
+  {"__annotations__", (getter) func_get_annotations, (setter) func_set_annotations},
+  {"__code__", (getter) func_get_code, (setter) func_set_code},
+  {NULL}
+};
+
+#define OFF(x) offsetof(PyFunctionObject, x)
+
+static PyMemberDef func_memberlist[] = {
+  {"__module__", T_OBJECT, OFF(func_module), 0},
+  {"__doc__", T_OBJECT, OFF(func_doc), 0},
   {NULL}
 };
 
@@ -16,6 +88,12 @@ func_descr_get(PyObject *func, PyObject *obj, PyObject *type) {
   return PyMethod_New(func, obj);
 }
 
+static PyObject *
+func_repr(PyFunctionObject *op) {
+  return PyUnicode_FromFormat("<function %U at %p>",
+    op->func_qualname, op);
+}
+
 PyTypeObject PyFunction_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "function",
@@ -26,6 +104,9 @@ PyTypeObject PyFunction_Type = {
 	.tp_vectorcall_offset = offsetof(PyFunctionObject, vectorcall),
   .tp_getset = func_getsetlist,
   .tp_descr_get = func_descr_get,
+  .tp_dictoffset = offsetof(PyFunctionObject, func_dict),
+  .tp_members = func_memberlist,
+  .tp_repr = (reprfunc) func_repr,
 };
 
 typedef struct {
@@ -161,7 +242,7 @@ static PyObject *cm_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
     assert(false);
   }
   if (Py_TYPE(cm->cm_callable)->tp_descr_get != NULL) {
-    assert(false);
+    return Py_TYPE(cm->cm_callable)->tp_descr_get(cm->cm_callable, type, type);
   }
   return PyMethod_New(cm->cm_callable, type);
 }

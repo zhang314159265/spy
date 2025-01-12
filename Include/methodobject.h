@@ -1,5 +1,8 @@
 #pragma once
 
+#define PyCFunction_GET_FLAGS(func) \
+  (((PyCFunctionObject *)func)->m_ml->ml_flags)
+
 typedef PyObject *(*PyCFunction)(PyObject *, PyObject *);
 typedef PyObject *(*PyCFunctionWithKeywords)(PyObject *, PyObject *, PyObject *);
 
@@ -7,6 +10,8 @@ typedef PyObject *(*_PyCFunctionFastWithKeywords)(PyObject *,
 		PyObject *const *,
 		Py_ssize_t,
 		PyObject *);
+
+typedef PyObject *(*_PyCFunctionFast)(PyObject *, PyObject *const *, Py_ssize_t);
 
 struct PyMethodDef {
 	const char *ml_name;
@@ -33,6 +38,7 @@ typedef struct {
 
 static PyObject *cfunction_call(PyObject *func, PyObject *args, PyObject *kwargs);
 static void meth_dealloc(PyCFunctionObject *m);
+static PyObject *meth_repr(PyCFunctionObject *m);
 
 PyTypeObject PyCFunction_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -43,6 +49,7 @@ PyTypeObject PyCFunction_Type = {
 	.tp_call = cfunction_call,
 	.tp_vectorcall_offset = offsetof(PyCFunctionObject, vectorcall),
   .tp_dealloc = (destructor) meth_dealloc,
+  .tp_repr = (reprfunc) meth_repr,
 };
 
 #define METH_VARARGS 0x0001
@@ -67,6 +74,8 @@ typedef void (*funcptr)(void);
 #define PyCFunction_GET_SELF(func) \
 		(((PyCFunctionObject *) func)->m_ml->ml_flags & METH_STATIC ? \
 			NULL : ((PyCFunctionObject *) func)->m_self)
+
+#define PyCFunction_CheckExact(op) Py_IS_TYPE(op, &PyCFunction_Type)
 
 #define PyCFunction_Check(op) PyObject_TypeCheck(op, &PyCFunction_Type)
 
@@ -135,12 +144,31 @@ cfunction_vectorcall_NOARGS(
   return result;
 }
 
+static PyObject *
+cfunction_vectorcall_FASTCALL(
+    PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  if (cfunction_check_kwargs(tstate, func, kwnames)) {
+    return NULL;
+  }
+  Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+  _PyCFunctionFast meth = (_PyCFunctionFast)
+    cfunction_enter_call(tstate, func);
+  if (meth == NULL) {
+    return NULL;
+  }
+  PyObject *result = meth(PyCFunction_GET_SELF(func), args, nargs);
+  // _Py_LeaveRecursiveCall(tstate);
+  return result;
+}
+
 PyObject *
 PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *cls) {
 	vectorcallfunc vectorcall;
 	// printf("module variable type %s\n", Py_TYPE(module)->tp_name);
 	switch (ml->ml_flags & (METH_VARARGS | METH_FASTCALL | METH_NOARGS |
 			METH_O | METH_KEYWORDS | METH_METHOD)) {
+  case METH_VARARGS:
   case METH_VARARGS | METH_KEYWORDS:
     // use tp_call instead of vectorcall
     vectorcall = NULL;
@@ -154,6 +182,9 @@ PyCMethod_New(PyMethodDef *ml, PyObject *self, PyObject *module, PyTypeObject *c
 	case METH_O:
 		vectorcall = cfunction_vectorcall_O;
 		break;
+  case METH_FASTCALL:
+    vectorcall = cfunction_vectorcall_FASTCALL;
+    break;
 	default:
 		assert(false);
 	}
@@ -188,7 +219,28 @@ PyObject *PyCFunction_NewEx(PyMethodDef *ml, PyObject *self, PyObject *module) {
 }
 
 static PyObject *cfunction_call(PyObject *func, PyObject *args, PyObject *kwargs) {
-	assert(false);
+  assert(kwargs == NULL || PyDict_Check(kwargs));
+
+  PyThreadState *tstate = _PyThreadState_GET();
+  assert(!_PyErr_Occurred(tstate));
+
+  int flags = PyCFunction_GET_FLAGS(func);
+  if (!(flags & METH_VARARGS)) {
+    fail(0);
+  }
+  PyCFunction meth = PyCFunction_GET_FUNCTION(func);
+  PyObject *self = PyCFunction_GET_SELF(func);
+
+  PyObject *result;
+  if (flags & METH_KEYWORDS) {
+    result = (*(PyCFunctionWithKeywords)(void(*)(void))meth)(self, args, kwargs);
+  } else {
+    if (kwargs != NULL && PyDict_GET_SIZE(kwargs) != 0) {
+      fail(0);
+    }
+    result = meth(self, args);
+  }
+  return _Py_CheckFunctionResult(tstate, func, result, NULL);
 }
 
 static void meth_dealloc(PyCFunctionObject *m) {
@@ -201,3 +253,6 @@ static void meth_dealloc(PyCFunctionObject *m) {
   Py_XDECREF(m->m_module);
   PyObject_GC_Del(m);
 }
+
+extern PyTypeObject PyCMethod_Type;
+#define PyCMethod_CheckExact(op) Py_IS_TYPE(op, &PyCMethod_Type)

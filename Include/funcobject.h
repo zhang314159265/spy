@@ -30,6 +30,8 @@ typedef struct {
 
   PyObject *func_weakreflist;
 	PyObject *func_module;
+
+  PyObject *func_annotations;
 	vectorcallfunc vectorcall;
 } PyFunctionObject;
 
@@ -111,6 +113,7 @@ PyObject *PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject
 	op->func_dict = NULL;
   op->func_weakreflist = NULL;
 	op->func_module = module;
+  op->func_annotations = NULL;
 	op->vectorcall = _PyFunction_Vectorcall;
 
 	return (PyObject *) op;
@@ -148,5 +151,10 @@ static PyObject *func_get_name(PyFunctionObject *op, void *ignored) {
 }
 
 static int func_set_name(PyFunctionObject *op, PyObject *value, void *ignore) {
-  assert(false);
+  if (value == NULL || !PyUnicode_Check(value)) {
+    assert(false);
+  }
+  Py_INCREF(value);
+  Py_XSETREF(op->func_name, value);
+  return 0;
 }

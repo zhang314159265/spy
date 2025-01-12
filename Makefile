@@ -12,8 +12,8 @@ else
 PREFIX :=
 endif
 
-TUTOR=tutor/misc.py
-# TUTOR=tutor/base_class.py
+# TUTOR=tutor/misc.py
+TUTOR=tutor/basic_import.py
 
 first: mine
 # first: pegen
@@ -29,7 +29,9 @@ cpy:
 pegen:
 	PYTHONPATH=../cpython/Tools/peg_generator ../cpython/build/$(PYEXE) -m pegen $(PEGEN_FLAGS) -q c Grammar/python.gram Grammar/Tokens -o Parser/parser.c
 
-CFLAGS := -IInclude -I.
+CFLAGS := -IInclude -I. -Wno-format-security
 mine: pegen
 	gcc -g main.c $(CFLAGS)
-	$(PREFIX) ./a.out $(EXTRA_ARGS) $(TUTOR)
+	# $(PREFIX) ./a.out $(EXTRA_ARGS) tutor/misc.py # TODO
+	cd tutor && $(PREFIX) ../a.out $(EXTRA_ARGS) basic_import.py # TODO
+	# $(PREFIX) ./a.out $(EXTRA_ARGS) $(TUTOR)

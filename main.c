@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "shunting.h"
 #include "object.h"
 #include "Parser/tokenizer.h"
 #include "token.h"
@@ -14,9 +15,11 @@
 
 #define DEBUG_TOKENIZER 0
 
-static PyStatus pycore_create_interpreter(_PyRuntimeState *runtime, PyThreadState **tstate_p) {
+static PyStatus pycore_create_interpreter(_PyRuntimeState *runtime, const PyConfig *config, PyThreadState **tstate_p) {
   PyInterpreterState *interp = PyInterpreterState_New();
   assert(interp);
+
+  _PyConfig_Copy(&interp->config, config);
 
   PyThreadState *tstate = PyThreadState_New(interp);
   assert(tstate);
@@ -70,10 +73,10 @@ pycore_interp_init(PyThreadState *tstate) {
   return status;
 }
 
-static PyStatus pyinit_config(_PyRuntimeState *runtime, PyThreadState **tstate_p) {
+static PyStatus pyinit_config(_PyRuntimeState *runtime, PyThreadState **tstate_p, const PyConfig *config) {
   PyStatus status;
   PyThreadState *tstate;
-  pycore_create_interpreter(runtime, &tstate);
+  pycore_create_interpreter(runtime, config, &tstate);
   *tstate_p = tstate;
 
   status = pycore_interp_init(tstate); // this will pre-create the list of small ints
@@ -85,21 +88,40 @@ static PyStatus pyinit_config(_PyRuntimeState *runtime, PyThreadState **tstate_p
   return _PyStatus_OK();
 }
 
-void pyinit_core(_PyRuntimeState *runtime, PyThreadState **tstate_p) {
-  pyinit_config(runtime, tstate_p);
+void pyinit_core(_PyRuntimeState *runtime, const PyConfig *src_config, PyThreadState **tstate_p) {
+  PyStatus status;
+
+  PyConfig config;
+  PyConfig_InitPythonConfig(&config);
+
+  status = _PyConfig_Copy(&config, src_config);
+  if (_PyStatus_EXCEPTION(status)) {
+    fail(0);
+  }
+  status = _PyConfig_Read(&config, 0);
+  if (_PyStatus_EXCEPTION(status)) {
+    fail(0);
+  }
+  pyinit_config(runtime, tstate_p, &config);
+
+  PyConfig_Clear(&config);
 }
 
 // defined in cpy/Python/pylifecycle.c
-void Py_InitializeFromConfig(void) {
+void Py_InitializeFromConfig(const PyConfig *config) {
   _PyRuntimeState *runtime = &_PyRuntime;
   PyThreadState *tstate = NULL;
-  pyinit_core(runtime, &tstate);
+  pyinit_core(runtime, config, &tstate);
 	pyinit_main(tstate);
 }
 
 void pymain_init() {
   _PyRuntime_Initialize();
-  Py_InitializeFromConfig();
+
+  PyConfig config;
+  PyConfig_InitPythonConfig(&config);
+
+  Py_InitializeFromConfig(&config);
 }
 
 int main(int argc, char **argv) {

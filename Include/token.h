@@ -48,6 +48,7 @@
 #define DOUBLESLASH 47
 #define DOUBLESLASHEQUAL 48
 #define AT 49
+#define ELLIPSIS 52
 #define OP 54
 #define TYPE_IGNORE 57
 

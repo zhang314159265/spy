@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdarg.h>
+#include "modsupport.h"
 
 #define FLAG_COMPAT 1
 
@@ -51,6 +52,20 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
     } else {
       p = va_arg(*p_va, PyObject **);
       *p = arg;
+    }
+    break;
+  }
+  case 'i': { // signed int
+    int *p = va_arg(*p_va, int *);
+    long ival = PyLong_AsLong(arg);
+    if (ival == -1 && PyErr_Occurred())
+      fail(0);
+    else if (ival > INT_MAX) {
+      fail(0);
+    } else if (ival < INT_MIN) {
+      fail(0);
+    } else {
+      *p = ival;
     }
     break;
   }
@@ -215,7 +230,20 @@ _PyArg_NoKeywords(const char *funcname, PyObject *kwargs) {
   if (kwargs == NULL) {
     return 1;
   }
-  assert(false);
+  if (!PyDict_CheckExact(kwargs)) {
+    fail(0);
+  }
+  if (PyDict_GET_SIZE(kwargs) == 0) {
+    return 1;
+  }
+
+  fail("%s() takes no keyword arguments", funcname);
+
+  #if 0
+  PyErr_Format(PyExc_TypeError, "%s() takes no keyword arguments",
+    fucnname);
+  return 0;
+  #endif
 }
 
 #undef _PyArg_CheckPositional
@@ -292,7 +320,9 @@ cleanreturn(int retval, freelist_t *freelist) {
 static int
 vgetargskeywords(PyObject *args, PyObject *kwargs, const char *format,
     char **kwlist, va_list *p_va, int flags) {
-  const char *fname, *custom_msg;
+  char msgbuf[512];
+  int levels[32];
+  const char *fname, *msg, *custom_msg;
   int min = INT_MAX;
   int max = INT_MAX;
   int i, pos, len;
@@ -371,15 +401,26 @@ vgetargskeywords(PyObject *args, PyObject *kwargs, const char *format,
     }
     if (!skip) {
       if (i < nargs) {
-        assert(false);
+        current_arg = PyTuple_GET_ITEM(args, i);
       } else if (nkwargs && i >= pos) {
-        assert(false);
+        PyObject *_PyDict_GetItemStringWithError(PyObject *v, const char *key);
+        current_arg = _PyDict_GetItemStringWithError(kwargs, kwlist[i]);
+        if (current_arg) {
+          --nkwargs;
+        } else if (PyErr_Occurred()) {
+          fail(0);
+        }
       } else {
         current_arg = NULL;
       }
 
       if (current_arg) {
-        assert(false);
+        msg = convertitem(current_arg, &format, p_va, flags,
+            levels, msgbuf, sizeof(msgbuf), &freelist);
+        if (msg) {
+          fail(0);
+        }
+        continue;
       }
 
       if (i < min) {
@@ -392,7 +433,20 @@ vgetargskeywords(PyObject *args, PyObject *kwargs, const char *format,
     }
     assert(false);
   }
-  assert(false);
+
+  if (skip) {
+    fail(0);
+  }
+
+  if (!IS_END_OF_FORMAT(*format) && (*format != '|') && (*format != '$')) {
+    fail(0);
+  }
+
+  if (nkwargs > 0) {
+    fail(0);
+  }
+
+  return cleanreturn(1, &freelist);
 }
 
 int PyArg_ParseTupleAndKeywords(PyObject *args,
@@ -428,4 +482,80 @@ int _PyArg_NoKwnames(const char *funcname, PyObject *kwnames) {
   }
 
   assert(false);
+}
+
+static struct _PyArg_Parser *static_arg_parsers = NULL;
+
+struct _PyArg_Parser;
+int parser_init(struct _PyArg_Parser *parser) {
+  const char *const *keywords;
+  const char *format, *msg;
+  int i, len, min, max, nkw;
+  PyObject *kwtuple;
+
+  assert(parser->keywords != NULL);
+  if (parser->kwtuple != NULL) {
+    return 1;
+  }
+
+  keywords = parser->keywords;
+  for (i = 0; keywords[i] && !*keywords[i]; i++) {
+  }
+  parser->pos = i;
+  for (; keywords[i]; i++) {
+    if (!*keywords[i]) {
+      fail(0);
+    }
+  }
+  len = i;
+
+  format = parser->format;
+  if (format) {
+    fail(0);
+  }
+
+  nkw = len - parser->pos;
+  kwtuple = PyTuple_New(nkw);
+  if (kwtuple == NULL) {
+    return 0;
+  }
+  keywords = parser->keywords + parser->pos;
+  for (i = 0; i < nkw; i++) {
+    PyObject *str = PyUnicode_FromString(keywords[i]);
+    if (str == NULL) {
+      fail(0);
+    }
+    PyUnicode_InternInPlace(&str);
+    PyTuple_SET_ITEM(kwtuple, i, str);
+  }
+  parser->kwtuple = kwtuple;
+
+  assert(parser->next == NULL);
+  parser->next = static_arg_parsers;
+  static_arg_parsers = parser;
+  return 1;
+}
+
+PyObject *find_keyword(PyObject *kwnames, PyObject *const *kwstack, PyObject *key) {
+  Py_ssize_t i, nkwargs;
+
+  nkwargs = PyTuple_GET_SIZE(kwnames);
+
+  for (i = 0; i < nkwargs; ++i) {
+    PyObject *kwname = PyTuple_GET_ITEM(kwnames, i);
+
+    if (kwname == key) {
+      return kwstack[i];
+    }
+  }
+
+  for (i = 0; i < nkwargs; ++i) {
+    PyObject *kwname = PyTuple_GET_ITEM(kwnames, i);
+
+    assert(PyUnicode_Check(kwname));
+    if (_PyUnicode_EQ(kwname, key)) {
+      return kwstack[i];
+    }
+  }
+  return NULL;
 }

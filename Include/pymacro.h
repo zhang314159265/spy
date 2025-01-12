@@ -25,4 +25,6 @@
 #define Py_ARRAY_LENGTH(array) \
   (sizeof(array) / sizeof((array)[0]))
 
+#define _Py_SIZE_ROUND_DOWN(n, a) ((size_t)(n) & ~(size_t)((a) - 1))
+
 #endif

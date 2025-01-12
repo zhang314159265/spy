@@ -74,17 +74,7 @@ static PyMappingMethods dict_as_mapping = {
   .mp_ass_subscript = (objobjargproc) dict_ass_sub,
 };
 
-PyTypeObject PyDict_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  .tp_name = "dict",
-  .tp_basicsize = sizeof(PyDictObject),
-  .tp_flags = Py_TPFLAGS_DICT_SUBCLASS,
-  .tp_dealloc = (destructor) dict_dealloc,
-  .tp_free = PyObject_GC_Del,
-  .tp_repr = (reprfunc) dict_repr,
-  .tp_as_mapping = &dict_as_mapping,
-	.tp_iter = (getiterfunc) dict_iter,
-};
+extern PyTypeObject PyDict_Type;
 
 static inline Py_ssize_t
 calculate_keysize(Py_ssize_t minsize) {
@@ -427,8 +417,12 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value) {
   /* When insertion order is different from shared key, we can't share
    * the key anymore.  Convert this instance to combine table.
    */
-  if (_PyDict_HasSplitTable(mp)) {
-    assert(false);
+  if (_PyDict_HasSplitTable(mp) &&
+      ((ix >= 0 && old_value == NULL && mp->ma_used != ix) ||
+      (ix == DKIX_EMPTY && mp->ma_used != mp->ma_keys->dk_nentries))) {
+    if (insertion_resize(mp) < 0)
+      fail(0);
+    ix = DKIX_EMPTY;
   }
 
   if (ix == DKIX_EMPTY) {
@@ -981,9 +975,11 @@ static PyObject *dict_repr(PyDictObject *mp) {
   return _PyUnicodeWriter_Finish(&writer);
 }
 
+int PyDict_DelItem(PyObject *op, PyObject *key);
+
 static int dict_ass_sub(PyDictObject *mp, PyObject *v, PyObject *w) {
   if (w == NULL) {
-    assert(false);
+    return PyDict_DelItem((PyObject *) mp, v);
   } else {
     return PyDict_SetItem((PyObject *) mp, v, w);
   }
@@ -1004,7 +1000,12 @@ static PyObject *dict_subscript(PyDictObject *mp, PyObject *key) {
   if (ix == DKIX_ERROR)
     return NULL;
   if (ix == DKIX_EMPTY || value == NULL) {
-    assert(false);
+    if (!PyDict_CheckExact(mp)) {
+      fail(0);
+    }
+
+    _PyErr_SetKeyError(key);
+    return NULL;
   }
   Py_INCREF(value);
   return value;
@@ -1192,3 +1193,12 @@ PyDict_Keys(PyObject *mp) {
   }
   return dict_keys((PyDictObject *) mp);
 }
+
+PyObject *PyObject_GenericGetDict(PyObject *obj, void *context);
+
+typedef struct {
+  PyObject_HEAD
+  PyDictObject *dv_dict;
+} _PyDictViewObject;
+
+int _PyDict_MergeEx(PyObject *a, PyObject *b, int override);

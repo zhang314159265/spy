@@ -108,7 +108,8 @@ PyUnicode_New(
 ) {
 	// Optimization for empty strings
 	if (size == 0) {
-		assert(false);
+    PyObject *unicode_new_empty(void);
+    return unicode_new_empty();
 	}
 
 	PyObject *obj;
@@ -263,7 +264,12 @@ PyObject *PyUnicode_RichCompare(PyObject *left, PyObject *right, int op) {
     return NULL;
 
   if (left == right) {
-    assert(false);
+    switch (op) {
+    case Py_NE:
+      Py_RETURN_FALSE;
+    default:
+      fail("op %d\n", op);
+    }
   } else if (op == Py_EQ || op == Py_NE) {
     result = unicode_compare_eq(left, right);
     result ^= (op == Py_NE);

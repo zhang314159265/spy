@@ -1,5 +1,4 @@
-#ifndef Py_PYMEM_H
-#define Py_PYMEM_H
+#pragma once
 
 #include <stdlib.h>
 
@@ -19,9 +18,31 @@ void PyMem_Free(void *ptr) {
 	free(ptr);
 }
 
+// TODO follow cpy
+#define PyMem_RawFree PyMem_Free
+
 #define PyMem_New(type, n) \
 	((type*) PyMem_Malloc((n) * sizeof(type)))
 
 #define PyMem_NEW(type, n) PyMem_New(type, n)
 
-#endif
+#include "cpython/pymem.h"
+
+#include <wchar.h>
+
+// defined in cpy/Objects/obmalloc.c
+wchar_t *
+_PyMem_RawWcsdup(const wchar_t *str) {
+  assert(str != NULL);
+
+  size_t len = wcslen(str);
+
+  size_t size = (len + 1) * sizeof(wchar_t);
+  wchar_t *str2 = PyMem_RawMalloc(size);
+  if (str2 == NULL) {
+    return NULL;
+  }
+
+  memcpy(str2, str, size);
+  return str2;
+}

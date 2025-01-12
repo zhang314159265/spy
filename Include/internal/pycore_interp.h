@@ -2,6 +2,7 @@
 
 #include "longobject.h"
 #include "cpython/pystate.h"
+#include "cpython/initconfig.h"
 
 #define _PY_NSMALLPOSINTS 257
 #define _PY_NSMALLNEGINTS 5
@@ -32,7 +33,13 @@ struct _is {
 
 	// sys.modules dictionary
 	PyObject *modules;
+  PyObject *modules_by_index;
 
 	// importlib module
 	PyObject *importlib;
+
+  PyObject *import_func;
+
+  PyConfig config;
+  struct ast_state ast;
 };

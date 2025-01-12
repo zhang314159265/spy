@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include "pymath.h"
 
 typedef struct {
 	PyObject_HEAD
@@ -16,6 +17,7 @@ static PyObject *float_sub(PyObject *v, PyObject *w);
 static PyObject *float_abs(PyFloatObject *v);
 static PyObject *float_richcompare(PyObject *v, PyObject *w, int op);
 static PyObject *float_repr(PyFloatObject *v);
+static PyObject * float___trunc___impl(PyObject *self);
 
 static PyNumberMethods float_as_number = {
 	.nb_floor_divide = float_floor_div,
@@ -23,6 +25,7 @@ static PyNumberMethods float_as_number = {
 	.nb_add = float_add,
 	.nb_subtract = float_sub,
 	.nb_absolute = (unaryfunc) float_abs,
+  .nb_int = float___trunc___impl,
 };
 
 PyTypeObject PyFloat_Type = {
@@ -122,28 +125,7 @@ static PyObject *float_abs(PyFloatObject *v) {
 	return PyFloat_FromDouble(fabs(v->ob_fval));
 }
 
-static PyObject *float_richcompare(PyObject *v, PyObject *w, int op) {
-	double i, j;
-	int r = 0;
-
-	assert(PyFloat_Check(v));
-	i = PyFloat_AS_DOUBLE(v);
-
-	if (PyFloat_Check(w)) {
-		j = PyFloat_AS_DOUBLE(w);
-	} else {
-		assert(false);
-	}
-Compare:
-	switch (op) {
-	case Py_LT:
-		r = i < j;
-		break;
-	default:
-		assert(false);
-	}
-	return PyBool_FromLong(r);
-}
+static PyObject *float_richcompare(PyObject *v, PyObject *w, int op);
 
 int _PyFloat_FormatAdvancedWriter(_PyUnicodeWriter *writer,
 		PyObject *obj, PyObject *format_spec, Py_ssize_t start, Py_ssize_t end);

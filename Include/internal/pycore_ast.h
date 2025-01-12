@@ -1,9 +1,21 @@
 // TODO generate this file rather than manually create it
 #pragma once
 
+#include "pycore_ast_state.h"
+
 #define _ASDL_SEQ_HEAD \
 	Py_ssize_t size; \
 	void **elements;
+
+struct _keyword;
+typedef struct _keyword *keyword_ty;
+
+
+typedef struct {
+	_ASDL_SEQ_HEAD
+	keyword_ty typed_elements[1];
+} asdl_keyword_seq;
+
 
 typedef struct _expr *expr_ty;
 typedef struct {
@@ -31,6 +43,19 @@ typedef struct {
 } asdl_arg_seq;
 
 #include "internal/pycore_asdl.h"
+
+typedef struct _alias *alias_ty;
+
+struct _alias {
+  identifier name;
+  identifier asname;
+};
+
+typedef struct {
+  _ASDL_SEQ_HEAD
+  alias_ty typed_elements[1];
+} asdl_alias_seq;
+
 
 typedef enum _unaryop { Invert=1, Not=2, UAdd=3, USub=4 } unaryop_ty;
 
@@ -85,17 +110,26 @@ typedef struct {
 	stmt_ty typed_elements[1];
 } asdl_stmt_seq;
 
-struct _keyword {
-	identifier arg;
-	expr_ty value;
+typedef struct _excepthandler *excepthandler_ty;
+
+enum _excepthandler_kind { ExceptHandler_kind=1};
+
+struct _excepthandler {
+  enum _excepthandler_kind kind;
+  union {
+    struct {
+      expr_ty type;
+      identifier name;
+      asdl_stmt_seq *body;
+    } ExceptHandler;
+  } v;
 };
 
-typedef struct _keyword *keyword_ty;
-
 typedef struct {
-	_ASDL_SEQ_HEAD
-	keyword_ty typed_elements[1];
-} asdl_keyword_seq;
+  _ASDL_SEQ_HEAD
+  excepthandler_ty typed_elements[1];
+} asdl_excepthandler_seq;
+
 
 enum _mod_kind {
 	Module_kind = 1
@@ -224,6 +258,9 @@ enum _stmt_kind {
 	While_kind = 11,
 	If_kind = 12,
   With_kind = 13,
+  Raise_kind = 16,
+  Try_kind = 17,
+  ImportFrom_kind = 20,
 	Expr_kind = 23,
   Pass_kind = 24,
 	Break_kind = 25,
@@ -233,10 +270,28 @@ struct _stmt {
 	enum _stmt_kind kind;
 	union {
     struct {
+      expr_ty exc;
+      expr_ty cause;
+    } Raise;
+
+    struct {
+      asdl_stmt_seq *body;
+      asdl_excepthandler_seq *handlers;
+      asdl_stmt_seq *orelse;
+      asdl_stmt_seq *finalbody;
+    } Try;
+
+    struct {
       asdl_withitem_seq *items;
       asdl_stmt_seq *body;
       string type_comment;
     } With;
+    struct {
+      identifier module;
+      asdl_alias_seq *names;
+      int level;
+    } ImportFrom;
+
 		struct {
 			identifier name;
 			asdl_expr_seq *bases;
@@ -294,6 +349,13 @@ struct _stmt {
 		} Assign;
 	} v;
 };
+
+struct _keyword {
+	identifier arg;
+	expr_ty value;
+};
+
+
 
 expr_ty
 _PyAST_Name(identifier id, expr_context_ty ctx, PyArena *arena) {
@@ -383,3 +445,33 @@ expr_ty _PyAST_Yield(expr_ty value) {
   p->v.Yield.value = value;
   return p;
 }
+
+keyword_ty
+_PyAST_keyword(identifier arg, expr_ty value) {
+  keyword_ty p;
+  if (!value) {
+    fail(0);
+  }
+  p = (keyword_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->arg = arg;
+  p->value = value;
+  return p;
+}
+
+stmt_ty
+_PyAST_Raise(expr_ty exc, expr_ty cause) {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = Raise_kind;
+  p->v.Raise.exc = exc;
+  p->v.Raise.cause = cause;
+  return p;
+}
+
+static struct ast_state *get_ast_state(void);
+int PyAST_Check(PyObject *obj);
+

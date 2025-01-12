@@ -35,7 +35,13 @@ static PyObject *list_repr(PyListObject *v);
 static int list_contains(PyListObject *a, PyObject *el);
 static PyObject *list_item(PyListObject *a, Py_ssize_t i);
 
+static Py_ssize_t
+list_length(PyListObject *a) {
+  return Py_SIZE(a);
+}
+
 static PySequenceMethods list_as_sequence = {
+  .sq_length = (lenfunc) list_length,
 	.sq_ass_item = (ssizeobjargproc) list_ass_item,
 	.sq_contains = (objobjproc) list_contains,
 	.sq_item = (ssizeargfunc) list_item,
@@ -304,6 +310,8 @@ PyObject *PySequence_Fast(PyObject *o, const char *m);
 PyObject *PyObject_GetIter(PyObject * o);
 Py_ssize_t PyObject_LengthHint(PyObject *o, Py_ssize_t defaultvalue);
 
+static int app1(PyListObject *self, PyObject *v);
+
 static PyObject *
 list_extend(PyListObject *self, PyObject *iterable) {
 	PyObject *it;
@@ -321,7 +329,8 @@ list_extend(PyListObject *self, PyObject *iterable) {
 			return NULL;
 		n = PySequence_Fast_GET_SIZE(iterable);
 		if (n == 0) {
-			assert(false);
+      Py_DECREF(iterable);
+      Py_RETURN_NONE;
 		}
 		m = Py_SIZE(self);
 		if (self->ob_item == NULL) {
@@ -361,7 +370,9 @@ list_extend(PyListObject *self, PyObject *iterable) {
 			assert(false);
 	} else {
 		// make room
-		assert(false);
+    if (list_resize(self, m + n) < 0)
+      fail(0);
+    Py_SET_SIZE(self, m);
 	}
 
 	// Run iterator to exhausion
@@ -377,7 +388,11 @@ list_extend(PyListObject *self, PyObject *iterable) {
 			PyList_SET_ITEM(self, Py_SIZE(self), item);
 			Py_SET_SIZE(self, Py_SIZE(self) + 1);
 		} else {
-			assert(false);
+      int status = app1(self, item);
+      Py_DECREF(item);
+      if (status < 0) {
+        fail(0);
+      }
 		}
 	}
 	if (Py_SIZE(self) < self->allocated) {
@@ -819,5 +834,24 @@ int PyList_Sort(PyObject *v) {
   if (v == NULL)
     return -1;
   Py_DECREF(v);
+  return 0;
+}
+
+static inline int
+valid_index(Py_ssize_t i, Py_ssize_t limit) {
+  return (size_t) i < (size_t) limit;
+}
+
+int
+PyList_SetItem(PyObject *op, Py_ssize_t i, PyObject *newitem) {
+  PyObject **p;
+  if (!PyList_Check(op)) {
+    fail(0);
+  }
+  if (!valid_index(i, Py_SIZE(op))) {
+    fail(0);
+  }
+  p = ((PyListObject *)op)->ob_item + i;
+  Py_XSETREF(*p, newitem);
   return 0;
 }

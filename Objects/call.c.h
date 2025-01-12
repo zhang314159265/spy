@@ -6,7 +6,9 @@ _Py_CheckFunctionResult(PyThreadState *tstate, PyObject *callable,
 	assert((callable != NULL) ^ (where != NULL));
 
 	if (result == NULL) {
-		assert(false);
+    if (!_PyErr_Occurred(tstate)) {
+      fail(0);
+    }
 	} else {
 		if (_PyErr_Occurred(tstate)) {
 			assert(false);
@@ -30,6 +32,10 @@ PyObject *_PyFunction_Vectorcall(PyObject *func, PyObject *const *stack, size_t 
 	}
 }
 
+static PyObject *const * _PyStack_UnpackDict(PyThreadState *tstate, PyObject *const *args, Py_ssize_t nargs, PyObject *kwargs, PyObject **p_kwnames);
+
+static void _PyStack_UnpackDict_Free(PyObject *const *stack, Py_ssize_t nargs, PyObject *kwnames);
+
 
 PyObject *PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *kwargs) {
   PyThreadState *tstate = _PyThreadState_GET();
@@ -50,7 +56,76 @@ PyObject *PyVectorcall_Call(PyObject *callable, PyObject *tuple, PyObject *kwarg
   if (kwargs == NULL || PyDict_GET_SIZE(kwargs) == 0) {
     return func(callable, _PyTuple_ITEMS(tuple), nargs, NULL);
   }
-	assert(false);
+
+  PyObject *const *args;
+  PyObject *kwnames;
+  args = _PyStack_UnpackDict(tstate, _PyTuple_ITEMS(tuple), nargs,
+      kwargs, &kwnames);
+  if (args == NULL) {
+    return NULL;
+  }
+  PyObject *result = func(callable, args,
+      nargs | PY_VECTORCALL_ARGUMENTS_OFFSET, kwnames);
+  _PyStack_UnpackDict_Free(args, nargs, kwnames);
+  return _Py_CheckFunctionResult(tstate, callable, result, NULL);
+}
+
+static PyObject *const *
+_PyStack_UnpackDict(PyThreadState *tstate,
+    PyObject *const *args, Py_ssize_t nargs,
+    PyObject *kwargs, PyObject **p_kwnames) {
+  assert(nargs >= 0);
+  assert(kwargs != NULL);
+  assert(PyDict_Check(kwargs));
+
+  Py_ssize_t nkwargs = PyDict_GET_SIZE(kwargs);
+
+  PyObject **stack = PyMem_Malloc((1 + nargs + nkwargs) * sizeof(args[0]));
+  if (stack == NULL) {
+    fail(0);
+  }
+
+  PyObject *kwnames = PyTuple_New(nkwargs);
+  if (kwnames == NULL) {
+    fail(0);
+  }
+  stack++;
+
+  for (Py_ssize_t i = 0; i < nargs; i++) {
+    Py_INCREF(args[i]);
+    stack[i] = args[i];
+  }
+
+  PyObject **kwstack = stack + nargs;
+  Py_ssize_t pos = 0, i = 0;
+  PyObject *key, *value;
+
+  unsigned long keys_are_strings = Py_TPFLAGS_UNICODE_SUBCLASS;
+  while (PyDict_Next(kwargs, &pos, &key, &value)) {
+    keys_are_strings &= Py_TYPE(key)->tp_flags;
+    Py_INCREF(key);
+    Py_INCREF(value);
+    PyTuple_SET_ITEM(kwnames, i, key);
+    kwstack[i] = value;
+    i++;
+  }
+
+  if (!keys_are_strings) {
+    fail(0);
+  }
+  *p_kwnames = kwnames;
+  return stack;
+}
+
+static void
+_PyStack_UnpackDict_Free(PyObject *const *stack, Py_ssize_t nargs,
+    PyObject *kwnames) {
+  Py_ssize_t n = PyTuple_GET_SIZE(kwnames) + nargs;
+  for (Py_ssize_t i = 0; i < n; i++) {
+    Py_DECREF(stack[i]);
+  }
+  PyMem_Free((PyObject **) stack - 1);
+  Py_DECREF(kwnames);
 }
 
 PyObject *
@@ -76,7 +151,16 @@ _PyObject_FastCallDictTstate(PyThreadState *tstate, PyObject *callable,
   if (kwargs == NULL || PyDict_GET_SIZE(kwargs) == 0) {
     res = func(callable, args, nargsf, NULL);
   } else {
-    assert(false);
+    PyObject *kwnames;
+    PyObject *const *newargs;
+    newargs = _PyStack_UnpackDict(tstate,
+        args, nargs, kwargs, &kwnames);
+    if (newargs == NULL) {
+      return NULL;
+    }
+    res = func(callable, newargs,
+        nargs | PY_VECTORCALL_ARGUMENTS_OFFSET, kwnames);
+    _PyStack_UnpackDict_Free(newargs, nargs, kwnames);
   }
 
   return _Py_CheckFunctionResult(tstate, callable, res, NULL);
@@ -85,6 +169,30 @@ _PyObject_FastCallDictTstate(PyThreadState *tstate, PyObject *callable,
 PyObject *PyObject_VectorcallDict(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwargs) {
   PyThreadState *tstate = _PyThreadState_GET();
   return _PyObject_FastCallDictTstate(tstate, callable, args, nargsf, kwargs);
+}
+
+PyObject *
+_PyStack_AsDict(PyObject *const *values, PyObject *kwnames) {
+  Py_ssize_t nkwargs;
+  PyObject *kwdict;
+  Py_ssize_t i;
+
+  assert(kwnames != NULL);
+  nkwargs = PyTuple_GET_SIZE(kwnames);
+  kwdict = _PyDict_NewPresized(nkwargs);
+  if (kwdict == NULL) {
+    return NULL;
+  }
+
+  for (i = 0; i < nkwargs; i++) {
+    PyObject *key = PyTuple_GET_ITEM(kwnames, i);
+    PyObject *value = *values++;
+    if (PyDict_SetItem(kwdict, key, value)) {
+      Py_DECREF(kwdict);
+      return NULL;
+    }
+  }
+  return kwdict;
 }
 
 // type(...) call this to create new class type.
@@ -105,7 +213,15 @@ PyObject *_PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
   if (keywords == NULL || PyDict_Check(keywords)) {
     kwdict = keywords;
   } else {
-    assert(false);
+    if (PyTuple_GET_SIZE(keywords)) {
+      assert(args != NULL);
+      kwdict = _PyStack_AsDict(args + nargs, keywords);
+      if (kwdict == NULL) {
+        fail(0);
+      }
+    } else {
+      keywords = kwdict = NULL;
+    }
   }
 
   PyObject *result = NULL;
@@ -128,8 +244,21 @@ PyObject *_PyObject_Call(PyThreadState *tstate, PyObject *callable, PyObject *ar
   if (PyVectorcall_Function(callable) != NULL) {
     return PyVectorcall_Call(callable, args, kwargs);
   } else {
-    assert(false);
+    ternaryfunc call = Py_TYPE(callable)->tp_call;
+    if (call == NULL) {
+      fail("tp_call is null for type %s\n", Py_TYPE(callable)->tp_name);
+      return NULL;
+    }
+
+    PyObject *result = (*call)(callable, args, kwargs);
+
+    return _Py_CheckFunctionResult(tstate, callable, result, NULL);
   }
+}
+
+PyObject *PyObject_Call(PyObject *callable, PyObject *args, PyObject *kwargs) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  return _PyObject_Call(tstate, callable, args, kwargs);
 }
 
 // call callable(obj, *args, **kwargs)
@@ -219,4 +348,103 @@ PyObject_CallFunctionObjArgs(PyObject *callable, ...) {
   return result;
 }
 
+PyObject *_PyObject_CallMethodIdObjArgs(PyObject *obj, struct _Py_Identifier *name, ...) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  if (obj == NULL || name == NULL) {
+    assert(false);
+  }
 
+  PyObject *oname = _PyUnicode_FromId(name);
+  if (!oname) {
+    return NULL;
+  }
+
+  PyObject *callable = NULL;
+  int is_method = _PyObject_GetMethod(obj, oname, &callable);
+  if (callable == NULL) {
+    return NULL;
+  }
+  obj = is_method ? obj : NULL;
+
+  va_list vargs;
+  va_start(vargs, name);
+  PyObject *result = object_vacall(tstate, obj, callable, vargs);
+  va_end(vargs);
+
+  Py_DECREF(callable);
+  return result;
+}
+
+
+static PyObject *
+_PyObject_CallFunctionVa(PyThreadState *tstate, PyObject *callable,
+    const char *format, va_list va, int is_size_t) {
+  PyObject *small_stack[_PY_FASTCALL_SMALL_STACK];
+  const Py_ssize_t small_stack_len = Py_ARRAY_LENGTH(small_stack);
+  PyObject **stack;
+  Py_ssize_t nargs, i;
+  PyObject *result;
+
+  if (callable == NULL) {
+    fail(0);
+  }
+
+  if (!format || !*format) {
+    return _PyObject_CallNoArgTstate(tstate, callable);
+  }
+
+  if (is_size_t) {
+    fail(0);
+  } else {
+    stack = _Py_VaBuildStack(small_stack, small_stack_len, format, va, &nargs);
+  }
+  if (stack == NULL) {
+    return NULL;
+  }
+
+  if (nargs == 1 && PyTuple_Check(stack[0])) {
+    fail(0);
+  } else {
+    result = _PyObject_VectorcallTstate(tstate, callable, stack, nargs, NULL);
+  }
+
+  for (i = 0; i < nargs; ++i) {
+    Py_DECREF(stack[i]);
+  }
+  if (stack != small_stack) {
+    PyMem_Free(stack);
+  }
+  return result;
+}
+
+PyObject * _PyObject_CallMethodId(PyObject *obj, _Py_Identifier *name,
+    const char *format, ...) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  if (obj == NULL || name == NULL) {
+    fail(0);
+  }
+
+  PyObject *callable = _PyObject_GetAttrId(obj, name);
+  if (callable == NULL)
+    return NULL;
+
+  va_list va;
+  va_start(va, format);
+  PyObject *retval = callmethod(tstate, callable, format, va, 0);
+  va_end(va);
+
+  Py_DECREF(callable);
+  return retval;
+}
+
+PyObject *PyObject_CallFunction(PyObject *callable, const char *format, ...) {
+  va_list va;
+  PyObject *result;
+  PyThreadState *tstate = _PyThreadState_GET();
+
+  va_start(va, format);
+  result = _PyObject_CallFunctionVa(tstate, callable, format, va, 0);
+  va_end(va);
+
+  return result;
+}

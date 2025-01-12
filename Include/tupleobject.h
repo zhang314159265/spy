@@ -2,6 +2,21 @@
 
 #include <stdarg.h>
 
+#define PyTuple_Check(op) \
+	PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_TUPLE_SUBCLASS)
+
+// defined in cpy/Include/cpython/tupleobject.h
+#define _PyTuple_CAST(op) (assert(PyTuple_Check(op)), (PyTupleObject *)(op))
+#define PyTuple_GET_SIZE(op) Py_SIZE(_PyTuple_CAST(op))
+
+#define PyTuple_GET_ITEM(op, i) (_PyTuple_CAST(op)->ob_item[i])
+#define PyTuple_SET_ITEM(op, i, v) ((void)(_PyTuple_CAST(op)->ob_item[i] = v))
+
+#define PyTuple_CheckExact(op) Py_IS_TYPE(op, &PyTuple_Type)
+extern PyTypeObject PyTuple_Type;
+
+
+
 // defined in cpy/Include/cpython/tupleobject.h
 typedef struct {
 	PyObject_VAR_HEAD
@@ -49,10 +64,60 @@ static void tupledealloc(PyTupleObject *op);
 static Py_ssize_t tuplelength(PyTupleObject *a) { return Py_SIZE(a); }
 static PyObject *tupleitem(PyTupleObject *a, Py_ssize_t i);
 static PyObject *tuplerepr(PyTupleObject *v);
+static int tuplecontains(PyTupleObject *a, PyObject *el);
+
+static PyObject *
+tupleconcat(PyTupleObject *a, PyObject *bb) {
+  Py_ssize_t size;
+  Py_ssize_t i;
+  PyObject **src, **dest;
+  PyTupleObject *np;
+
+  if (Py_SIZE(a) == 0 && PyTuple_CheckExact(bb)) {
+    Py_INCREF(bb);
+    return bb;
+  }
+  if (!PyTuple_Check(bb)) {
+    fail(0);
+  }
+  PyTupleObject *b = (PyTupleObject *) bb;
+
+  if (Py_SIZE(b) == 0 && PyTuple_CheckExact(a)) {
+    fail(0);
+  }
+
+  assert((size_t) Py_SIZE(a) + (size_t) Py_SIZE(b) < PY_SSIZE_T_MAX);
+  size = Py_SIZE(a) + Py_SIZE(b);
+  if (size == 0) {
+    fail(0);
+  }
+
+  np = tuple_alloc(size);
+  if (np == NULL) {
+    return NULL;
+  }
+  src = a->ob_item;
+  dest = np->ob_item;
+  for (i = 0; i < Py_SIZE(a); i++) {
+    PyObject *v = src[i];
+    Py_INCREF(v);
+    dest[i] = v;
+  }
+  src = b->ob_item;
+  dest = np->ob_item + Py_SIZE(a);
+  for (i = 0; i < Py_SIZE(b); i++) {
+    PyObject *v = src[i];
+    Py_INCREF(v);
+    dest[i] = v;
+  }
+  return (PyObject *) np;
+}
 
 static PySequenceMethods tuple_as_sequence = {
 	.sq_length = (lenfunc) tuplelength,
 	.sq_item = (ssizeargfunc) tupleitem,
+  .sq_contains = (objobjproc) tuplecontains,
+  .sq_concat = (binaryfunc) tupleconcat,
 };
 
 static PyObject *tuple_new(PyTypeObject *type, PyObject *args, PyObject *kwargs);
@@ -63,7 +128,7 @@ PyTypeObject PyTuple_Type = {
 	.tp_name = "tuple",
 	.tp_basicsize = sizeof(PyTupleObject) - sizeof(PyObject *),
 	.tp_itemsize = sizeof(PyObject *),
-	.tp_flags = Py_TPFLAGS_TUPLE_SUBCLASS,
+	.tp_flags = Py_TPFLAGS_BASETYPE | Py_TPFLAGS_TUPLE_SUBCLASS,
 	.tp_hash = (hashfunc) tuplehash,
 	.tp_richcompare = tuplerichcompare,
 	.tp_dealloc = (destructor) tupledealloc,
@@ -105,18 +170,6 @@ PyObject *PyTuple_New(Py_ssize_t size) {
 	tuple_gc_track(op);
 	return (PyObject *) op;
 }
-
-#define PyTuple_Check(op) \
-	PyType_FastSubclass(Py_TYPE(op), Py_TPFLAGS_TUPLE_SUBCLASS)
-
-// defined in cpy/Include/cpython/tupleobject.h
-#define _PyTuple_CAST(op) (assert(PyTuple_Check(op)), (PyTupleObject *)(op))
-#define PyTuple_GET_SIZE(op) Py_SIZE(_PyTuple_CAST(op))
-
-#define PyTuple_GET_ITEM(op, i) (_PyTuple_CAST(op)->ob_item[i])
-#define PyTuple_SET_ITEM(op, i, v) ((void)(_PyTuple_CAST(op)->ob_item[i] = v))
-
-#define PyTuple_CheckExact(op) Py_IS_TYPE(op, &PyTuple_Type)
 
 static PyObject *
 tuple_get_empty(void) {
@@ -310,4 +363,14 @@ static PyObject *tupleiter_next(tupleiterobject *it) {
 static void tupleiter_dealloc(tupleiterobject *it) {
   Py_XDECREF(it->it_seq);
   PyObject_GC_Del(it);
+}
+
+static int tuplecontains(PyTupleObject *a, PyObject *el) {
+  Py_ssize_t i;
+  int cmp;
+
+  for (i = 0, cmp = 0; cmp == 0 && i < Py_SIZE(a); ++i) {
+    cmp = PyObject_RichCompareBool(PyTuple_GET_ITEM(a, i), el, Py_EQ);
+  }
+  return cmp;
 }

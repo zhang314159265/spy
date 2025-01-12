@@ -1,5 +1,7 @@
 #pragma once
 
+#include "moduleobject.h"
+
 PyFrameObject *
 _PyFrame_New_NoTrack(PyThreadState *tstate, PyFrameConstructor *con, PyObject *locals) {
 	PyFrameObject *f = frame_alloc((PyCodeObject *) con->fc_code);
@@ -40,3 +42,20 @@ PyTryBlock *PyFrame_BlockPop(PyFrameObject *f) {
   b = &f->f_blockstack[--f->f_iblock];
   return b;
 }
+PyObject *_PyEval_BuiltinsFromGlobals(PyThreadState *tstate, PyObject *globals)
+{
+	PyObject *builtins = _PyDict_GetItemIdWithError(globals, &PyId___builtins__);
+	if (builtins) {
+    if (PyModule_Check(builtins)) {
+      assert(false);
+    }
+    return builtins;
+	}
+	if (PyErr_Occurred()) {
+		return NULL;
+	}
+
+	return _PyEval_GetBuiltins(tstate);
+}
+
+

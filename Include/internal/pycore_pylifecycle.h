@@ -2,6 +2,7 @@
 
 #include "longintrepr.h"
 #include "typeobject.h"
+#include "weakrefobject.h"
 
 // defined in cpy/Objects/longobject.c
 int _PyLong_Init(PyInterpreterState *interp) {
@@ -61,6 +62,7 @@ PyStatus _PyTypes_Init() {
   INIT_TYPE(PyFunction_Type);
   INIT_TYPE(PyStaticMethod_Type);
   INIT_TYPE(PyClassMethod_Type);
+  INIT_TYPE(_PyWeakref_RefType);
 
 	return _PyStatus_OK();
 

@@ -5,6 +5,7 @@ typedef PyObject *(*allocfunc)(PyTypeObject *, Py_ssize_t);
 typedef PyObject *(*vectorcallfunc)(PyObject *callable, PyObject *const *args, size_t nargsf, PyObject *kwnames);
 
 typedef struct {
+  lenfunc mp_length;
   binaryfunc mp_subscript;
   objobjargproc mp_ass_subscript;
 } PyMappingMethods;
@@ -43,19 +44,61 @@ typedef struct {
   ternaryfunc nb_inplace_power;
 
   unaryfunc nb_index;
+
+  unaryfunc nb_int;
+  unaryfunc nb_float;
+  binaryfunc nb_matrix_multiply;
+  binaryfunc nb_inplace_matrix_multiply;
+  binaryfunc nb_divmod;
 } PyNumberMethods;
 
 typedef struct {
   ssizeobjargproc sq_ass_item;
+  binaryfunc sq_concat;
   lenfunc sq_length;
   ssizeargfunc sq_item;
   objobjproc sq_contains;
+  ssizeargfunc sq_repeat;
+  ssizeargfunc sq_inplace_repeat;
+  binaryfunc sq_inplace_concat;
 } PySequenceMethods;
 
-typedef struct {
-} PyAsyncMethods;
+typedef PySendResult (*sendfunc)(PyObject *iter, PyObject *value, PyObject **result);
 
 typedef struct {
+  unaryfunc am_await;
+  unaryfunc am_aiter;
+  unaryfunc am_anext;
+  sendfunc am_send;
+} PyAsyncMethods;
+
+typedef struct bufferinfo {
+  void *buf;
+  PyObject *obj;
+  Py_ssize_t len;
+  Py_ssize_t itemsize;
+  int readonly;
+  int ndim;
+  char *format;
+  Py_ssize_t *shape;
+  Py_ssize_t *strides;
+  Py_ssize_t *suboffsets;
+  void *internal;
+} Py_buffer;
+
+#define PyBUF_SIMPLE 0
+#define PyBUF_WRITABLE 0x0001
+
+#define PyBUF_FORMAT 0x0004
+#define PyBUF_ND 0x0008
+#define PyBUF_STRIDES (0x0010 | PyBUF_ND)
+
+typedef int(*getbufferproc)(PyObject *, Py_buffer *, int);
+typedef void (*releasebufferproc)(PyObject *, Py_buffer *);
+
+typedef struct {
+  getbufferproc bf_getbuffer;
+  releasebufferproc bf_releasebuffer;
 } PyBufferProcs;
 
 struct PyMemberDef;
@@ -69,6 +112,8 @@ struct _typeobject {
   destructor tp_dealloc;
 
   allocfunc tp_alloc;
+  inquiry tp_is_gc;
+  destructor tp_del;
 
   PyObject *tp_mro; // method resolution order
   PyNumberMethods *tp_as_number;
@@ -182,3 +227,4 @@ typedef struct _Py_Identifier {
 int _PyObject_LookupAttrId(PyObject *v, struct _Py_Identifier *name, PyObject **result);
 
 
+int _PyObject_LookupAttr(PyObject *v, PyObject *name, PyObject **result);

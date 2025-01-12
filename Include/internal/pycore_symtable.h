@@ -94,6 +94,8 @@ typedef struct _symtable_entry {
 	unsigned ste_needs_class_closure : 1;
   unsigned ste_generator : 1; // true if namespace is a generator
   unsigned ste_coroutine : 1;
+  unsigned ste_varargs : 1;
+  unsigned ste_varkeywords : 1;
   _Py_comprehension_ty ste_comprehension;
   _Py_block_ty ste_type; // module, class or function
 } PySTEntryObject;
@@ -156,6 +158,8 @@ ste_new(struct symtable *st, _Py_block_ty block, void *key) {
   ste->ste_id = k; /* ste owns reference to k */
 
   ste->ste_free = 0;
+  ste->ste_varargs = 0;
+  ste->ste_varkeywords = 0;
 
   ste->ste_generator = 0;
   ste->ste_coroutine = 0;
@@ -694,10 +698,14 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a) {
 	if (a->kwonlyargs && !symtable_visit_params(st, a->kwonlyargs))
 		return 0;
   if (a->vararg) {
-    assert(false);
+    if (!symtable_add_def(st, a->vararg->arg, DEF_PARAM, LOCATION(a->vararg)))
+      return 0;
+    st->st_cur->ste_varargs = 1;
   }
   if (a->kwarg) {
-    assert(false);
+    if (!symtable_add_def(st, a->kwarg->arg, DEF_PARAM, LOCATION(a->kwarg)))
+      return 0;
+    st->st_cur->ste_varkeywords = 1;
   }
 	return 1;
 }
@@ -708,6 +716,42 @@ symtable_visit_withitem(struct symtable *st, withitem_ty item) {
   if (item->optional_vars) {
     VISIT(st, expr, item->optional_vars);
   }
+  return 1;
+}
+static int
+symtable_visit_alias(struct symtable *st, alias_ty a) {
+  PyObject *store_name;
+  PyObject *name = (a->asname == NULL) ? a->name : a->asname;
+  Py_ssize_t dot = PyUnicode_FindChar(name, '.', 0,
+      PyUnicode_GET_LENGTH(name), 1);
+
+  if (dot != -1) {
+    store_name = PyUnicode_Substring(name, 0, dot);
+    if (!store_name)
+      return 0;
+  } else {
+    store_name = name;
+    Py_INCREF(store_name);
+  }
+  if (!_PyUnicode_EqualToASCIIString(name, "*")) {
+    int r = symtable_add_def(st, store_name, DEF_IMPORT, LOCATION(a));
+    Py_DECREF(store_name);
+    return r;
+  } else {
+    assert(false);
+  }
+}
+
+static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
+
+static int
+symtable_visit_excepthandler(struct symtable *st, excepthandler_ty eh) {
+  if (eh->v.ExceptHandler.type)
+    VISIT(st, expr, eh->v.ExceptHandler.type);
+  if (eh->v.ExceptHandler.name)
+    if (!symtable_add_def(st, eh->v.ExceptHandler.name, DEF_LOCAL, LOCATION(eh)))
+      return 0;
+  VISIT_SEQ(st, stmt, eh->v.ExceptHandler.body);
   return 1;
 }
 
@@ -787,11 +831,28 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s) {
   case Delete_kind:
     VISIT_SEQ(st, expr, s->v.Delete.targets);
     break;
+  case ImportFrom_kind:
+    VISIT_SEQ(st, alias, s->v.ImportFrom.names);
+    break;
   case Pass_kind:
     break;
   case With_kind:
     VISIT_SEQ(st, withitem, s->v.With.items);
     VISIT_SEQ(st, stmt, s->v.With.body);
+    break;
+  case Try_kind:
+    VISIT_SEQ(st, stmt, s->v.Try.body);
+    VISIT_SEQ(st, stmt, s->v.Try.orelse);
+    VISIT_SEQ(st, excepthandler, s->v.Try.handlers);
+    VISIT_SEQ(st, stmt, s->v.Try.finalbody);
+    break;
+  case Raise_kind:
+    if (s->v.Raise.exc) {
+      VISIT(st, expr, s->v.Raise.exc);
+      if (s->v.Raise.cause) {
+        VISIT(st, expr, s->v.Raise.cause);
+      }
+    }
     break;
   default:
     assert(false);

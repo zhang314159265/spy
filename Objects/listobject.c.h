@@ -1,7 +1,13 @@
 #pragma once
 
+#define LIST_EXTEND_METHODDEF \
+  {"extend", (PyCFunction)list_extend, METH_O, ""},
+
+static PyObject *list_extend(PyListObject *self, PyObject *iterable);
+
 static PyMethodDef list_methods[] = {
 	LIST_APPEND_METHODDEF
+  LIST_EXTEND_METHODDEF
 	{NULL, NULL},
 };
 
@@ -9,9 +15,75 @@ static PyObject *list_subscript(PyListObject *self, PyObject *item);
 static int list_ass_subscript(PyListObject *self, PyObject *item, PyObject *value);
 
 static PyMappingMethods list_as_mapping = {
-	(binaryfunc) list_subscript,
-	(objobjargproc) list_ass_subscript,
+	.mp_subscript = (binaryfunc) list_subscript,
+	.mp_ass_subscript = (objobjargproc) list_ass_subscript,
 };
+
+typedef struct {
+  PyObject_HEAD
+  Py_ssize_t it_index;
+  PyListObject *it_seq;
+} listiterobject;
+
+static PyMethodDef listiter_methods[] = {
+  {NULL, NULL}
+};
+
+static void
+listiter_dealloc(listiterobject *it) {
+  Py_XDECREF(it->it_seq);
+  PyObject_GC_Del(it);
+}
+
+static PyObject *
+listiter_next(listiterobject *it) {
+  PyListObject *seq;
+  PyObject *item;
+
+  assert(it != NULL);
+  seq = it->it_seq;
+  if (seq == NULL)
+    return NULL;
+  assert(PyList_Check(seq));
+
+  if (it->it_index < PyList_GET_SIZE(seq)) {
+    item = PyList_GET_ITEM(seq, it->it_index);
+    ++it->it_index;
+    Py_INCREF(item);
+    return item;
+  }
+  it->it_seq = NULL;
+  Py_DECREF(seq);
+  return NULL;
+}
+
+PyTypeObject PyListIter_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "list_iterator",
+  .tp_basicsize = sizeof(listiterobject),
+  .tp_dealloc = (destructor) listiter_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_flags = 0,
+  .tp_iter = PyObject_SelfIter,
+  .tp_iternext = (iternextfunc) listiter_next,
+  .tp_methods = listiter_methods,
+};
+
+static PyObject *
+list_iter(PyObject *seq) {
+  listiterobject *it;
+
+  if (!PyList_Check(seq)) {
+    fail(0);
+  }
+  it = PyObject_GC_New(listiterobject, &PyListIter_Type);
+  if (it == NULL)
+    return NULL;
+  it->it_index = 0;
+  Py_INCREF(seq);
+  it->it_seq = (PyListObject *) seq;
+  return (PyObject *) it;
+}
 
 // defined in cpy/Objects/listobject.c
 PyTypeObject PyList_Type = {
@@ -26,6 +98,7 @@ PyTypeObject PyList_Type = {
 	.tp_repr = (reprfunc) list_repr,
 	.tp_methods = list_methods,
 	.tp_getattro = PyObject_GenericGetAttr,
+  .tp_iter = list_iter,
 };
 
 static PyObject *

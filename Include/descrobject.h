@@ -45,6 +45,11 @@ typedef struct {
 
 typedef struct {
   PyDescr_COMMON;
+  struct PyMemberDef *d_member;
+} PyMemberDescrObject;
+
+typedef struct {
+  PyDescr_COMMON;
   struct wrapperbase *d_base;
   void *d_wrapped;
 } PyWrapperDescrObject;
@@ -59,6 +64,46 @@ typedef void (*funcptr)(void);
 static inline funcptr
 method_enter_call(PyThreadState *tstate, PyObject *func) {
 	return (funcptr) ((PyMethodDescrObject *) func)->d_method->ml_meth;
+}
+
+static int descr_check(PyDescrObject *descr, PyObject *obj);
+
+static inline int
+method_check_args(PyObject *func, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames) {
+  assert(!PyErr_Occurred());
+  if (nargs < 1) {
+    fail(0);
+  }
+  PyObject *self = args[0];
+  if (descr_check((PyDescrObject *) func, self) < 0) {
+    return -1;
+  }
+  if (kwnames && PyTuple_GET_SIZE(kwnames)) {
+    fail(0);
+  }
+  return 0;
+}
+
+static PyObject *
+method_vectorcall_VARARGS(
+    PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+  if (method_check_args(func, args, nargs, kwnames)) {
+    return NULL;
+  }
+  PyObject *argstuple = _PyTuple_FromArray(args + 1, nargs - 1);
+  if (argstuple == NULL) {
+    return NULL;
+  }
+  PyCFunction meth = (PyCFunction) method_enter_call(tstate, func);
+  if (meth == NULL) {
+    Py_DECREF(argstuple);
+    return NULL;
+  }
+  PyObject *result = meth(args[0], argstuple);
+  Py_DECREF(argstuple);
+  return result;
 }
 
 static PyObject *
@@ -95,7 +140,6 @@ classmethoddescr_call(PyMethodDescrObject *descr, PyObject *args,
   assert(false);
 }
 
-static int descr_check(PyDescrObject *descr, PyObject *obj);
 
 static PyObject *
 method_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type) {
@@ -122,6 +166,54 @@ PyTypeObject PyMethodDescr_Type = {
   .tp_descr_get = (descrgetfunc) method_get,
 };
 
+static void
+descr_dealloc(PyDescrObject *descr) {
+  assert(false);
+}
+
+static PyObject *
+member_get(PyMemberDescrObject *descr, PyObject *obj, PyObject *type) {
+  if (obj == NULL) {
+    return Py_NewRef(descr);
+  }
+  if (descr_check((PyDescrObject *) descr, obj) < 0) {
+    return NULL;
+  }
+
+  if (descr->d_member->flags & PY_AUDIT_READ) {
+    assert(false);
+  }
+
+  return PyMember_GetOne((char *) obj, descr->d_member);
+}
+
+static int
+descr_setcheck(PyDescrObject *descr, PyObject *obj, PyObject *value) {
+  assert(obj != NULL);
+  if (!PyObject_TypeCheck(obj, descr->d_type)) {
+    assert(false);
+  }
+  return 0;
+}
+
+static int
+member_set(PyMemberDescrObject *descr, PyObject *obj, PyObject *value) {
+  if (descr_setcheck((PyDescrObject *) descr, obj, value) < 0) {
+    return -1;
+  }
+  return PyMember_SetOne((char *) obj, descr->d_member, value);
+}
+
+PyTypeObject PyMemberDescr_Type = {
+  PyVarObject_HEAD_INIT(&PyType_Type, 0)
+  .tp_name = "member_descriptor",
+  .tp_basicsize = sizeof(PyMemberDescrObject),
+  .tp_dealloc = (destructor) descr_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_descr_get = (descrgetfunc) member_get,
+  .tp_descr_set = (descrsetfunc) member_set,
+};
+
 static PyObject * classmethod_get(PyMethodDescrObject *descr, PyObject *obj, PyObject *type);
 
 PyTypeObject PyClassMethodDescr_Type = {
@@ -140,10 +232,6 @@ PyTypeObject PyWrapperDescr_Type = {
   .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
       Py_TPFLAGS_METHOD_DESCRIPTOR,
 };
-
-static void descr_dealloc(PyDescrObject *descr) {
-  assert(false);
-}
 
 static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject *type);
 
@@ -247,17 +335,76 @@ method_vectorcall_O(
 	return result;
 }
 
+static PyObject *
+method_vectorcall_FASTCALL_KEYWORDS(
+    PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+  if (method_check_args(func, args, nargs, NULL)) {
+    return NULL;
+  }
+  _PyCFunctionFastWithKeywords meth = (_PyCFunctionFastWithKeywords)
+      method_enter_call(tstate, func);
+  if (meth == NULL) {
+    return NULL;
+  }
+  PyObject *result = meth(args[0], args + 1, nargs - 1, kwnames);
+  return result;
+}
+
+static PyObject *
+method_vectorcall_NOARGS(
+    PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+  if (nargs != 1) {
+    fail(0);
+  }
+  PyCFunction meth = (PyCFunction) method_enter_call(tstate, func);
+  if (meth == NULL) {
+    return NULL;
+  }
+  PyObject *result = meth(args[0], NULL);
+  return result;
+}
+
+static PyObject *
+method_vectorcall_FASTCALL(
+  PyObject *func, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+
+  _PyCFunctionFast meth = (_PyCFunctionFast) method_enter_call(tstate, func);
+  if (meth == NULL) {
+    return NULL;
+  }
+  PyObject *result = meth(args[0], args + 1, nargs - 1);
+  return result;
+}
+
 PyObject *
 PyDescr_NewMethod(PyTypeObject *type, PyMethodDef *method) {
 	vectorcallfunc vectorcall;
 	switch (method->ml_flags & (METH_VARARGS | METH_FASTCALL | METH_NOARGS |
 			METH_O | METH_KEYWORDS | METH_METHOD)) {
+  case METH_VARARGS:
+    vectorcall = method_vectorcall_VARARGS;
+    break;
 	case METH_VARARGS | METH_KEYWORDS:
 		vectorcall = method_vectorcall_VARARGS_KEYWORDS;
 		break;
+  case METH_FASTCALL:
+    vectorcall = method_vectorcall_FASTCALL;
+    break;
 	case METH_O:
 		vectorcall = method_vectorcall_O;
 		break;
+  case METH_NOARGS:
+    vectorcall = method_vectorcall_NOARGS;
+    break;
+  case METH_FASTCALL | METH_KEYWORDS:
+    vectorcall = method_vectorcall_FASTCALL_KEYWORDS;
+    break;
 	default:
 		assert(false);
 	}
@@ -357,6 +504,12 @@ static PyObject *getset_get(PyGetSetDescrObject *descr, PyObject *obj, PyObject 
 }
 
 static int getset_set(PyGetSetDescrObject *descr, PyObject *obj, PyObject *value) {
+  if (descr_setcheck((PyDescrObject *) descr, obj, value) < 0) {
+    return -1;
+  }
+  if (descr->d_getset->set != NULL) {
+    return descr->d_getset->set(obj, value, descr->d_getset->closure);
+  }
   assert(false);
 }
 
@@ -447,4 +600,16 @@ property_copy(PyObject *old, PyObject *get, PyObject *set, PyObject *del) {
   return new;
 }
 
+PyObject *
+PyDescr_NewMember(PyTypeObject *type, PyMemberDef *member) {
+  PyMemberDescrObject *descr;
 
+  descr = (PyMemberDescrObject *) descr_new(&PyMemberDescr_Type,
+      type, member->name);
+
+  if (descr != NULL) {
+    descr->d_member = member;
+  }
+
+  return (PyObject *) descr;
+}

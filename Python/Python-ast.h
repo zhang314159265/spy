@@ -380,16 +380,17 @@ _PyAST_Pass() {
   return p;
 }
 
-stmt_ty
-_PyAST_With(asdl_withitem_seq *items, asdl_stmt_seq *body, string type_comment) {
-  stmt_ty p;
-  p = (stmt_ty) malloc(sizeof(*p));
+alias_ty
+_PyAST_alias(identifier name, identifier asname) {
+  alias_ty p;
+  if (!name) {
+    assert(false);
+  }
+  p = (alias_ty) malloc(sizeof(*p));
   if (!p)
     return NULL;
-  p->kind = With_kind;
-  p->v.With.items = items;
-  p->v.With.body = body;
-  p->v.With.type_comment = type_comment;
+  p->name = name;
+  p->asname = asname;
   return p;
 }
 
@@ -404,5 +405,59 @@ _PyAST_withitem(expr_ty context_expr, expr_ty optional_vars) {
     return NULL;
   p->context_expr = context_expr;
   p->optional_vars = optional_vars;
+  return p;
+}
+
+stmt_ty
+_PyAST_With(asdl_withitem_seq *items, asdl_stmt_seq *body, string type_comment) {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = With_kind;
+  p->v.With.items = items;
+  p->v.With.body = body;
+  p->v.With.type_comment = type_comment;
+  return p;
+}
+
+stmt_ty
+_PyAST_ImportFrom(identifier module, asdl_alias_seq *names, int level) {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = ImportFrom_kind;
+  p->v.ImportFrom.module = module;
+  p->v.ImportFrom.names = names;
+  p->v.ImportFrom.level = level;
+  return p;
+}
+
+stmt_ty
+_PyAST_Try(asdl_stmt_seq *body, asdl_excepthandler_seq *handlers,
+    asdl_stmt_seq *orelse, asdl_stmt_seq *finalbody) {
+  stmt_ty p;
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = Try_kind;
+  p->v.Try.body = body;
+  p->v.Try.handlers = handlers;
+  p->v.Try.orelse = orelse;
+  p->v.Try.finalbody = finalbody;
+  return p;
+}
+
+excepthandler_ty
+_PyAST_ExceptHandler(expr_ty type, identifier name, asdl_stmt_seq *body) {
+  excepthandler_ty p;
+  p = (excepthandler_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = ExceptHandler_kind;
+  p->v.ExceptHandler.type = type;
+  p->v.ExceptHandler.name = name;
+  p->v.ExceptHandler.body = body;
   return p;
 }

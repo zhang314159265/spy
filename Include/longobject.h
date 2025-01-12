@@ -20,45 +20,7 @@ typedef struct _longobject PyLongObject;
 
 #include "longintrepr.h"
 
-long
-PyLong_AsLongAndOverflow(PyObject *vv, int *overflow) {
-  PyLongObject *v;
-  int do_decref = 0;
-  long res;
-  Py_ssize_t i;
-
-  *overflow = 0;
-  if (vv == NULL) {
-    assert(false);
-  }
-
-  if (PyLong_Check(vv)) {
-    v = (PyLongObject *) vv;
-  } else {
-    assert(false);
-  }
-
-  res = -1;
-  i = Py_SIZE(v);
-  switch (i) {
-  case -1:
-    res = -(sdigit) v->ob_digit[0];
-    break;
-  case 0:
-    res = 0;
-    break;
-  case 1:
-    res = v->ob_digit[0];
-    break;
-  default:
-    assert(false);
-  }
-
-  if (do_decref) {
-    Py_DECREF(v);
-  }
-  return res;
-}
+long PyLong_AsLongAndOverflow(PyObject *vv, int *overflow);
 
 long PyLong_AsLong(PyObject *obj) {
   int overflow;
@@ -81,6 +43,8 @@ get_small_int(sdigit ival) {
 PyObject *PyLong_FromLong(long ival) {
   PyLongObject *v;
   unsigned long abs_ival;
+  unsigned long t;
+  int ndigits = 0;
   int sign;
 
   if (IS_SMALL_INT(ival)) {
@@ -105,7 +69,24 @@ PyObject *PyLong_FromLong(long ival) {
     }
     return (PyObject *) v;
   }
-  assert(false);
+
+  t = abs_ival;
+  while (t) {
+    ++ndigits;
+    t >>= PyLong_SHIFT;
+  }
+  v = _PyLong_New(ndigits);
+  if (v != NULL) {
+    digit *p = v->ob_digit;
+    Py_SET_SIZE(v, ndigits * sign);
+    t = abs_ival;
+    while (t) {
+      *p++ = Py_SAFE_DOWNCAST(
+        t & PyLong_MASK, unsigned long, digit);
+      t >>= PyLong_SHIFT;
+    }
+  }
+  return (PyObject *) v;
 }
 
 #define PYLONG_FROM_UINT(INT_TYPE, ival) \
@@ -136,6 +117,11 @@ PyObject *
 PyLong_FromUnsignedLong(unsigned long ival)
 {
   PYLONG_FROM_UINT(unsigned long, ival);
+}
+
+PyObject *
+PyLong_FromUnsignedLongLong(unsigned long long ival) {
+  PYLONG_FROM_UINT(unsigned long long, ival);
 }
 
 PyObject *PyLong_FromVoidPtr(void *p) {
@@ -206,7 +192,10 @@ long_to_decimal_string_internal(PyObject *aa,
 	for (i = size_a; --i >= 0; ) {
 		digit hi = pin[i];
 		for (j = 0; j < size; j++) {
-			assert(false);
+      twodigits z = (twodigits) pout[j] << PyLong_SHIFT | hi;
+      hi = (digit) (z / _PyLong_DECIMAL_BASE);
+      pout[j] = (digit)(z - (twodigits) hi * 
+        _PyLong_DECIMAL_BASE);
 		}
 		while (hi) {
 			pout[size++] = hi % _PyLong_DECIMAL_BASE;
@@ -355,4 +344,31 @@ PyLong_FromLongLong(long long ival) {
 		}
 	}
 	return (PyObject *) v;
+}
+
+int _PyLong_AsInt(PyObject *obj) {
+  int overflow;
+  long result = PyLong_AsLongAndOverflow(obj, &overflow);
+  if (overflow || result > INT_MAX || result < INT_MIN) {
+    assert(false);
+  }
+  return (int) result;
+}
+
+int _PyLong_Sign(PyObject *vv) {
+  PyLongObject *v = (PyLongObject *) vv;
+
+  assert(v != NULL);
+  assert(PyLong_Check(v));
+
+  return Py_SIZE(v) == 0 ? 0 : (Py_SIZE(v) < 0 ? -1 : 1);
+}
+
+PyObject *
+PyLong_FromDouble(double dval) {
+  const double int_max = (unsigned long) LONG_MAX + 1;
+  if (-int_max < dval && dval < int_max) {
+    return PyLong_FromLong((long) dval);
+  }
+  fail(0);
 }

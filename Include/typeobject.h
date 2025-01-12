@@ -3,6 +3,7 @@
 
 #include "tupleobject.h"
 #include "methodobject.h"
+#include "structmember.h"
 
 
 static int type_ready(PyTypeObject *type);
@@ -36,21 +37,19 @@ static PyMethodDef object_methods[] = {
 static PyObject *object_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 static int object_init(PyObject *self, PyObject *args, PyObject *kwds);
 
-// defined in cpy/Objects/typeobject.c
-PyTypeObject PyBaseObject_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  .tp_name = "object",
-  .tp_basicsize = sizeof(PyObject),
-	.tp_dealloc = object_dealloc,
-	.tp_free = PyObject_Del,
-	.tp_hash = (hashfunc) _Py_HashPointer,
-  .tp_alloc = PyType_GenericAlloc,
-  .tp_methods = object_methods,
-  .tp_new = object_new,
-  .tp_init = object_init,
-  .tp_getattro = PyObject_GenericGetAttr,
-  .tp_setattro = PyObject_GenericSetAttr,
-};
+extern PyTypeObject PyBaseObject_Type;
+
+static int
+tail_contains(PyObject *tuple, int whence, PyObject *o) {
+  Py_ssize_t j, size;
+  size = PyTuple_GET_SIZE(tuple);
+
+  for (j = whence + 1; j < size; j++) {
+    if (PyTuple_GET_ITEM(tuple, j) == o)
+      return 1;
+  }
+  return 0;
+}
 
 static int
 pmerge(PyObject *acc, PyObject **to_merge, Py_ssize_t to_merge_size) {
@@ -76,7 +75,26 @@ pmerge(PyObject *acc, PyObject **to_merge, Py_ssize_t to_merge_size) {
 			empty_cnt++;
 			continue;
 		}
-		assert(false);
+
+    candidate = PyTuple_GET_ITEM(cur_tuple, remain[i]);
+    for (j = 0; j < to_merge_size; j++) {
+      PyObject *j_lst = to_merge[j];
+      if (tail_contains(j_lst, remain[j], candidate))
+        goto skip;
+    }
+    res = PyList_Append(acc, candidate);
+    if (res < 0)
+      goto out;
+
+    for (j = 0; j < to_merge_size; j++) {
+      PyObject *j_lst = to_merge[j];
+      if (remain[j] < PyTuple_GET_SIZE(j_lst) &&
+        PyTuple_GET_ITEM(j_lst, remain[j]) == candidate) {
+        remain[j]++;
+      }
+    }
+    goto again;
+  skip: ;
 	}
 
 	if (empty_cnt != to_merge_size) {
@@ -171,6 +189,10 @@ inherit_special(PyTypeObject *type, PyTypeObject *base) {
 
   if (PyType_IsSubtype(base, (PyTypeObject*) PyExc_BaseException)) {
     type->tp_flags |= Py_TPFLAGS_BASE_EXC_SUBCLASS;
+  } else if (PyType_IsSubtype(base, &PyLong_Type)) {
+    type->tp_flags |= Py_TPFLAGS_LONG_SUBCLASS;
+  } else if (PyType_IsSubtype(base, &PyTuple_Type)) {
+    type->tp_flags |= Py_TPFLAGS_TUPLE_SUBCLASS;
   }
 }
 
@@ -208,6 +230,8 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
     type->tp_setattr = base->tp_setattr;
     type->tp_setattro = base->tp_setattro;
   }
+  COPYSLOT(tp_repr);
+  COPYSLOT(tp_str);
 	{
 		if (type->tp_richcompare == NULL && type->tp_hash == NULL) {
 			int r = overrides_hash(type);
@@ -265,6 +289,7 @@ static int add_operators(PyTypeObject *type);
 
 static int type_add_getset(PyTypeObject *type);
 
+static int type_add_members(PyTypeObject *type);
 static int
 type_ready_fill_dict(PyTypeObject *type) {
   if (add_operators(type) < 0) {
@@ -273,6 +298,9 @@ type_ready_fill_dict(PyTypeObject *type) {
 	if (type_add_methods(type) < 0) {
 		return -1;
 	}
+  if (type_add_members(type) < 0) {
+    return -1;
+  }
   if (type_add_getset(type) < 0) {
     return -1;
   }
@@ -599,3 +627,16 @@ PyType_Modified(PyTypeObject *type) {
 }
 
 PyObject *_PyObject_LookupSpecial(PyObject *self, _Py_Identifier *attrid);
+PyObject *PyType_FromSpecWithBases(PyType_Spec *spec, PyObject *bases);
+
+const char *
+_PyType_Name(PyTypeObject *type) {
+  assert(type->tp_name != NULL);
+  const char *s = strrchr(type->tp_name, '.');
+  if (s == NULL) {
+    s = type->tp_name;
+  } else {
+    s++;
+  }
+  return s;
+}

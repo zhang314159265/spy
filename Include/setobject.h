@@ -18,6 +18,10 @@
 
 #define PySet_GET_SIZE(so) (assert(PyAnySet_Check(so)), (((PySetObject *) (so))->used))
 
+#define PyFrozenSet_Check(ob) \
+  (Py_IS_TYPE(ob, &PyFrozenSet_Type) || \
+    PyType_IsSubtype(Py_TYPE(ob), &PyFrozenSet_Type))
+
 // Object used as dummy key to fill deleted entries
 static PyObject _dummy_struct;
 #define dummy (&_dummy_struct)
@@ -32,6 +36,7 @@ typedef struct {
 	PyObject_HEAD
 
 	setentry *table;
+  Py_hash_t hash; // only used by frozenset objects
 	setentry smalltable[PySet_MINSIZE];
 
 	Py_ssize_t fill; // Number active and dummy entries
@@ -105,6 +110,39 @@ set_dealloc(PySetObject *so) {
 static PyObject *set_repr(PySetObject *so);
 PyObject *PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems);
 
+static PyObject *make_new_set(PyTypeObject *type, PyObject *iterable);
+
+static PyObject *
+set_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  return make_new_set(type, NULL);
+}
+
+static Py_ssize_t
+set_len(PyObject *so) {
+  return ((PySetObject *) so)->used;
+}
+
+static int set_contains_key(PySetObject *so, PyObject *key);
+
+static int set_contains(PySetObject *so, PyObject *key) {
+  PyObject *tmpkey;
+  int rv;
+
+  rv = set_contains_key(so, key);
+  if (rv < 0) {
+    fail(0); 
+  }
+  return rv;
+}
+
+static PySequenceMethods set_as_sequence = {
+  .sq_length = set_len,
+  .sq_contains = (objobjproc) set_contains,
+};
+
+static int set_update_internal(PySetObject *so, PyObject *other);
+static int set_init(PySetObject *self, PyObject *args, PyObject *kwds);
+
 PyTypeObject PySet_Type = {
 	PyVarObject_HEAD_INIT(&PyType_Type, 0)
 	.tp_name = "set",
@@ -117,14 +155,34 @@ PyTypeObject PySet_Type = {
   .tp_dealloc = (destructor) set_dealloc,
   .tp_free = PyObject_GC_Del,
 	.tp_repr = (reprfunc) set_repr,
+  .tp_new = set_new,
+  .tp_as_sequence = &set_as_sequence,
+  .tp_init = (initproc) set_init,
 };
+
+static PyObject *
+frozenset_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  fail(0);
+}
+
+static PyObject *
+frozenset_vectorcall(PyObject *type, PyObject *const *args,
+    size_t nargsf, PyObject *kwnames) {
+  fail(0);
+}
 
 PyTypeObject PyFrozenSet_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "frozenset",
   .tp_basicsize = sizeof(PySetObject),
   .tp_itemsize = 0,
-  .tp_flags = 0,
+  .tp_flags = Py_TPFLAGS_BASETYPE,
+  .tp_dealloc = (destructor) set_dealloc,
+  .tp_getattro = PyObject_GenericGetAttr,
+  .tp_alloc = PyType_GenericAlloc,
+  .tp_new = frozenset_new,
+  .tp_free = PyObject_GC_Del,
+  .tp_vectorcall = frozenset_vectorcall,
 };
 
 #define LINEAR_PROBES 9
@@ -258,12 +316,36 @@ set_merge(PySetObject *so, PyObject *otherset) {
 	return 0;
 }
 
+static int set_add_key(PySetObject *so, PyObject *key);
+
 static int
 set_update_internal(PySetObject *so, PyObject *other)
 {
+  PyObject *key, *it;
+
   if (PyAnySet_Check(other))
     return set_merge(so, other);
-  assert(false);
+
+  if (PyDict_CheckExact(other)) {
+    fail(0);
+  }
+
+  it = PyObject_GetIter(other);
+  if (it == NULL)
+    return -1;
+
+  while ((key = PyIter_Next(it)) != NULL) {
+    if (set_add_key(so, key)) {
+      Py_DECREF(it);
+      Py_DECREF(key);
+      return -1;
+    }
+    Py_DECREF(key);
+  }
+  Py_DECREF(it);
+  if (PyErr_Occurred())
+    return -1;
+  return 0;
 }
 
 static PyObject *
@@ -307,6 +389,11 @@ make_new_set(PyTypeObject *type, PyObject *iterable) {
 // defined in cpy/Objects/setobject.c
 PyObject *PySet_New(PyObject *iterable) {
 	return make_new_set(&PySet_Type, iterable);
+}
+
+PyObject *
+PyFrozenSet_New(PyObject *iterable) {
+  return make_new_set(&PyFrozenSet_Type, iterable);
 }
 
 static setentry *
@@ -360,7 +447,9 @@ set_contains_key(PySetObject *so, PyObject *key) {
 
   if (!PyUnicode_CheckExact(key) ||
       (hash = ((PyASCIIObject *) key)->hash) == -1) {
-    assert(false);
+    hash = PyObject_Hash(key);
+    if (hash == -1)
+      return -1;
   }
   return set_contains_entry(so, key, hash);
 }
@@ -415,6 +504,7 @@ static void setiter_dealloc(setiterobject *si) {
 
 static int
 set_add_entry(PySetObject *so, PyObject *key, Py_hash_t hash) {
+  setentry *table;
 	setentry *freeslot;
 	setentry *entry;
 
@@ -422,6 +512,7 @@ set_add_entry(PySetObject *so, PyObject *key, Py_hash_t hash) {
 	size_t mask;
 	size_t i;
 	int probes;
+  int cmp;
 
 	Py_INCREF(key);
 
@@ -439,7 +530,25 @@ restart:
 			if (entry->hash == 0 && entry->key == NULL)
 				goto found_unused_or_dummy;
 			if (entry->hash == hash) {
-				assert(false);
+        PyObject *startkey = entry->key;
+        assert(startkey != dummy);
+        if (startkey == key)
+          goto found_active;
+        if (PyUnicode_CheckExact(startkey)
+            && PyUnicode_CheckExact(key)
+            && _PyUnicode_EQ(startkey, key))
+          goto found_active;
+        table = so->table;
+        Py_INCREF(startkey);
+        cmp = PyObject_RichCompareBool(startkey, key, Py_EQ);
+        Py_DECREF(startkey);
+        if (cmp > 0)
+          goto found_active;
+        if (cmp < 0)
+          fail(0);
+        if (table != so->table || entry->key != startkey)
+          fail(0);
+        mask = so->mask;
 			}
 			else if (entry->hash == -1) {
 				assert(false);
@@ -460,7 +569,10 @@ found_unused:
 	entry->hash = hash;
 	if ((size_t) so->fill * 5 < mask * 3)
 		return 0;
-	assert(false);
+  return set_table_resize(so, so->used > 50000 ? so->used * 2 : so->used * 4);
+ found_active:
+  Py_DECREF(key);
+  return 0;
 }
 
 static int
@@ -477,7 +589,7 @@ set_add_key(PySetObject *so, PyObject *key) {
 }
 
 int PySet_Add(PyObject *anyset, PyObject *key) {
-	if (!PySet_Check(anyset)) {
+	if (!PySet_Check(anyset) && (!PyFrozenSet_Check(anyset) || Py_REFCNT(anyset) != 1)) {
 		assert(false);
 	}
 	return set_add_key((PySetObject *) anyset, key);
@@ -529,7 +641,8 @@ static PyObject *set_repr(PySetObject *so) {
 	PyObject *result=NULL, *keys, *listrepr, *tmp;
 
 	if (!so->used) {
-		assert(false);
+    // Py_ReprLeave((PyObject *) so);
+    return PyUnicode_FromFormat("%s()", Py_TYPE(so)->tp_name);
 	}
 
 	keys = PySequence_List((PyObject *) so);

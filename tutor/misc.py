@@ -201,10 +201,126 @@
 # 
 # test_ctx_mgr()
 
-def test_type():
-    class Cls:
-        pass
-    obj = Cls()
-    print(type(obj))
+# def test_type():
+#     class Cls:
+#         pass
+#     obj = Cls()
+#     print(type(obj))
+# 
+# test_type()
 
-test_type()
+# def test_dict_items():
+#     d = {'a': 3, 'b': 5}
+#     for kv in d.items():
+#         print(kv[0], kv[1])
+# 
+# test_dict_items()
+
+# def test_isinstance():
+#     x = 3
+#     print(isinstance(x, int))
+#     print(isinstance(x, dict))
+# 
+# test_isinstance()
+
+# def test_exc():
+#     x = 3
+#     try:
+#         print(x.no_such_attr)
+#         print("Attr found")
+#     except:
+#         print("Attr not found")
+#     finally:
+#         print("Finally got called")
+# 
+#     try:
+#         print(x.__class__)
+#         print("Attr found")
+#     except:
+#         print("Attr not found")
+#     finally:
+#         print("Finally got called")
+# 
+# test_exc()
+
+# def test_call_function_kw():
+#     def f(a, b):
+#         return a + b
+# 
+#     # print(f(9, 16))
+#     print(f(9, b=16))
+# 
+# test_call_function_kw()
+
+
+# def test_getattr():
+#     x = 3
+#     print(getattr(x, 'foo', 'bar'))
+# 
+# test_getattr()
+
+# def test_rpartition():
+#     print("hello-world".rpartition("-"))
+# 
+# test_rpartition()
+
+# def test_in_dict():
+#     d = {"x": 5}
+#     print("x" in d)
+#     print("y" in d)
+# 
+# test_in_dict()
+
+
+# def test_raise():
+#     try:
+#         raise RuntimeError("a runtime error")
+#     except RuntimeError as e:
+#         print("Caught", str(e))
+# 
+# test_raise()
+
+# def test_var_call():
+#     def make_call(f, *args, **kwargs):
+#         return f(*args, **kwargs)
+# 
+#     def inc(v):
+#         return v + 1
+# 
+#     print(make_call(inc, 23))
+# 
+# test_var_call()
+
+# def test_del_subscr():
+#     l = [3, 5]
+#     del l[1]
+#     print(l)
+# 
+#     d = {"a": 0, "b": 1}
+#     del d["b"]
+#     print(d)
+# 
+# test_del_subscr()
+
+# def test_startswith():
+#     s = "/a/b/c"
+#     sep = "/"
+#     ret = s.startswith(sep)
+#     print(ret)
+# 
+# test_startswith()
+
+# def test_float_cmp():
+#     a = 3.14
+#     b = 3.15
+#     print(a == a)
+#     print(a == b)
+
+# test_float_cmp()
+
+def test_to_set():
+    a = ["a", "a", "b"]
+    s = set(a)
+    print(s)
+
+test_to_set()

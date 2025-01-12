@@ -68,18 +68,7 @@ static PyNumberMethods long_as_number = {
   .nb_index = long_long,
 };
 
-// defined in cpy/Objects/longobject.c
-PyTypeObject PyLong_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  .tp_name = "int",
-  .tp_basicsize = offsetof(PyLongObject, ob_digit),
-  .tp_flags = Py_TPFLAGS_LONG_SUBCLASS,
-  .tp_free = PyObject_Del,
-  .tp_hash = (hashfunc) long_hash,
-  .tp_richcompare = long_richcompare,
-  .tp_as_number = &long_as_number,
-  .tp_repr = long_to_decimal_string,
-};
+extern PyTypeObject PyLong_Type;
 
 // defined in cpy/Objects/longobject.c
 PyLongObject * _PyLong_New(Py_ssize_t size) {

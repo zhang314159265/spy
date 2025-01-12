@@ -32,10 +32,15 @@ property_init_impl(propertyobject *self, PyObject *fget, PyObject *fset,
     if (rc <= 0) {
       return rc;
     }
-    assert(false);
+    if (Py_IS_TYPE(self, &PyProperty_Type)) {
+      Py_XSETREF(self->prop_doc, get_doc);
+    } else {
+      assert(false);
+    }
+    self->getter_doc = 1;
   }
 
-  assert(false);
+  return 0;
 }
 
 static int property_init(PyObject *self, PyObject *args, PyObject *kwargs) {

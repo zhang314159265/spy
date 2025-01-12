@@ -14,6 +14,8 @@ enum _framestate {
   FRAME_SUSPENDED = -1,
 	FRAME_EXECUTING = 0,
 	FRAME_RETURNED = 1,
+  FRAME_UNWINDING = 2,
+  FRAME_RAISED = 3,
 };
 
 typedef signed char PyFrameState;
@@ -80,19 +82,7 @@ _Py_IDENTIFIER(__builtins__);
 
 PyObject * _PyEval_GetBuiltins(PyThreadState *tstate);
 
-PyObject *
-_PyEval_BuiltinsFromGlobals(PyThreadState *tstate, PyObject *globals)
-{
-	PyObject *builtins = _PyDict_GetItemIdWithError(globals, &PyId___builtins__);
-	if (builtins) {
-		assert(false);
-	}
-	if (PyErr_Occurred()) {
-		return NULL;
-	}
-
-	return _PyEval_GetBuiltins(tstate);
-}
+PyObject *_PyEval_BuiltinsFromGlobals(PyThreadState *tstate, PyObject *globals);
 
 static void frame_dealloc(PyFrameObject *f) {
 	PyObject **valuestack = f->f_valuestack;
@@ -130,3 +120,10 @@ static inline int _PyFrameHasCompleted(struct _frame *f) {
 
 void PyFrame_BlockSetup(PyFrameObject *f, int type, int handler, int level);
 PyTryBlock *PyFrame_BlockPop(PyFrameObject *f);
+
+int PyFrame_GetLineNumber(PyFrameObject *f) {
+  // TODO follow cpy
+  return 0;
+}
+
+#define PyFrame_Check(op) Py_IS_TYPE(op, &PyFrame_Type)

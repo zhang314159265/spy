@@ -7,6 +7,15 @@
 #include "cellobject.h"
 #include "genobject.h"
 #include "typeobject.h"
+#include "traceback.h"
+#include "descrobject.h"
+
+#include "cpython/object.h"
+
+#define FVC_MASK 0x3
+#define FVC_NONE 0x0
+#define FVS_MASK 0x4
+#define FVS_HAVE_SPEC 0x4
 
 PyObject *PyObject_GetAttr(PyObject *v, PyObject *name);
 #define GETLOCAL(i) (fastlocals[i])
@@ -90,6 +99,20 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 	PyObject *kwdict = NULL;
   Py_ssize_t i;
 
+  if (co->co_flags & CO_VARKEYWORDS) {
+    kwdict = PyDict_New();
+    if (kwdict == NULL) {
+      fail(0);
+    }
+    i = total_args;
+    if (co->co_flags & CO_VARARGS) {
+      i++;
+    }
+    SETLOCAL(i, kwdict);
+  } else {
+    kwdict = NULL;
+  }
+
 	// Copy all positional arguments into local variables
 	Py_ssize_t j, n;
 	if (argcount > co->co_argcount) {
@@ -105,11 +128,60 @@ _PyEval_MakeFrameVector(PyThreadState *tstate,
 	}
 
   if (co->co_flags & CO_VARARGS) {
-    assert(false);
+    PyObject *u = _PyTuple_FromArray(args + n, argcount - n);
+    if (u == NULL) {
+      fail(0);
+    }
+    SETLOCAL(total_args, u);
   }
 
   if (kwnames != NULL) {
-    assert(false);
+    Py_ssize_t kwcount = PyTuple_GET_SIZE(kwnames);
+    for (i = 0; i < kwcount; i++) {
+      PyObject **co_varnames;
+      PyObject *keyword = PyTuple_GET_ITEM(kwnames, i);
+      PyObject *value = args[i + argcount];
+      Py_ssize_t j;
+
+      if (keyword == NULL || !PyUnicode_Check(keyword)) {
+        fail(0);
+      }
+
+      co_varnames = ((PyTupleObject *)(co->co_varnames))->ob_item;
+      for (j = co->co_posonlyargcount; j < total_args; j++) {
+        PyObject *varname = co_varnames[j];
+        if (varname == keyword) {
+          goto kw_found;
+        }
+      }
+
+      for (j = co->co_posonlyargcount; j < total_args; j++) {
+        PyObject *varname = co_varnames[j];
+        int cmp = PyObject_RichCompareBool(keyword, varname, Py_EQ);
+        if (cmp > 0) {
+          goto kw_found;
+        } else if (cmp < 0) {
+          fail(0);
+        }
+      }
+
+      assert(j >= total_args);
+      if (kwdict == NULL) {
+        fail(0);
+      }
+
+      if (PyDict_SetItem(kwdict, keyword, value) == -1) {
+        fail(0);
+      }
+      continue;
+
+    kw_found:
+      if (GETLOCAL(j) != NULL) {
+        fail(0);
+      }
+      Py_INCREF(value);
+      SETLOCAL(j, value);
+    }
   }
 
   if ((argcount > co->co_argcount) && !(co->co_flags & CO_VARARGS)) {
@@ -214,7 +286,7 @@ call_function(PyThreadState *tstate,
 	PyObject **stack = (*pp_stack) - oparg;
 
 	x = PyObject_Vectorcall(func, stack, nargs | PY_VECTORCALL_ARGUMENTS_OFFSET, kwnames);
-	assert(x != NULL);
+	assert((x != NULL) ^ (_PyErr_Occurred(tstate) != NULL));
 
 	while ((*pp_stack) > pfunc) {
 		w = EXT_POP(*pp_stack);
@@ -223,11 +295,137 @@ call_function(PyThreadState *tstate,
 	return x;
 }
 
-void debug_eval(int opcode, int oparg, PyObject *top) {
-  // dump op code and stack before process a opcode
-  printf("<opcode %s (%d), oparg %d>\n", opcode_to_str(opcode), opcode, oparg);
-  if (top) {
-    printf("  - type %s\n", Py_TYPE(top)->tp_name);
+static void dump_value(PyObject *obj) {
+  if (!obj) {
+    printf("NULL\n");
+    return;
+  }
+  if (obj == Py_None) {
+    printf("none\n");
+    return;
+  }
+  const char *tpstr = obj->ob_type->tp_name;
+  if (
+      strcmp(tpstr, "ModuleSpec") == 0 ||
+      strcmp(tpstr, "_thread.lock") == 0 ||
+      strcmp(tpstr, "tuple") == 0 ||
+      strcmp(tpstr, "_io.BufferedReader") == 0 ||
+      strcmp(tpstr, "property") == 0 ||
+      strcmp(tpstr, "SourceFileLoader") == 0 ||
+      strcmp(tpstr, "types.SimpleNamespace") == 0 ||
+      strcmp(tpstr, "dict") == 0 ||
+      // strcmp(tpstr, "set") == 0 ||
+      strcmp(tpstr, "generator") == 0 ||
+      strcmp(tpstr, "sys.flags") == 0 ||
+      strcmp(tpstr, "_ModuleLockManager") == 0 ||
+      strcmp(tpstr, "_ModuleLock") == 0 ||
+      strcmp(tpstr, "object") == 0 ||
+      strcmp(tpstr, "type") == 0 ||
+      strcmp(tpstr, "cell") == 0 ||
+      strcmp(tpstr, "method") == 0 ||
+      strcmp(tpstr, "code") == 0 ||
+      strcmp(tpstr, "list_iterator") == 0 ||
+      strcmp(tpstr, "str_iterator") == 0 ||
+      strcmp(tpstr, "FileFinder") == 0 ||
+      strcmp(tpstr, "tuple_iterator") == 0 ||
+      strcmp(tpstr, "method_descriptor") == 0 ||
+
+      // structseq
+      strcmp(tpstr, "stat_result") == 0 ||
+      0
+  ) {
+    printf("type %s\n", tpstr);
+    return;
+  }
+  printf("type %s, tostr %s\n", obj->ob_type->tp_name, (char *) PyUnicode_DATA(PyObject_Str(obj)));
+}
+
+void debug_eval_done_frame(PyFrameObject *f, PyObject *retval) {
+  PyCodeObject *co = f->f_code;
+  PyObject *name = co->co_name;
+  printf("\033[34mReturn from frame %s\033[0m\n", (char *) PyUnicode_DATA(name));
+  printf("  RETVAL: "); dump_value(retval);
+}
+
+void debug_eval(int opcode, int oparg,
+    PyObject **fastlocals,
+    PyObject *names,
+    PyObject **stack_pointer) {
+  printf("\033[32m<opcode %s (%d), oparg %d>\033[0m\n", opcode_to_str(opcode), opcode, oparg);
+
+  switch (opcode) {
+  case LOAD_FAST: {
+    PyObject *value = GETLOCAL(oparg);
+    dump_value(value);
+    break;
+  }
+  case LOAD_ATTR: {
+    PyObject *name = GETITEM(names, oparg);
+    printf("attr name %s\n", (char*) PyUnicode_DATA(name));
+    PyObject *owner = TOP();
+    printf("owner "); dump_value(owner);
+    if (PyObject_HasAttr(owner, name)) {
+      PyObject *res = PyObject_GetAttr(owner, name);
+      printf("res "); dump_value(res);
+    } else {
+      printf("attr not found\n");
+    }
+    break;
+  }
+  case STORE_ATTR: {
+    PyObject *name = GETITEM(names, oparg);
+    PyObject *owner = TOP();
+    PyObject *v = SECOND();
+    printf("attr name %s\n", (char *) PyUnicode_DATA(name));
+    printf("owner "); dump_value(owner);
+    printf("newval "); dump_value(v);
+    break;
+  }
+  case LOAD_GLOBAL: {
+    PyObject *name = GETITEM(names, oparg);
+    printf("gvar name %s\n", (char *) PyUnicode_DATA(name));
+    break; 
+  }
+  case LOAD_METHOD: {
+    PyObject *name = GETITEM(names, oparg);
+    printf("method name %s\n", (char *) PyUnicode_DATA(name));
+    break; 
+  }
+  case CALL_FUNCTION: {
+    PyObject **itr = stack_pointer - oparg - 1;
+    PyObject *func = *itr++;
+    printf("  func: "); dump_value(func);
+    for (int i = 0; i < oparg; ++i) {
+      printf("  ARG %d: ", i);
+      dump_value(*itr++); 
+    }
+    break;
+  }
+  case CALL_METHOD: {
+    PyObject *meth = PEEK(oparg + 2);
+    if (meth == NULL) {
+      printf("  no self\n");
+      PyObject **itr = stack_pointer - oparg - 1;
+      PyObject *func = *itr++;
+      printf("  func: "); dump_value(func);
+      
+      for (int i = 0; i < oparg; ++i) {
+        printf("  ARG %d: ", i);
+        dump_value(*itr++); 
+      }
+    } else {
+      PyObject **itr = stack_pointer - oparg - 1;
+      printf("  with self\n");
+      printf("  meth: "); dump_value(meth);
+      for (int i = 0; i < oparg + 1; ++i) {
+        printf("  ARG %d: ", i);
+        dump_value(*itr++); 
+      }
+    }
+    break;
+  }
+  default:
+    break;
   }
 }
 
@@ -236,7 +434,20 @@ unicode_concatenate(PyThreadState *tstate, PyObject *v, PyObject *w,
     PyFrameObject *f, const _Py_CODEUNIT *next_instr) {
   PyObject *res;
   if (Py_REFCNT(v) == 2) {
-    assert(false);
+    int opcode, oparg;
+    NEXTOPARG();
+    switch (opcode) {
+    case STORE_FAST:
+    {
+      PyObject **fastlocals = f->f_localsplus;
+      if (GETLOCAL(oparg) == v)
+        SETLOCAL(oparg, NULL);
+      break;
+    }
+    case STORE_DEREF:
+    case STORE_NAME:
+      fail("opcode is %d\n", opcode);
+    }
   }
   res = v;
   PyUnicode_Append(&res, w);
@@ -248,10 +459,137 @@ special_lookup(PyThreadState *tstate, PyObject *o, _Py_Identifier *id) {
   PyObject *res;
   res = _PyObject_LookupSpecial(o, id);
   if (res == NULL && !_PyErr_Occurred(tstate)) {
-    assert(false);
+    _PyErr_SetObject(tstate, PyExc_AttributeError, _PyUnicode_FromId(id));
+    return NULL;
   }
   return res;
 }
+
+PyObject *PyImport_ImportModuleLevelObject(PyObject *name, PyObject *globals,
+		PyObject *locals, PyObject *fromlist,
+		int level);
+
+static PyObject *
+import_name(PyThreadState *tstate, PyFrameObject *f,
+    PyObject *name, PyObject *fromlist, PyObject *level) {
+  _Py_IDENTIFIER(__import__);
+  PyObject *import_func, *res;
+
+  import_func = _PyDict_GetItemIdWithError(f->f_builtins, &PyId___import__);
+  if (import_func == NULL) {
+    assert(false);
+  }
+  if (import_func == tstate->interp->import_func) {
+    int ilevel = _PyLong_AsInt(level);
+    if (ilevel == -1 && _PyErr_Occurred(tstate)) {
+      return NULL;
+    }
+    res = PyImport_ImportModuleLevelObject(
+      name,
+      f->f_globals,
+      f->f_locals == NULL ? Py_None : f->f_locals,
+      fromlist,
+      ilevel
+    );
+    return res;
+  }
+  assert(false);
+}
+
+static int
+do_raise(PyThreadState *tstate, PyObject *exc, PyObject *cause) {
+  PyObject *type = NULL, *value = NULL;
+
+  if (exc == NULL) {
+    fail(0);
+  }
+
+  if (PyExceptionClass_Check(exc)) {
+    fail(0);
+  } else if (PyExceptionInstance_Check(exc)) {
+    value = exc;
+    type = PyExceptionInstance_Class(exc);
+    Py_INCREF(type);
+  } else {
+    fail(0);
+  }
+
+  assert(type != NULL);
+  assert(value != NULL);
+
+  if (cause) {
+    fail(0);
+  }
+
+  _PyErr_SetObject(tstate, type, value);
+  Py_DECREF(value);
+  Py_DECREF(type);
+  return 0;
+}
+
+// TODO follow cpy
+#define C_TRACE(x, call) \
+  x = call; 
+
+static PyObject *
+do_call_core(PyThreadState *tstate,
+    PyObject *func,
+    PyObject *callargs,
+    PyObject *kwdict) {
+  PyObject *result;
+  if (PyCFunction_CheckExact(func) || PyCMethod_CheckExact(func)) {
+    result = PyObject_Call(func, callargs, kwdict);
+    return result;
+  } else if (Py_IS_TYPE(func, &PyMethodDescr_Type)) {
+    fail(0);
+  }
+  return PyObject_Call(func, callargs, kwdict);
+}
+
+static int
+check_args_iterable(PyThreadState *tstate, PyObject *func, PyObject *args) {
+  if (Py_TYPE(args)->tp_iter == NULL && !PySequence_Check(args)) {
+    fail(0);
+  }
+  return 0;
+}
+
+static PyObject *
+import_from(PyThreadState *tstate, PyObject *v, PyObject *name) {
+  PyObject *x;
+
+  if (_PyObject_LookupAttr(v, name, &x) != 0) {
+    return x;
+  }
+  fail(0);
+}
+
+#define UNWIND_BLOCK(b) \
+  while (STACK_LEVEL() > (b)->b_level) { \
+    PyObject *v = POP(); \
+    Py_XDECREF(v); \
+  }
+
+#define UNWIND_EXCEPT_HANDLER(b) \
+  do { \
+    PyObject *type, *value, *traceback; \
+    _PyErr_StackItem *exc_info; \
+    assert(STACK_LEVEL() >= (b)->b_level + 3); \
+    while (STACK_LEVEL() > (b)->b_level + 3) { \
+      value = POP(); \
+      Py_XDECREF(value); \
+    } \
+    exc_info = tstate->exc_info; \
+    type = exc_info->exc_type; \
+    value = exc_info->exc_value; \
+    traceback = exc_info->exc_traceback; \
+    exc_info->exc_type = POP(); \
+    exc_info->exc_value = POP(); \
+    exc_info->exc_traceback = POP(); \
+    Py_XDECREF(type); \
+    Py_XDECREF(value); \
+    Py_XDECREF(traceback); \
+  } while (0)
 
 PyObject *
 _PyEval_EvalFrameDefault(PyThreadState *tstate, PyFrameObject *f, int throwflag) {
@@ -308,7 +646,9 @@ main_loop:
 
 		dispatch_opcode:
 
-    // debug_eval(opcode, oparg, stack_pointer > f->f_valuestack ? TOP() : NULL);
+    if (getenv("DEBUG_EVAL")) {
+      debug_eval(opcode, oparg, fastlocals, names, stack_pointer);
+    }
 
 		switch (opcode) {
 		case TARGET(LOAD_METHOD): {
@@ -319,7 +659,7 @@ main_loop:
 			int meth_found = _PyObject_GetMethod(obj, name, &meth);
 
 			if (meth == NULL) {
-				assert(false);
+        goto error;
 			}
 
 			if (meth_found) {
@@ -332,6 +672,270 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(JUMP_IF_TRUE_OR_POP): {
+      PyObject *cond = TOP();
+      int err;
+      if (Py_IsFalse(cond)) {
+        STACK_SHRINK(1);
+        Py_DECREF(cond);
+        DISPATCH();
+      }
+      if (Py_IsTrue(cond)) {
+        JUMPTO(oparg);
+        DISPATCH();
+      }
+      err = PyObject_IsTrue(cond);
+      if (err > 0) {
+        JUMPTO(oparg);
+      } else if (err == 0) {
+        STACK_SHRINK(1);
+        Py_DECREF(cond);
+      } else {
+        goto error;
+      }
+      DISPATCH();
+    }
+    case TARGET(STORE_DEREF): {
+      PyObject *v = POP();
+      PyObject *cell = freevars[oparg];
+      PyObject *oldobj = PyCell_GET(cell);
+      PyCell_SET(cell, v);
+      Py_XDECREF(oldobj);
+      DISPATCH();
+    }
+    case TARGET(BUILD_STRING): {
+      PyObject *str;
+      PyObject *empty = PyUnicode_New(0, 0);
+      if (empty == NULL) {
+        goto error;
+      }
+      PyObject * _PyUnicode_JoinArray(PyObject *separator, PyObject *const *items, Py_ssize_t seqlen);
+      str = _PyUnicode_JoinArray(empty, stack_pointer - oparg, oparg);
+
+      Py_DECREF(empty);
+      if (str == NULL)
+        goto error;
+      while (--oparg >= 0) {
+        PyObject *item = POP();
+        Py_DECREF(item);
+      }
+      PUSH(str);
+      DISPATCH();
+    }
+    case TARGET(FORMAT_VALUE): {
+      // Handles f-string value formatting
+      PyObject *result;
+      PyObject *fmt_spec;
+      PyObject *value;
+      PyObject *(*conv_fn)(PyObject *);
+      int which_conversion = oparg & FVC_MASK;
+      int have_fmt_spec = (oparg & FVS_MASK) == FVS_HAVE_SPEC;
+
+      fmt_spec = have_fmt_spec ? POP() : NULL;
+      value = POP();
+
+      switch (which_conversion) {
+      case FVC_NONE: conv_fn = NULL; break;
+      default:
+        fail("conversion is %d\n", which_conversion);
+        goto error;
+      }
+      if (conv_fn != NULL) {
+        fail(0);
+      }
+
+      if (PyUnicode_CheckExact(value) && fmt_spec == NULL) {
+        result = value;
+      } else {
+        fail(0);
+      }
+
+      PUSH(result);
+      DISPATCH();
+    }
+    case TARGET(WITH_EXCEPT_START): {
+      PyObject *exit_func;
+      PyObject *exc, *val, *tb, *res;
+
+      exc = TOP();
+      val = SECOND();
+      tb = THIRD();
+      assert(!Py_IsNone(exc));
+      assert(!PyLong_Check(exc));
+      exit_func = PEEK(7);
+      PyObject *stack[4] = {NULL, exc, val, tb};
+      res = PyObject_Vectorcall(exit_func, stack + 1,
+          3 | PY_VECTORCALL_ARGUMENTS_OFFSET, NULL);
+      if (res == NULL)
+        goto error;
+      PUSH(res);
+      DISPATCH();
+    }
+    case TARGET(ROT_TWO): {
+      PyObject *top = TOP();
+      PyObject *second = SECOND();
+      SET_TOP(second);
+      SET_SECOND(top);
+      DISPATCH();
+    }
+    case TARGET(DELETE_SUBSCR): {
+      PyObject *sub = TOP();
+      PyObject *container = SECOND();
+      int err;
+      STACK_SHRINK(2);
+      err = PyObject_DelItem(container, sub);
+      Py_DECREF(container);
+      Py_DECREF(sub);
+      if (err != 0)
+        goto error;
+      DISPATCH();
+    }
+    case TARGET(RERAISE): {
+      void _PyErr_Restore(PyThreadState *tstate, PyObject *type, PyObject *value, PyObject *traceback);
+      assert(f->f_iblock > 0);
+      if (oparg) {
+        f->f_lasti = f->f_blockstack[f->f_iblock - 1].b_handler;
+      }
+      PyObject *exc = POP();
+      PyObject *val = POP();
+      PyObject *tb = POP();
+      assert(PyExceptionClass_Check(exc));
+      _PyErr_Restore(tstate, exc, val, tb);
+      goto exception_unwind;
+    }
+    case TARGET(CALL_FUNCTION_EX): {
+      PyObject *func, *callargs, *kwargs = NULL, *result;
+      if (oparg & 0x01) {
+        kwargs = POP();
+        if (!PyDict_CheckExact(kwargs)) {
+          fail(0);
+        }
+        assert(PyDict_CheckExact(kwargs));
+      }
+      callargs = POP();
+      func = TOP();
+      if (!PyTuple_CheckExact(callargs)) {
+        if (check_args_iterable(tstate, func, callargs) < 0) {
+          fail(0);
+        }
+        Py_SETREF(callargs, PySequence_Tuple(callargs));
+        if (callargs == NULL) {
+          fail(0);
+        }
+      }
+      assert(PyTuple_CheckExact(callargs));
+
+      result = do_call_core(tstate, func, callargs, kwargs);
+
+      Py_DECREF(func);
+      Py_DECREF(callargs);
+      Py_XDECREF(kwargs);
+
+      SET_TOP(result);
+      if (result == NULL) {
+        goto error;
+      }
+      DISPATCH();
+    }
+
+    case TARGET(DICT_MERGE): {
+      PyObject *update = POP();
+      PyObject *dict = PEEK(oparg);
+
+      if (_PyDict_MergeEx(dict, update, 2) < 0) {
+        fail(0);
+      }
+      Py_DECREF(update);
+      DISPATCH();
+    }
+    case TARGET(RAISE_VARARGS): {
+      PyObject *cause = NULL, *exc = NULL;
+      switch (oparg) {
+      case 2:
+        cause = POP();
+      case 1:
+        exc = POP();
+      case 0:
+        if (do_raise(tstate, exc, cause)) {
+          fail(0);
+        }
+        break;
+      default:
+        fail(0);
+      }
+      goto error;
+    }
+    case TARGET(CALL_FUNCTION_KW): {
+      PyObject **sp, *res, *names;
+
+      names = POP();
+      assert(PyTuple_Check(names));
+      assert(PyTuple_GET_SIZE(names) <= oparg);
+      sp = stack_pointer;
+      res = call_function(tstate, &sp, oparg, names);
+      stack_pointer = sp;
+      PUSH(res);
+      Py_DECREF(names);
+
+      if (res == NULL) {
+        goto error;
+      }
+      DISPATCH();
+    }
+    case TARGET(JUMP_IF_NOT_EXC_MATCH): {
+      PyObject *right = POP();
+      PyObject *left = POP();
+      if (PyTuple_Check(right)) {
+        Py_ssize_t i, length;
+        length = PyTuple_GET_SIZE(right);
+        for (i = 0; i < length; i++) {
+          PyObject *exc = PyTuple_GET_ITEM(right, i);
+          if (!PyExceptionClass_Check(exc)) {
+            fail(0);
+          }
+        }
+      } else {
+        if (!PyExceptionClass_Check(right)) {
+          fail(0);
+        }
+      }
+      int res = PyErr_GivenExceptionMatches(left, right);
+      Py_DECREF(left);
+      Py_DECREF(right);
+      if (res > 0) {
+      } else if (res == 0) {
+        JUMPTO(oparg);
+      } else {
+        fail(0);
+      }
+      DISPATCH();
+    }
+    case TARGET(POP_EXCEPT): {
+      PyObject *type, *value, *traceback;
+      _PyErr_StackItem *exc_info;
+      PyTryBlock *b = PyFrame_BlockPop(f);
+      if (b->b_type != EXCEPT_HANDLER) {
+        fail(0);
+      }
+      assert(STACK_LEVEL() >= (b)->b_level + 3 &&
+        STACK_LEVEL() <= (b)->b_level + 4);
+      exc_info = tstate->exc_info;
+      type = exc_info->exc_type;
+      value = exc_info->exc_value;
+      traceback = exc_info->exc_traceback;
+      exc_info->exc_type = POP();
+      exc_info->exc_value = POP();
+      exc_info->exc_traceback = POP();
+      Py_XDECREF(type);
+      Py_XDECREF(value);
+      Py_XDECREF(traceback);
+      DISPATCH();
+    }
+    case TARGET(SETUP_FINALLY): {
+      PyFrame_BlockSetup(f, SETUP_FINALLY, INSTR_OFFSET() + oparg,
+          STACK_LEVEL());
+      DISPATCH();
+    }
     case TARGET(BUILD_CONST_KEY_MAP): {
       Py_ssize_t i;
       PyObject *map;
@@ -358,6 +962,39 @@ main_loop:
         Py_DECREF(POP());
       }
       PUSH(map);
+      DISPATCH();
+    }
+    case TARGET(STORE_GLOBAL): {
+      PyObject *name = GETITEM(names, oparg);
+      PyObject *v = POP();
+      int err;
+      err = PyDict_SetItem(f->f_globals, name, v);
+      Py_DECREF(v);
+      if (err != 0)
+        goto error;
+      DISPATCH();
+    }
+    case TARGET(IMPORT_NAME): {
+      PyObject *name = GETITEM(names, oparg);
+      PyObject *fromlist = POP();
+      PyObject *level = TOP();
+      PyObject *res;
+      res = import_name(tstate, f, name, fromlist, level);
+      Py_DECREF(level);
+      Py_DECREF(fromlist);
+      SET_TOP(res);
+      if (res == NULL)
+        goto error;
+      DISPATCH();
+    }
+    case TARGET(IMPORT_FROM): {
+      PyObject *name = GETITEM(names, oparg);
+      PyObject *from = TOP();
+      PyObject *res;
+      res = import_from(tstate, from, name);
+      PUSH(res);
+      if (res == NULL)
+        goto error;
       DISPATCH();
     }
     case TARGET(NOP): {
@@ -481,7 +1118,12 @@ main_loop:
 		case TARGET(UNPACK_SEQUENCE): {
 			PyObject *seq = POP(), *item, **items;
 			if (PyTuple_CheckExact(seq) && PyTuple_GET_SIZE(seq) == oparg) {
-				assert(false);
+        items = ((PyTupleObject *) seq)->ob_item;
+        while (oparg--) {
+          item = items[oparg];
+          Py_INCREF(item);
+          PUSH(item);
+        }
 			} else if (PyList_CheckExact(seq) &&
 					PyList_GET_SIZE(seq) == oparg) {
 				items = ((PyListObject *) seq)->ob_item;
@@ -872,8 +1514,31 @@ main_loop:
 				assert(false);
 			DISPATCH();
 		}
+    case TARGET(JUMP_IF_FALSE_OR_POP): {
+      PyObject *cond = TOP();
+      int err;
+      if (Py_IsTrue(cond)) {
+        STACK_SHRINK(1);
+        Py_DECREF(cond);
+        DISPATCH();
+      }
+      if (Py_IsFalse(cond)) {
+        JUMPTO(oparg);
+        DISPATCH();
+      }
+      err = PyObject_IsTrue(cond);
+      if (err > 0) {
+        STACK_SHRINK(1);
+        Py_DECREF(cond);
+      } else if (err == 0)
+        JUMPTO(oparg);
+      else
+        goto error;
+      DISPATCH();
+    }
 		case TARGET(POP_JUMP_IF_FALSE): {
 			PyObject *cond = POP();
+      int err;
 			if (Py_IsTrue(cond)) {
 				Py_DECREF(cond);
 				DISPATCH();
@@ -883,10 +1548,20 @@ main_loop:
 				JUMPTO(oparg);
 				DISPATCH();
 			}
-			assert(false);
+      err = PyObject_IsTrue(cond);
+      Py_DECREF(cond);
+      if (err > 0)
+        ;
+      else if (err == 0) {
+        JUMPTO(oparg);
+      } else {
+        goto error;
+      }
+      DISPATCH();
 		}
 		case TARGET(POP_JUMP_IF_TRUE): {
 			PyObject *cond = POP();
+      int err;
 			if (Py_IsFalse(cond)) {
 				Py_DECREF(cond);
 				DISPATCH();
@@ -896,7 +1571,15 @@ main_loop:
 				JUMPTO(oparg);
 				DISPATCH();
 			}
-			assert(false);
+      err = PyObject_IsTrue(cond);
+      Py_DECREF(cond);
+      if (err > 0) {
+        JUMPTO(oparg);
+      } else if (err == 0) {
+      } else {
+        goto error;
+      }
+      DISPATCH();
 		}
 		case TARGET(COMPARE_OP): {
 			PyObject *right = POP();
@@ -943,7 +1626,7 @@ main_loop:
 
 			PUSH(res);
 			if (res == NULL) {
-				assert(false);
+        goto error;
 			}
 			DISPATCH();
 		}
@@ -959,7 +1642,8 @@ main_loop:
 			Py_DECREF(owner);
 			SET_TOP(res);
 			if (res == NULL) {
-				assert(false);
+        // printf("LOAD_ATTR fail for type %s, name %s\n", Py_TYPE(owner)->tp_name, (char *) PyUnicode_DATA(name));
+        goto error;
 			}
 			DISPATCH();
 		}
@@ -1039,6 +1723,7 @@ main_loop:
 					if (PyDict_CheckExact(f->f_builtins)) {
 						v = PyDict_GetItemWithError(f->f_builtins, name);
 						if (v == NULL) {
+			        printf("LOAD_NAME not found: name is %s\n", PyUnicode_1BYTE_DATA(name));
 							assert(false);
 						}
 						Py_INCREF(v);
@@ -1250,17 +1935,87 @@ main_loop:
 			or goto error. */
 		Py_UNREACHABLE();
 error:
-		assert(false); 
+    if (!_PyErr_Occurred(tstate)) {
+      fail(0);
+    }
+
+    PyTraceBack_Here(f);
+
+    if (tstate->c_tracefunc != NULL) {
+      fail(0);
+    }
+exception_unwind:
+    f->f_state = FRAME_UNWINDING;
+    while (f->f_iblock > 0) {
+      PyTryBlock *b = &f->f_blockstack[--f->f_iblock];
+
+      if (b->b_type == EXCEPT_HANDLER) {
+        UNWIND_EXCEPT_HANDLER(b);
+        continue;
+      }
+      UNWIND_BLOCK(b);
+      if (b->b_type == SETUP_FINALLY) {
+        PyObject *exc, *val, *tb;
+        int handler = b->b_handler;
+        _PyErr_StackItem *exc_info = tstate->exc_info;
+        PyFrame_BlockSetup(f, EXCEPT_HANDLER, f->f_lasti, STACK_LEVEL());
+        PUSH(exc_info->exc_traceback);
+        PUSH(exc_info->exc_value);
+        if (exc_info->exc_type != NULL) {
+          PUSH(exc_info->exc_type);
+        } else {
+          Py_INCREF(Py_None);
+          PUSH(Py_None);
+        }
+        _PyErr_Fetch(tstate, &exc, &val, &tb);
+        _PyErr_NormalizeException(tstate, &exc, &val, &tb);
+        if (tb != NULL) {
+          PyException_SetTraceback(val, tb);
+        } else {
+          fail(0);
+        }
+        Py_INCREF(exc);
+        exc_info->exc_type = exc;
+        Py_INCREF(val);
+        exc_info->exc_value = val;
+        exc_info->exc_traceback = tb;
+        if (tb == NULL)
+          tb = Py_None;
+        Py_INCREF(tb);
+        PUSH(tb);
+        PUSH(val);
+        PUSH(exc);
+        JUMPTO(handler);
+        f->f_state = FRAME_EXECUTING;
+        goto main_loop;
+      }
+    }
+
+    break;
 	} // main loop
 
-	assert(false);
+  assert(retval == NULL);
+  assert(_PyErr_Occurred(tstate));
+
+  // Pop remaining stack entries
+  while (!EMPTY()) {
+    PyObject *o = POP();
+    Py_XDECREF(o);
+  }
+  f->f_stackdepth = 0;
+  f->f_state = FRAME_RAISED;
+
+  printf("cur exception: %s\n", (char *) PyUnicode_DATA(PyObject_Str(tstate->curexc_value)));
 
 exiting:
 	/* pop frame */
 
 exit_eval_frame:
 	tstate->frame = f->f_back;
-
+  
+  if (getenv("DEBUG_EVAL")) {
+    debug_eval_done_frame(f, retval);
+  }
 	return _Py_CheckFunctionResult(tstate, NULL, retval, __func__);
 }
 
@@ -1349,7 +2104,8 @@ PyObject *PyEval_GetGlobals(void) {
 	if (current_frame == NULL) {
 		return NULL;
 	}
-	assert(false);
+  assert(current_frame->f_globals != NULL);
+  return current_frame->f_globals;
 }
 
 // return 0 on error, 1 on success
@@ -1367,4 +2123,10 @@ int _PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi) {
 		*pi = x;
 	}
 	return 1;
+}
+
+PyObject *
+PyEval_GetBuiltins(void) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  return _PyEval_GetBuiltins(tstate);
 }

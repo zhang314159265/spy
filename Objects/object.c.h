@@ -231,9 +231,7 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name) {
 }
 
 int PyErr_ExceptionMatches(PyObject *exc);
-void PyErr_Fetch(PyObject **p_type, PyObject **p_value, PyObject **p_traceback);
 void PyErr_NormalizeException(PyObject **exc, PyObject **val, PyObject **tb);
-void PyErr_Restore(PyObject *type, PyObject *value, PyObject *traceback);
 
 static inline int
 set_attribute_error_context(PyObject *v, PyObject *name)
@@ -322,9 +320,12 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
       Py_DECREF(dict);
       goto done;
     } else {
-      assert(false);
+      printf("check '%s' object attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+      Py_DECREF(dict);
+      if (PyErr_Occurred()) {
+        assert(false);
+      }
     }
-    assert(false);
   }
 
   if (f != NULL) {
@@ -340,13 +341,20 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
   }
 
   if (!suppress) {
-    printf("'%s' object has no attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+    if (strcmp(tp->tp_name, "module") == 0) {
+      printf("'%s' object (str repr %s) has no attribute '%s'\n", tp->tp_name, (char *) PyUnicode_DATA(PyObject_Str(obj)), (char*) PyUnicode_DATA(name));
+    } else {
+      printf("'%s' object has no attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+    }
     PyErr_Format(PyExc_AttributeError,
       // "'%.50s' object has no attribute '%U'",
       "'%s' object has no attribute '%U'",
       tp->tp_name, name);
 
     set_attribute_error_context(obj, name);
+    if (strcmp(PyUnicode_DATA(name), "platform") == 0) {
+      fail(0);
+    }
   }
  done:
   Py_XDECREF(descr);
@@ -362,12 +370,14 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name) {
 int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
   PyTypeObject *tp = Py_TYPE(obj);
   PyObject *descr;
+  descrgetfunc f = NULL;
   PyObject **dictptr, *dict;
+  PyObject *attr;
   int meth_found = 0;
 
   assert(*method == NULL);
 
-  // printf("Py_TYPE(obj)->tp_getattro %p, type %s, type name %s\n", Py_TYPE(obj)->tp_getattro, Py_TYPE(obj)->tp_name, Py_TYPE(name)->tp_name);
+  printf("Py_TYPE(obj)->tp_getattro %p, type %s, name %s\n", Py_TYPE(obj)->tp_getattro, Py_TYPE(obj)->tp_name, (char *) PyUnicode_DATA(name));
   if (Py_TYPE(obj)->tp_getattro != PyObject_GenericGetAttr
       || !PyUnicode_Check(name)) {
     *method = PyObject_GetAttr(obj, name);
@@ -390,14 +400,42 @@ int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
 
   dictptr = _PyObject_GetDictPtr(obj);
   if (dictptr != NULL && (dict = *dictptr) != NULL) {
-    assert(false);
+    Py_INCREF(dict);
+    attr = PyDict_GetItemWithError(dict, name);
+    if (attr != NULL) {
+      Py_INCREF(attr);
+      *method = attr;
+      Py_DECREF(dict);
+      Py_XDECREF(descr);
+      return 0;
+    } else {
+      Py_DECREF(dict);
+      if (PyErr_Occurred()) {
+        Py_XDECREF(descr);
+        return 0;
+      }
+    }
   }
 
   if (meth_found) {
     *method = descr;
     return 1;
   }
-  assert(false);
+
+  if (f != NULL) {
+    assert(false);
+  }
+
+  if (descr != NULL) {
+    assert(false);
+  }
+
+  PyErr_Format(PyExc_AttributeError,
+      "'%s' object has no attribute '%U'",
+      tp->tp_name, name);
+
+  set_attribute_error_context(obj, name);
+  return 0;
 }
 
 PyObject *
@@ -405,6 +443,7 @@ PyObject_Repr(PyObject *v) {
   PyObject *res;
   assert(v != NULL);
   if (Py_TYPE(v)->tp_repr == NULL) {
+    printf("type %s has no tp_repr defined\n", Py_TYPE(v)->tp_name);
     assert(false);
   }
   res = (*Py_TYPE(v)->tp_repr)(v);
@@ -423,12 +462,27 @@ PyObject *PyObject_Str(PyObject *v) {
   assert(v != NULL);
 
   if (PyUnicode_CheckExact(v)) {
-    assert(false);
+    if (PyUnicode_READY(v) < 0) {
+      return NULL;
+    }
+    Py_INCREF(v);
+    return v;
   }
   if (Py_TYPE(v)->tp_str == NULL) {
     return PyObject_Repr(v);
   }
-  assert(false);
+
+  res = (*Py_TYPE(v)->tp_str)(v);
+  if (res == NULL) {
+    return NULL;
+  }
+  if (!PyUnicode_Check(res)) {
+    fail(0);
+  }
+  if (PyUnicode_READY(res) < 0) {
+    return NULL;
+  }
+  return res;
 }
 
 // 1 for value interpreted as true, 0 for value interpreted as false;
@@ -444,12 +498,16 @@ int PyObject_IsTrue(PyObject *v) {
 	else if (Py_TYPE(v)->tp_as_number != NULL &&
 			Py_TYPE(v)->tp_as_number->nb_bool != NULL) {
 		res = (*Py_TYPE(v)->tp_as_number->nb_bool)(v);
+  } else if (Py_TYPE(v)->tp_as_sequence != NULL &&
+      Py_TYPE(v)->tp_as_sequence->sq_length != NULL) {
+    res = (*Py_TYPE(v)->tp_as_sequence->sq_length)(v);
 	} else {
 		assert(false);
 	}
 	return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
 }
 
+void PyErr_Clear(void);
 int _PyObject_LookupAttr(PyObject *v, PyObject *name, PyObject **result) {
   PyTypeObject *tp = Py_TYPE(v);
 
@@ -480,7 +538,11 @@ int _PyObject_LookupAttr(PyObject *v, PyObject *name, PyObject **result) {
   if (*result != NULL) {
     return 1;
   }
-  assert(false);
+  if (!PyErr_ExceptionMatches(PyExc_AttributeError)) {
+    return -1;
+  }
+  PyErr_Clear();
+  return 0;
 }
 
 int _PyObject_LookupAttrId(PyObject *v, struct _Py_Identifier *name, PyObject **result) {
@@ -540,4 +602,46 @@ int PyObject_CallFinalizerFromDealloc(PyObject *self) {
     return 0;
   }
   assert(false);
+}
+
+int PyObject_GenericSetDict(PyObject *obj, PyObject *value, void *context) {
+  assert(false);
+}
+
+PyObject *
+PyObject_GetAttrString(PyObject *v, const char *name) {
+  PyObject *w, *res;
+
+  if (Py_TYPE(v)->tp_getattr != NULL)
+    return (*Py_TYPE(v)->tp_getattr)(v, (char *) name);
+  w = PyUnicode_FromString(name);
+  if (w == NULL)
+    return NULL;
+  res = PyObject_GetAttr(v, w);
+  Py_DECREF(w);
+  return res;
+}
+
+PyObject *PyObject_Bytes(PyObject *v) {
+  if (v == NULL) {
+    fail(0);
+  }
+
+  if (PyBytes_CheckExact(v)) {
+    Py_INCREF(v);
+    return v;
+  }
+  fail(0);
+}
+
+int PyObject_HasAttr(PyObject *v, PyObject *name) {
+  PyObject *res;
+  if (_PyObject_LookupAttr(v, name, &res) < 0) {
+    PyErr_Clear();
+    return 0;
+  }
+  if (res == NULL)
+    return 0;
+  Py_DECREF(res);
+  return 1;
 }

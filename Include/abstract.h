@@ -347,21 +347,19 @@ PyNumber_Add(PyObject *v, PyObject *w) {
 	if (result != Py_NotImplemented) {
 		return result;
 	}
+  Py_DECREF(result);
+
+  PySequenceMethods *m = Py_TYPE(v)->tp_as_sequence;
+  if (m && m->sq_concat) {
+    result = (*m->sq_concat)(v, w);
+    assert(result != NULL);
+    return result;
+  }
 	assert(false);
 }
 
-PyObject *
-_PyNumber_Index(PyObject *item) {
-	if (item == NULL) {
-		assert(false);
-	}
+PyObject *_PyNumber_Index(PyObject *item);
 
-	if (PyLong_Check(item)) {
-		Py_INCREF(item);
-		return item;
-	}
-	assert(false);
-}
 
 PyObject *
 PyNumber_Index(PyObject *item) {
@@ -534,6 +532,9 @@ _PyIndex_Check(PyObject *obj) {
 	return (tp_as_number != NULL && tp_as_number->nb_index != NULL);
 }
 
+Py_ssize_t
+PyNumber_AsSsize_t(PyObject *item, PyObject *err);
+
 PyObject *
 PyObject_GetItem(PyObject *o, PyObject *key) {
 	if (o == NULL || key == NULL) {
@@ -543,7 +544,8 @@ PyObject_GetItem(PyObject *o, PyObject *key) {
 	PyMappingMethods *m = Py_TYPE(o)->tp_as_mapping;
 	if (m && m->mp_subscript) {
 		PyObject *item = m->mp_subscript(o, key);
-		assert(item != NULL);
+
+    assert(_Py_CheckSlotResult(o, "__getitem__", item != NULL));
 		return item;
 	}
 
@@ -551,12 +553,37 @@ PyObject_GetItem(PyObject *o, PyObject *key) {
 	PySequenceMethods *ms = Py_TYPE(o)->tp_as_sequence;
 	if (ms && ms->sq_item) {
 		if (_PyIndex_Check(key)) {
-			assert(false);
+      Py_ssize_t key_value;
+      // key_value = PyNumber_AsSsize_t(key, PyExc_IndexError);
+      key_value = PyNumber_AsSsize_t(key, NULL);
+      if (key_value == -1 && PyErr_Occurred())
+        return NULL;
+
+      return PySequence_GetItem(o, key_value);
 		} else {
 			assert(false);
 		}
 	}
 	assert(false);
+}
+
+int PyObject_DelItem(PyObject *o, PyObject *key) {
+  if (o == NULL || key == NULL) {
+    fail(0);
+  }
+
+  PyMappingMethods *m = Py_TYPE(o)->tp_as_mapping;
+  if (m && m->mp_ass_subscript) {
+    int res = m->mp_ass_subscript(o, key, (PyObject*) NULL);
+    assert(res >= 0);
+    return res;
+  }
+
+  if (Py_TYPE(o)->tp_as_sequence) {
+    fail(0);
+  }
+  fail(0);
+  return -1;
 }
 
 PyObject *
@@ -640,6 +667,7 @@ PySequence_Contains(PyObject *seq, PyObject *ob) {
 		assert(res >= 0);
 		return res;
 	}
+  printf("seq type %s\n", Py_TYPE(seq)->tp_name);
 	assert(false);
 }
 
@@ -678,6 +706,8 @@ _PyObject_FastCall(PyObject *func, PyObject *const *args, Py_ssize_t nargs) {
 }
 
 PyObject *_PyObject_Call(PyThreadState *tstate, PyObject *callable, PyObject *args, PyObject *kwargs);
+
+PyObject *PyObject_Call(PyObject *callable, PyObject *args, PyObject *kwargs);
 
 #define _PY_FASTCALL_SMALL_STACK 5
 
@@ -729,4 +759,217 @@ static inline PyObject *
 _PyObject_CallNoArg(PyObject *func) {
   PyThreadState *tstate = PyThreadState_Get();
   return _PyObject_VectorcallTstate(tstate, func, NULL, 0, NULL);
+}
+
+int
+PyMapping_SetItemString(PyObject *o, const char *key, PyObject *value) {
+  PyObject *okey;
+  int r;
+
+  if (key == NULL) {
+    fail(0);
+  }
+
+  okey = PyUnicode_FromString(key);
+  if (okey == NULL)
+    return -1;
+  r = PyObject_SetItem(o, okey, value);
+  Py_DECREF(okey);
+  return r;
+}
+
+static int
+object_isinstance(PyObject *inst, PyObject *cls) {
+  PyObject *icls;
+  int retval;
+  _Py_IDENTIFIER(__class__);
+
+  if (PyType_Check(cls)) {
+    retval = PyObject_TypeCheck(inst, (PyTypeObject *) cls);
+    if (retval == 0) {
+      retval = _PyObject_LookupAttrId(inst, &PyId___class__, &icls);
+      if (icls != NULL) {
+        if (icls != (PyObject *)(Py_TYPE(inst)) && PyType_Check(icls)) {
+          fail(0);
+        } else {
+          retval = 0;
+        }
+        Py_DECREF(icls);
+      }
+    }
+  } else {
+    fail(0);
+  }
+
+  return retval;
+}
+
+static int
+object_recursive_isinstance(PyThreadState *tstate, PyObject *inst, PyObject *cls) {
+  if (Py_IS_TYPE(inst, (PyTypeObject *) cls)) {
+    return 1;
+  }
+
+  if (PyType_CheckExact(cls)) {
+    return object_isinstance(inst, cls);
+  }
+
+  if (PyTuple_Check(cls)) {
+    Py_ssize_t n = PyTuple_GET_SIZE(cls);
+    int r = 0;
+    for (Py_ssize_t i = 0; i < n; ++i) {
+      PyObject *item = PyTuple_GET_ITEM(cls, i);
+      r = object_recursive_isinstance(tstate, inst, item);
+      if (r != 0) {
+        break;
+      }
+    }
+    return r;
+  }
+  fail(0);
+}
+
+int PyObject_IsInstance(PyObject *inst, PyObject *cls) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  return object_recursive_isinstance(tstate, inst, cls);
+}
+
+Py_ssize_t
+PyMapping_Size(PyObject *o) {
+  fail(0);
+}
+
+Py_ssize_t 
+PyObject_Size(PyObject *o) {
+  if (o == NULL) {
+    fail(0);
+  }
+
+  PySequenceMethods *m = Py_TYPE(o)->tp_as_sequence;
+  if (m && m->sq_length) {
+    Py_ssize_t len = m->sq_length(o);
+    assert(len >= 0);
+    return len;
+  }
+  return PyMapping_Size(o);
+}
+
+int
+PyObject_GetBuffer(PyObject *obj, Py_buffer *view, int flags) {
+  PyBufferProcs *pb = Py_TYPE(obj)->tp_as_buffer;
+
+  if (pb == NULL || pb->bf_getbuffer == NULL) {
+    fail(0);
+  }
+  int res = (*pb->bf_getbuffer)(obj, view, flags);
+  assert(res >= 0);
+  return res;
+}
+
+int PyBuffer_FillInfo(Py_buffer *view, PyObject *obj, void *buf, Py_ssize_t len, int readonly, int flags) {
+  if (view == NULL) {
+    fail(0);
+  }
+
+  if (((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE) && (readonly == 1)) {
+    fail(0);
+  }
+  view->obj = obj;
+  if (obj)
+    Py_INCREF(obj);
+  view->buf = buf;
+  view->len = len;
+  view->readonly = readonly;
+  view->itemsize = 1;
+  view->format = NULL;
+  if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT) {
+    fail(0);
+  }
+  view->ndim = 1;
+  view->shape = NULL;
+  if ((flags & PyBUF_ND) == PyBUF_ND) {
+    fail(0);
+  }
+  view->strides = NULL;
+  if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES)
+    fail(0);
+  view->suboffsets = NULL;
+  view->internal = NULL;
+  return 0;
+}
+
+void PyBuffer_Release(Py_buffer *view) {
+  PyObject *obj = view->obj;
+  PyBufferProcs *pb;
+  if (obj == NULL)
+    return;
+  pb = Py_TYPE(obj)->tp_as_buffer;
+  if (pb && pb->bf_releasebuffer) {
+    pb->bf_releasebuffer(obj, view);
+  }
+  view->obj = NULL;
+  Py_DECREF(obj);
+}
+
+int
+PySequence_Check(PyObject *s) {
+  if (PyDict_Check(s))
+    return 0;
+  return Py_TYPE(s)->tp_as_sequence &&
+    Py_TYPE(s)->tp_as_sequence->sq_item != NULL;
+}
+
+int PyIndex_Check(PyObject *obj) {
+  return _PyIndex_Check(obj);
+}
+
+int
+PyObject_CheckBuffer(PyObject *obj) {
+  PyBufferProcs *tp_as_buffer = Py_TYPE(obj)->tp_as_buffer;
+  return (tp_as_buffer != NULL && tp_as_buffer->bf_getbuffer != NULL);
+}
+
+int
+PyNumber_Check(PyObject *o) {
+  if (o == NULL)
+    return 0;
+  PyNumberMethods *nb = Py_TYPE(o)->tp_as_number;
+  // return nb && (nb->nb_index || nb->nb_int || nb->nb_float || PyComplex_Check(o));
+  return nb && (nb->nb_index || nb->nb_int || nb->nb_float);
+}
+
+PyObject *
+PyNumber_Long(PyObject *o) {
+  PyObject *result;
+  PyNumberMethods *m;
+  if (o == NULL) {
+    fail(0);
+  }
+
+  if (PyLong_CheckExact(o)) {
+    Py_INCREF(o);
+    return o;
+  }
+  m = Py_TYPE(o)->tp_as_number;
+  if (m && m->nb_int) {
+    result = m->nb_int(o);
+    assert(result != NULL);
+    if (!result || PyLong_CheckExact(result)) {
+      return result;
+    }
+    fail(0);
+  }
+  fail(0);
+}
+
+static inline PyObject *_PyObject_CallMethodIdNoArgs(PyObject *self, _Py_Identifier *name);
+
+static inline PyObject *_PyObject_VectorcallMethodId(_Py_Identifier *name, PyObject *const *args, size_t nargsf, PyObject *kwnames);
+
+PyObject *PyObject_VectorcallMethod(PyObject *name, PyObject *const *args, size_t nargsf, PyObject *kwnames);
+
+static inline PyObject *
+PyObject_CallMethodNoArgs(PyObject *self, PyObject *name) {
+  return PyObject_VectorcallMethod(name, &self,
+      1 | PY_VECTORCALL_ARGUMENTS_OFFSET, NULL);
 }

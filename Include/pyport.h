@@ -1,5 +1,4 @@
-#ifndef Py_PYPORT_H
-#define Py_PYPORT_H
+#pragma once
 
 typedef ssize_t Py_ssize_t;
 typedef Py_ssize_t Py_hash_t;
@@ -19,6 +18,10 @@ typedef size_t Py_uhash_t;
 #define INT_MAX 2147483647
 #endif
 
+#ifndef INT_MIN
+#define INT_MIN -2147483648
+#endif
+
 #define SIZEOF_LONG 8
 
 #ifndef LONG_MAX
@@ -32,5 +35,7 @@ typedef size_t Py_uhash_t;
 #endif
 
 #define PY_SSIZE_T_MAX ((Py_ssize_t)(((size_t) -1) >> 1))
+#define PY_SSIZE_T_MIN (-PY_SSIZE_T_MAX - 1)
 
-#endif
+// TODO follow cpy
+#define PyMODINIT_FUNC PyObject *

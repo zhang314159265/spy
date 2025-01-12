@@ -10,6 +10,7 @@
 #include "bytesobject.h"
 #include "floatobject.h"
 #include "Parser/tokenizer.h"
+#include "compile.h"
 
 #include "Python/Python-ast.h"
 
@@ -39,6 +40,11 @@ typedef struct {
 	PyObject *bytes;
 	Memo *memo;
 } Token;
+
+typedef struct {
+  void *element;
+  int is_keyword;
+} KeywordOrStarred;
 
 typedef struct {
 	char *str;
@@ -336,6 +342,49 @@ _PyPegen_dummy_name(Parser *p, ...) {
 	return cache;
 }
 
+static int
+_seq_number_of_starred_exprs(asdl_seq *seq) {
+  int n = 0;
+  for (Py_ssize_t i = 0, l = asdl_seq_LEN(seq); i < l; i++) {
+    KeywordOrStarred *k = asdl_seq_GET_UNTYPED(seq, i);
+    if (!k->is_keyword) {
+      n++;
+    }
+  }
+  return n;
+}
+
+asdl_expr_seq *
+_PyPegen_seq_extract_starred_exprs(Parser *p, asdl_seq *kwargs) {
+  int new_len = _seq_number_of_starred_exprs(kwargs);
+  if (new_len == 0) {
+    return NULL;
+  }
+  fail(0);
+}
+
+asdl_keyword_seq*
+_PyPegen_seq_delete_starred_exprs(Parser *p, asdl_seq *kwargs) {
+  Py_ssize_t len = asdl_seq_LEN(kwargs);
+  Py_ssize_t new_len = len - _seq_number_of_starred_exprs(kwargs);
+  if (new_len == 0) {
+    return NULL;
+  }
+  asdl_keyword_seq *new_seq = _Py_asdl_keyword_seq_new(new_len, p->arena);
+  if (!new_seq) {
+    return NULL;
+  }
+
+  int idx = 0;
+  for (Py_ssize_t i = 0; i < len; i++) {
+    KeywordOrStarred *k = asdl_seq_GET_UNTYPED(kwargs, i);
+    if (k->is_keyword) {
+      asdl_seq_SET(new_seq, idx++, k->element);
+    }
+  }
+  return new_seq;
+}
+
 expr_ty _PyPegen_collect_call_seqs(Parser *p, asdl_expr_seq *a, asdl_seq *b) {
 	Py_ssize_t args_len = asdl_seq_LEN(a);
 	Py_ssize_t total_len = args_len;
@@ -343,7 +392,24 @@ expr_ty _PyPegen_collect_call_seqs(Parser *p, asdl_expr_seq *a, asdl_seq *b) {
 	if (b == NULL) {
 		return _PyAST_Call(_PyPegen_dummy_name(p), a, NULL);
 	}
-	assert(false);
+
+  asdl_expr_seq *starreds = _PyPegen_seq_extract_starred_exprs(p, b);
+  asdl_keyword_seq *keywords = _PyPegen_seq_delete_starred_exprs(p, b);
+
+  if (starreds) {
+    fail(0);
+  }
+
+  asdl_expr_seq *args = _Py_asdl_expr_seq_new(total_len, p->arena);
+
+  Py_ssize_t i = 0;
+  for (i = 0; i < args_len; i++) {
+    asdl_seq_SET(args, i, asdl_seq_GET(a, i));
+  }
+  for (; i < total_len; i++) {
+    asdl_seq_SET(args, i, asdl_seq_GET(starreds, i - args_len));
+  }
+  return _PyAST_Call(_PyPegen_dummy_name(p), args, keywords);
 }
 
 int
@@ -441,6 +507,25 @@ _PyPegen_add_type_comment_to_arg(Parser *p, arg_ty a, Token *tc) {
 	assert(false);
 }
 
+asdl_seq *
+_PyPegen_join_sequences(Parser *p, asdl_seq *a, asdl_seq *b) {
+  Py_ssize_t first_len = asdl_seq_LEN(a);
+  Py_ssize_t second_len = asdl_seq_LEN(b);
+  asdl_seq *new_seq = (asdl_seq *) _Py_asdl_generic_seq_new(first_len + second_len, p->arena);
+  if (!new_seq) {
+    return NULL;
+  }
+
+  int k = 0;
+  for (Py_ssize_t i = 0; i < first_len; i++) {
+    asdl_seq_SET_UNTYPED(new_seq, k++, asdl_seq_GET_UNTYPED(a, i));
+  }
+  for (Py_ssize_t i = 0; i < second_len; i++) {
+    asdl_seq_SET_UNTYPED(new_seq, k++, asdl_seq_GET_UNTYPED(b, i));
+  }
+  return new_seq;
+}
+
 static int
 _make_posargs(Parser *p,
 		asdl_arg_seq *plain_names,
@@ -448,7 +533,12 @@ _make_posargs(Parser *p,
 		asdl_arg_seq **posargs) {
 
   if (plain_names != NULL && names_with_default != NULL) {
-    assert(false);
+    asdl_arg_seq *names_with_default_names = _get_names(p, names_with_default);
+    if (!names_with_default_names) {
+      return -1;
+    }
+    *posargs = (asdl_arg_seq*)_PyPegen_join_sequences(
+      p, (asdl_seq*) plain_names, (asdl_seq*) names_with_default_names);
   } else if (plain_names == NULL && names_with_default != NULL) {
     *posargs = _get_names(p, names_with_default);
   } else if (plain_names != NULL && names_with_default == NULL) {
@@ -682,7 +772,22 @@ _PyPegen_augoperator(Parser *p, operator_ty kind) {
 
 Token *
 _PyPegen_expect_forced_token(Parser *p, int type, const char *expected) {
-	assert(false);
+  if (p->error_indicator == 1) {
+    return NULL;
+  }
+
+  if (p->mark == p->fill) {
+    if (_PyPegen_fill_token(p) < 0) {
+      p->error_indicator = 1;
+      return NULL;
+    }
+  }
+  Token *t = p->tokens[p->mark];
+  if (t->type != type) {
+    fail(0);
+  }
+  p->mark += 1;
+  return t;
 }
 
 typedef struct {
@@ -873,3 +978,36 @@ _PyPegen_name_default_pair(Parser *p, arg_ty arg, expr_ty value, Token *tc) {
   a->value = value;
   return a;
 }
+
+int
+_PyPegen_seq_count_dots(asdl_seq *seq) {
+  int number_of_dots = 0;
+  for (Py_ssize_t i = 0, l = asdl_seq_LEN(seq); i < l; i++) {
+    Token *current_expr = asdl_seq_GET_UNTYPED(seq, i);
+    switch (current_expr->type) {
+    case ELLIPSIS:
+      number_of_dots += 3;
+      break;
+    case DOT:
+      number_of_dots += 1;
+      break;
+    default:
+      Py_UNREACHABLE();
+    }
+  }
+  return number_of_dots;
+}
+
+KeywordOrStarred *
+_PyPegen_keyword_or_starred(Parser *p, void *element, int is_keyword) {
+  KeywordOrStarred *a = malloc(sizeof(KeywordOrStarred));
+  if (!a) {
+    return NULL;
+  }
+  a->element = element;
+  a->is_keyword = is_keyword;
+  return a;
+}
+
+mod_ty
+_PyPegen_run_parser_from_string(const char *str, int start_rule, PyObject *filename_ob, PyCompilerFlags *flags, PyArena *arena);

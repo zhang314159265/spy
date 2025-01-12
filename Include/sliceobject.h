@@ -58,13 +58,13 @@ int PySlice_Unpack(PyObject *_r,
 	}
 
 	if (r->start == Py_None) {
-		assert(false);
+    *start = *step < 0 ? PY_SSIZE_T_MAX : 0;
 	} else {
 		if (!_PyEval_SliceIndex(r->start, start)) return -1;
 	}
 
 	if (r->stop == Py_None) {
-		assert(false);
+    *stop = *step < 0 ? PY_SSIZE_T_MIN : PY_SSIZE_T_MAX;
 	} else {
 		if (!_PyEval_SliceIndex(r->stop, stop)) return -1;
 	}
@@ -86,7 +86,7 @@ PySlice_AdjustIndices(Py_ssize_t length,
 	if (*stop < 0) {
 		assert(false);
 	} else if (*stop >= length) {
-		assert(false);
+    *stop = (step < 0) ? length - 1 : length;
 	}
 
 	if (step < 0) {
