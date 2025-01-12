@@ -105,6 +105,7 @@ _PyBuiltin_Init(PyInterpreterState *interp)
   SETBUILTIN("property", &PyProperty_Type);
   SETBUILTIN("staticmethod", &PyStaticMethod_Type);
   SETBUILTIN("classmethod", &PyClassMethod_Type);
+  SETBUILTIN("type", &PyType_Type);
 
 	return mod;
 #undef ADD_TO_ALL

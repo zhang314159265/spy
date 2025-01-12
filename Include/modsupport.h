@@ -219,3 +219,5 @@ PyObject *const * _PyArg_UnpackKeywords(
     (minpos) <= (nargs) && (nargs) <= (maxpos) && args != NULL) ? (args) : \
   _PyArg_UnpackKeywords((args), (nargs), (kwargs), (kwnames), (parser), \
     (minpos), (maxpos), (minkw), (buf)))
+
+int _PyArg_NoKwnames(const char *funcname, PyObject *kwnnames);

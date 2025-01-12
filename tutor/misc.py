@@ -188,15 +188,23 @@
 #  
 # test_str_add()
 
-def test_ctx_mgr():
-    class Ctx:
-        def __enter__(self):
-            print("Enter")
+# def test_ctx_mgr():
+#     class Ctx:
+#         def __enter__(self):
+#             print("Enter")
+# 
+#         def __exit__(self, a, b, c):
+#             print("Exit")
+# 
+#     with Ctx():
+#         print("Hi")
+# 
+# test_ctx_mgr()
 
-        def __exit__(self, a, b, c):
-            print("Exit")
+def test_type():
+    class Cls:
+        pass
+    obj = Cls()
+    print(type(obj))
 
-    with Ctx():
-        print("Hi")
-
-test_ctx_mgr()
+test_type()

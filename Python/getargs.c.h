@@ -415,3 +415,17 @@ int PyArg_ParseTupleAndKeywords(PyObject *args,
   va_end(va);
   return retval;
 }
+
+int _PyArg_NoKwnames(const char *funcname, PyObject *kwnames) {
+  if (kwnames == NULL) {
+    return 1;
+  }
+
+  assert(PyTuple_CheckExact(kwnames));
+
+  if (PyTuple_GET_SIZE(kwnames) == 0) {
+    return 1;
+  }
+
+  assert(false);
+}

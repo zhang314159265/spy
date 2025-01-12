@@ -223,6 +223,8 @@ static PyObject *type_vectorcall(PyObject *metatype, PyObject *const *args, size
 static PyObject *type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds);
 static int type_init(PyObject *cls, PyObject *args, PyObject *kwds);
 
+static PyObject *type_repr(PyTypeObject *type);
+
 PyTypeObject PyType_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "type",
@@ -239,6 +241,7 @@ PyTypeObject PyType_Type = {
   .tp_new = type_new,
   .tp_init = type_init,
   .tp_dictoffset = offsetof(PyTypeObject, tp_dict),
+  .tp_repr = (reprfunc) type_repr,
 };
 
 typedef struct {
@@ -352,7 +355,10 @@ PyObject *_PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
 static PyObject *type_vectorcall(PyObject *metatype, PyObject *const *args, size_t nargsf, PyObject *kwnames) {
   Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
   if (nargs == 1 && metatype == (PyObject *) &PyType_Type) {
-    assert(false);
+    if (!_PyArg_NoKwnames("type", kwnames)) {
+      return NULL;
+    }
+    return Py_NewRef(Py_TYPE(args[0]));
   }
 
   PyThreadState *tstate = PyThreadState_GET();
@@ -1586,3 +1592,11 @@ static int update_slot(PyTypeObject *type, PyObject *name) {
 }
 
 
+static PyObject *type_repr(PyTypeObject *type) {
+  PyObject *rtn;
+
+  // TODO follow cpy
+
+  rtn = PyUnicode_FromFormat("<class '%s'>", type->tp_name);
+  return rtn;
+}
