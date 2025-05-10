@@ -51,3 +51,4 @@
 #include "Python/pythonrun.c.h"
 #include "Parser/peg_api.c.h"
 #include "Parser/pegen.c.h"
+#include "Modules/mathmodule.c.h"

@@ -17,11 +17,13 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 - Arguments when defining class (e.g. base class)
 
 
+
 # Scratch
+
+- import from the directory of the main script (import from current dir already works)
 
 - create the frozon module for import myself (right now it's copied)
 
-Quest: cover import
-- Import some alien modules
-  - import math
-  - import dataclasses
+- import dataclasses ('import sum' already works)
+
+- Move current code to legacy/

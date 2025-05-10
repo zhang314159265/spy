@@ -7,6 +7,7 @@ extern PyObject *PyInit__weakref(void);
 extern PyObject *PyInit__io(void);
 extern PyObject *PyMarshal_Init(void);
 extern PyObject *PyInit_posix(void);
+extern PyObject *PyInit_math(void);
 
 struct _inittab _PyImport_Inittab[] = {
   {"_imp", PyInit__imp},
@@ -17,5 +18,6 @@ struct _inittab _PyImport_Inittab[] = {
   {"marshal", PyMarshal_Init},
   {"posix", PyInit_posix},
   {"sys", NULL},
+  {"math", PyInit_math}, // this is from cpy/PC/config.c
   {0, 0},
 };

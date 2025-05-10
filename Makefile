@@ -13,7 +13,7 @@ PREFIX :=
 endif
 
 # TUTOR=tutor/misc.py
-TUTOR=tutor/basic_import.py
+TUTOR=tutor/import_math.py
 
 first: mine
 # first: pegen
@@ -33,5 +33,5 @@ CFLAGS := -IInclude -I. -Wno-format-security
 mine: pegen
 	gcc -g main.c $(CFLAGS)
 	# $(PREFIX) ./a.out $(EXTRA_ARGS) tutor/misc.py # TODO
-	cd tutor && $(PREFIX) ../a.out $(EXTRA_ARGS) basic_import.py # TODO
-	# $(PREFIX) ./a.out $(EXTRA_ARGS) $(TUTOR)
+	# cd tutor && $(PREFIX) ../a.out $(EXTRA_ARGS) basic_import.py # TODO
+	$(PREFIX) ./a.out $(EXTRA_ARGS) $(TUTOR)

@@ -404,6 +404,7 @@ set_lookkey(PySetObject *so, PyObject *key, Py_hash_t hash) {
   size_t mask = so->mask;
   size_t i = (size_t) hash & mask;
   int probes;
+  int cmp;
 
   while (1) {
     entry = &so->table[i];
@@ -421,7 +422,16 @@ set_lookkey(PySetObject *so, PyObject *key, Py_hash_t hash) {
             && _PyUnicode_EQ(startkey, key))
           return entry;
         table = so->table;
-        assert(false);
+        Py_INCREF(startkey);
+        cmp = PyObject_RichCompareBool(startkey, key, Py_EQ);
+        Py_DECREF(startkey);
+        if (cmp < 0)
+          return NULL;
+        if (table != so->table || entry->key != startkey)
+          fail(0);
+        if (cmp > 0)
+          return entry;
+        mask = so->mask;
       }
       entry++;
     } while (probes--);
