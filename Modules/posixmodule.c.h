@@ -230,9 +230,14 @@ _pystat_fromstructstat(PyObject *module, STRUCT_STAT *st) {
   assert(sizeof(long long) >= sizeof(st->st_size));
   PyStructSequence_SET_ITEM(v, 6, PyLong_FromLongLong(st->st_size));
 
+  #if 0
+  // only works in some of the platforms
   ansec = st->st_atimespec.tv_nsec;
   mnsec = st->st_mtimespec.tv_nsec;
   cnsec = st->st_ctimespec.tv_nsec;
+  #else
+  ansec = mnsec = cnsec = 0;
+  #endif
 
   fill_time(module, v, 7, st->st_atime, ansec);
   fill_time(module, v, 8, st->st_mtime, mnsec);

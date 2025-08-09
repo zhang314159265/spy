@@ -1,5 +1,7 @@
 #pragma once
 
+#include <math.h>
+
 static int
 math_exec(PyObject *module) {
   return 0;
