@@ -82,10 +82,12 @@ PyObject *PyImport_ImportModuleLevelObject(PyObject *name, PyObject *globals,
 		PyObject *locals, PyObject *fromlist,
 		int level) {
 	PyThreadState *tstate = _PyThreadState_GET();
+  _Py_IDENTIFIER(_handle_fromlist);
 	PyObject *abs_name = NULL;
   PyObject *final_mod = NULL;
 	PyObject *mod = NULL;
   PyObject *package = NULL;
+  PyInterpreterState *interp = tstate->interp;
   int has_from;
 
 	printf("PyImport_ImportModuleLevelObject name is %s\n", PyUnicode_1BYTE_DATA(name));
@@ -159,7 +161,10 @@ PyObject *PyImport_ImportModuleLevelObject(PyObject *name, PyObject *globals,
       fail(0);
     }
     if (path) {
-      fail(0);
+      Py_DECREF(path);
+      final_mod = _PyObject_CallMethodIdObjArgs(
+        interp->importlib, &PyId__handle_fromlist,
+        mod, fromlist, interp->import_func, NULL);
     } else {
       final_mod = mod;
       Py_INCREF(mod);

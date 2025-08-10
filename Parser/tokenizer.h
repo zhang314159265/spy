@@ -86,6 +86,7 @@ tok_new(void) {
   tok->input = NULL;
   tok->enc = NULL;
   tok->str = NULL;
+  tok->fp = NULL;
 
   tok->decoding_state = STATE_INIT;
 
@@ -192,7 +193,14 @@ get_coding_spec(const char *s, char **spec, Py_ssize_t size, struct tok_state *t
     if (s[i] != ' ' && s[i] != '\t' && s[i] != '\014')
       return 1;
   }
-  fail(0);
+
+  for (; i < size - 6; i++) {
+    const char *t = s + i;
+    if (memcmp(t, "coding", 6) == 0) {
+      fail(0);
+    }
+  }
+  return 1;
 }
 
 static int

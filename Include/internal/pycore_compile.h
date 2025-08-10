@@ -255,6 +255,12 @@ fold_binop(expr_ty node, PyArena *arena, _PyASTOptimizeState *state) {
   fail(0);
 }
 
+static int
+fold_compare(expr_ty node, PyArena *arena, _PyASTOptimizeState *state) {
+  // TODO follow cpy
+  return 1;
+}
+
 // defined in cpy/Python/ast_opt.c
 int
 astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
@@ -273,6 +279,16 @@ astfold_expr(expr_ty node_, PyArena *ctx_, _PyASTOptimizeState *state) {
     CALL(astfold_expr, expr_ty, node_->v.BinOp.left);
     CALL(astfold_expr, expr_ty, node_->v.BinOp.right);
     CALL(fold_binop, expr_ty, node_);
+    break;
+  case IfExp_kind:
+    CALL(astfold_expr, expr_ty, node_->v.IfExp.test);
+    CALL(astfold_expr, expr_ty, node_->v.IfExp.body);
+    CALL(astfold_expr, expr_ty, node_->v.IfExp.orelse);
+    break;
+  case Compare_kind:
+    CALL(astfold_expr, expr_ty, node_->v.Compare.left);
+    CALL_SEQ(astfold_expr, expr, node_->v.Compare.comparators);
+    CALL(fold_compare, expr_ty, node_);
     break;
 	default:
 		fprintf(stderr, "expr kind %d\n", node_->kind);

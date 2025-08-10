@@ -90,7 +90,8 @@ list_resize(PyListObject *self, Py_ssize_t newsize) {
     new_allocated = 0;
   }
   num_allocated_bytes = new_allocated * sizeof(PyObject *);
-  items = (PyObject **) PyMem_Realloc(self->ob_item, num_allocated_bytes);
+  // plus 1 to avoid nullptr returned when num_allocated_bytes is 0
+  items = (PyObject **) PyMem_Realloc(self->ob_item, num_allocated_bytes + 1);
   assert(items);
   self->ob_item = items;
   Py_SET_SIZE(self, newsize);

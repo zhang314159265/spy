@@ -224,8 +224,9 @@ int _PySys_UpdateConfig(PyThreadState *tstate) {
 
   {
     // TODO follow cpy to setup sys.path
-    PyObject *pylist = PyList_New(1);
+    PyObject *pylist = PyList_New(2);
     PyList_SET_ITEM(pylist, 0, PyUnicode_FromString(""));
+    PyList_SET_ITEM(pylist, 1, PyUnicode_FromString("Lib"));
     SET_SYS("path", pylist);
   }
 
