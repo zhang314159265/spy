@@ -1403,9 +1403,34 @@ compiler_slice(struct compiler *c, expr_ty s) {
   return 1;
 }
 
+static basicblock *compiler_use_next_block(struct compiler *c, basicblock *block);
+
+static int
+compiler_ifexp(struct compiler *c, expr_ty e) {
+  basicblock *end, *next;
+
+  assert(e->kind == IfExp_kind);
+  end = compiler_new_block(c);
+  if (end == NULL)
+    return 0;
+  next = compiler_new_block(c);
+  if (next == NULL)
+    return 0;
+  if (!compiler_jump_if(c, e->v.IfExp.test, next, 0))
+    return 0;
+  VISIT(c, expr, e->v.IfExp.body);
+  ADDOP_JUMP_NOLINE(c, JUMP_FORWARD, end);
+  compiler_use_next_block(c, next);
+  VISIT(c, expr, e->v.IfExp.orelse);
+  compiler_use_next_block(c, end);
+  return 1;
+}
+
 static int
 compiler_visit_expr1(struct compiler *c, expr_ty e) {
 	switch (e->kind) {
+  case IfExp_kind:
+    return compiler_ifexp(c, e);
 	case Call_kind:
 		return compiler_call(c, e);
 	case Name_kind:
@@ -1895,7 +1920,10 @@ static int
 compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond) {
   switch (e->kind) {
   case UnaryOp_kind:
-    assert(false);
+    if (e->v.UnaryOp.op == Not)
+      return compiler_jump_if(c, e->v.UnaryOp.operand, next, !cond);
+    // fallback to general implementation
+    break;
   case BoolOp_kind:
     assert(false);
   case IfExp_kind:

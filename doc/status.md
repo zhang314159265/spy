@@ -21,7 +21,6 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 # Scratch
 
 - support ctypes <=
-  - right now the tutor call rand, call sqrt as well to make it easier to verify correctness.
 
 - import from the directory of the main script (import from current dir already works)
 

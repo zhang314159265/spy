@@ -186,6 +186,7 @@ star_expression[expr_ty] (memo):
 
 # TODO follow cpy
 expression[expr_ty] (memo):
+  | a=disjunction 'if' b=disjunction 'else' c=expression { _PyAST_IfExp(b, a, c) }
   | disjunction
 
 disjunction[expr_ty] (memo):

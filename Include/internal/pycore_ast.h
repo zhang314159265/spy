@@ -168,6 +168,12 @@ struct _expr {
 	enum _expr_kind kind;
 	union {
     struct {
+      expr_ty test;
+      expr_ty body;
+      expr_ty orelse;
+    } IfExp;
+
+    struct {
       expr_ty value;
     } Yield;
 		struct {
@@ -474,4 +480,25 @@ _PyAST_Raise(expr_ty exc, expr_ty cause) {
 
 static struct ast_state *get_ast_state(void);
 int PyAST_Check(PyObject *obj);
+
+expr_ty _PyAST_IfExp(expr_ty test, expr_ty body, expr_ty orelse) {
+  expr_ty p;
+  if (!test) {
+    fail(0);
+  }
+  if (!body) {
+    fail(0);
+  }
+  if (!orelse) {
+    fail(0);
+  }
+  p = (expr_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = IfExp_kind;
+  p->v.IfExp.test = test;
+  p->v.IfExp.body = body;
+  p->v.IfExp.orelse = orelse;
+  return p;
+}
 

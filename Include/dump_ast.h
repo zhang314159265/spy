@@ -277,6 +277,12 @@ void dump_expr(expr_ty expr, int indent) {
     fprintf(stderr, "Yield:\n");
     dump_expr(expr->v.Yield.value, indent + 2);
     break;
+  case IfExp_kind:
+    fprintf(stderr, "IfExp:\n");
+    dump_expr(expr->v.IfExp.test, indent + 2);
+    dump_expr(expr->v.IfExp.body, indent + 2);
+    dump_expr(expr->v.IfExp.orelse, indent + 2);
+    break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);
 		assert(false && "dump_expr");

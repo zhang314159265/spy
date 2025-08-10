@@ -12,8 +12,8 @@ else
 PREFIX :=
 endif
 
-# TUTOR=tutor/misc.py
-TUTOR=tutor/use_ctypes.py
+TUTOR=tutor/misc.py
+# TUTOR=tutor/use_ctypes.py
 
 first: mine
 # first: pegen

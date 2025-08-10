@@ -660,6 +660,11 @@ symtable_visit_expr(struct symtable *st, expr_ty e) {
       assert(false);
     }
     break;
+  case IfExp_kind:
+    VISIT(st, expr, e->v.IfExp.test);
+    VISIT(st, expr, e->v.IfExp.body);
+    VISIT(st, expr, e->v.IfExp.orelse);
+    break;
   default:
     printf("Unhandled kind %d\n", e->kind);
     assert(false);
