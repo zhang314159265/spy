@@ -148,6 +148,9 @@ PyObject *PyExc_BaseException = (PyObject *) &_PyExc_BaseException;
 SimpleExtendsException(PyExc_BaseException, Exception,
     "Common base class for all non-exit exceptions.");
 
+SimpleExtendsException(PyExc_Exception, AssertionError,
+    "Assertion failed.");
+
 SimpleExtendsException(PyExc_Exception, RuntimeError,
     "Unspecified run-time error.");
 
@@ -509,6 +512,7 @@ PyStatus _PyExc_Init(PyInterpreterState *interp) {
   PRE_INIT(NotADirectoryError);
   PRE_INIT(TypeError);
   PRE_INIT(ValueError);
+  PRE_INIT(AssertionError);
   return _PyStatus_OK();
 }
 
@@ -538,6 +542,7 @@ _PyBuiltins_AddExceptions(PyObject *bltinmod) {
   POST_INIT(NotADirectoryError);
   POST_INIT(TypeError);
   POST_INIT(ValueError);
+  POST_INIT(AssertionError);
   return _PyStatus_OK();
 #undef POST_INIT
 #undef INIT_ALIAS

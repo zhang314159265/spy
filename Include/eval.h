@@ -672,6 +672,12 @@ main_loop:
 			}
 			DISPATCH();
 		}
+    case TARGET(LOAD_ASSERTION_ERROR): {
+      PyObject *value = PyExc_AssertionError;
+      Py_INCREF(value);
+      PUSH(value);
+      DISPATCH();
+    }
     case TARGET(JUMP_IF_TRUE_OR_POP): {
       PyObject *cond = TOP();
       int err;
@@ -2005,7 +2011,7 @@ exception_unwind:
   f->f_stackdepth = 0;
   f->f_state = FRAME_RAISED;
 
-  printf("cur exception: %s\n", (char *) PyUnicode_DATA(PyObject_Str(tstate->curexc_value)));
+  printf("cur exception %s: %s\n", Py_TYPE(tstate->curexc_value)->tp_name, (char *) PyUnicode_DATA(PyObject_Str(tstate->curexc_value)));
 
 exiting:
 	/* pop frame */

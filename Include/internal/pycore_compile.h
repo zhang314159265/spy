@@ -2404,12 +2404,33 @@ compiler_try(struct compiler *c, stmt_ty s) {
 }
 
 static int
+compiler_assert(struct compiler *c, stmt_ty s) {
+  basicblock *end;
+
+  end = compiler_new_block(c);
+  if (end == NULL)
+    return 0;
+  if (!compiler_jump_if(c, s->v.Assert.test, end, 1))
+    return 0;
+  ADDOP(c, LOAD_ASSERTION_ERROR);
+  if (s->v.Assert.msg) {
+    VISIT(c, expr, s->v.Assert.msg);
+    ADDOP_I(c, CALL_FUNCTION, 1);
+  }
+  ADDOP_I(c, RAISE_VARARGS, 1);
+  compiler_use_next_block(c, end);
+  return 1;
+}
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s) {
 	Py_ssize_t i, n;
 
 	SET_LOC(c, s);
 
 	switch (s->kind) {
+  case Assert_kind:
+    return compiler_assert(c, s);
   case FunctionDef_kind:
     return compiler_function(c, s, 0);
 	case Expr_kind:

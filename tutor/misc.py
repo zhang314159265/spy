@@ -325,10 +325,15 @@
 # 
 # test_to_set()
 
-def test_ternary_conditional_expr():
-    a = True
-    v = 3 if a else 5
-    w = 3 if not a else 5
-    print(v, w)
+# def test_ternary_conditional_expr():
+#     a = True
+#     v = 3 if a else 5
+#     w = 3 if not a else 5
+#     print(v, w)
+# 
+# test_ternary_conditional_expr()
 
-test_ternary_conditional_expr()
+def test_assert():
+    assert False, "hi"
+
+test_assert()

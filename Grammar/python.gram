@@ -121,6 +121,8 @@ param[arg_ty]: a=NAME {
 simple_stmts[asdl_stmt_seq*]: a=simple_stmt !';' NEWLINE {
   (asdl_stmt_seq*) _PyPegen_singleton_seq(p, a) }
 
+assert_stmt[stmt_ty]: 'assert' a=expression b=[',' z=expression {z}] { _PyAST_Assert(a, b) }
+
 simple_stmt[stmt_ty] (memo):
   | assignment
   | &'return' return_stmt
@@ -131,6 +133,7 @@ simple_stmt[stmt_ty] (memo):
   | 'pass' { _PyAST_Pass() }
   | &('import' | 'from') import_stmt
   | &'raise' raise_stmt
+  | &'assert' assert_stmt
 
 raise_stmt[stmt_ty]:
   | 'raise' a=expression b=['from' z=expression {z}] {_PyAST_Raise(a, b) }
@@ -358,6 +361,7 @@ kwarg_or_double_starred[KeywordOrStarred*]:
 atom[expr_ty]:
   | NAME
   | 'True' { _PyAST_Constant(Py_True) }
+  | 'False' { _PyAST_Constant(Py_False) }
   | NUMBER
   | a=STRING { _PyPegen_concatenate_strings(p, _PyPegen_singleton_seq(p, a)) }
   | &'(' (tuple | group)

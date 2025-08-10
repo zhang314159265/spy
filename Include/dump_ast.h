@@ -417,6 +417,11 @@ void dump_stmt(stmt_ty stmt, int indent) {
     dump_expr(stmt->v.Raise.exc, indent + 2);
     dump_expr(stmt->v.Raise.cause, indent + 2);
     break;
+  case Assert_kind:
+    fprintf(stderr, "Assert\n");
+    dump_expr(stmt->v.Assert.test, indent + 2);
+    dump_expr(stmt->v.Assert.msg, indent + 2);
+    break;
 	default:
 		fprintf(stderr, "Can not dump statement of type %d\n", stmt->kind);
 		assert(false && "dump_stmt");

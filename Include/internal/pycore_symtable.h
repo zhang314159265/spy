@@ -763,6 +763,11 @@ symtable_visit_excepthandler(struct symtable *st, excepthandler_ty eh) {
 static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s) {
   switch (s->kind) {
+  case Assert_kind:
+    VISIT(st, expr, s->v.Assert.test);
+    if (s->v.Assert.msg)
+      VISIT(st, expr, s->v.Assert.msg);
+    break;
 	case FunctionDef_kind:
 		if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL, LOCATION(s)))
 			VISIT_QUIT(st, 0);

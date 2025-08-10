@@ -25,6 +25,7 @@ PyObject *PyErr_Occurred(void) {
 
 extern PyObject *PyExc_AttributeError;
 extern PyObject *PyExc_KeyError;
+extern PyObject *PyExc_AssertionError;
 
 PyObject *PyErr_Format(PyObject *exception, const char *format, ...);
 

@@ -266,6 +266,7 @@ enum _stmt_kind {
   With_kind = 13,
   Raise_kind = 16,
   Try_kind = 17,
+  Assert_kind = 18,
   ImportFrom_kind = 20,
 	Expr_kind = 23,
   Pass_kind = 24,
@@ -275,6 +276,11 @@ enum _stmt_kind {
 struct _stmt {
 	enum _stmt_kind kind;
 	union {
+    struct {
+      expr_ty test;
+      expr_ty msg;
+    } Assert;
+
     struct {
       expr_ty exc;
       expr_ty cause;

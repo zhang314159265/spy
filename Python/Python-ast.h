@@ -461,3 +461,18 @@ _PyAST_ExceptHandler(expr_ty type, identifier name, asdl_stmt_seq *body) {
   p->v.ExceptHandler.body = body;
   return p;
 }
+
+stmt_ty
+_PyAST_Assert(expr_ty test, expr_ty msg) {
+  stmt_ty p;
+  if (!test) {
+    fail(0);
+  }
+  p = (stmt_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = Assert_kind;
+  p->v.Assert.test = test;
+  p->v.Assert.msg = msg;
+  return p;
+}
