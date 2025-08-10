@@ -221,7 +221,7 @@ PyObject *PyObject_GetAttr(PyObject *v, PyObject *name) {
   } else if (tp->tp_getattr != NULL) {
     assert(false);
   } else {
-    printf("PyObject_GetAttr obj type %s\n", Py_TYPE(v)->tp_name);
+    printf("PyObject_GetAttr obj type %s, attr name %s\n", Py_TYPE(v)->tp_name, (char *) PyUnicode_DATA(name));
     assert(false);
   }
   if (result == NULL) {
@@ -342,10 +342,11 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
 
   if (!suppress) {
     if (strcmp(tp->tp_name, "module") == 0) {
-      printf("'%s' object (str repr %s) has no attribute '%s'\n", tp->tp_name, (char *) PyUnicode_DATA(PyObject_Str(obj)), (char*) PyUnicode_DATA(name));
+      printf("'%s' object (str repr %s) has no attribute '%s' - may get fixedup\n", tp->tp_name, (char *) PyUnicode_DATA(PyObject_Str(obj)), (char*) PyUnicode_DATA(name));
     } else {
-      printf("'%s' object has no attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+      printf("'%s' object has no attribute '%s' - may get fixedup\n", tp->tp_name, (char*) PyUnicode_DATA(name));
     }
+    // if (strcmp((char *) PyUnicode_DATA(name), "foo") == 0) { fail(0); }
     PyErr_Format(PyExc_AttributeError,
       // "'%.50s' object has no attribute '%U'",
       "'%s' object has no attribute '%U'",

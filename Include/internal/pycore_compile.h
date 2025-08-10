@@ -1783,7 +1783,10 @@ compiler_return(struct compiler *c, stmt_ty s) {
   if (preserve_tos) {
     VISIT(c, expr, s->v.Return.value);
   } else {
-    assert(false);
+    if (s->v.Return.value != NULL) {
+      // SET_LOC
+      ADDOP(c, NOP);
+    }
   }
 
   if (!compiler_unwind_fblock_stack(c, preserve_tos, NULL))
@@ -1793,7 +1796,7 @@ compiler_return(struct compiler *c, stmt_ty s) {
     assert(false);
   }
   else if (!preserve_tos) {
-    assert(false);
+    ADDOP_LOAD_CONST(c, s->v.Return.value->v.Constant.value);
   }
   ADDOP(c, RETURN_VALUE);
   NEXT_BLOCK(c);
@@ -1970,7 +1973,10 @@ compiler_if(struct compiler *c, stmt_ty s) {
     return 0;
   }
   if (asdl_seq_LEN(s->v.If.orelse)) {
-    assert(false);
+    next = compiler_new_block(c);
+    if (next == NULL) {
+      return 0;
+    }
   } else {
     next = end;
   }
@@ -1979,7 +1985,9 @@ compiler_if(struct compiler *c, stmt_ty s) {
   }
   VISIT_SEQ(c, stmt, s->v.If.body);
   if (asdl_seq_LEN(s->v.If.orelse)) {
-    assert(false);
+    ADDOP_JUMP_NOLINE(c, JUMP_FORWARD, end);
+    compiler_use_next_block(c, next);
+    VISIT_SEQ(c, stmt, s->v.If.orelse);
   }
   compiler_use_next_block(c, end);
   return 1;

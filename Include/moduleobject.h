@@ -9,6 +9,7 @@ typedef struct PyModuleDef_Base {
 	PyObject_HEAD
   PyObject *(*m_init)(void);
 	Py_ssize_t m_index;
+  PyObject *m_copy;
 } PyModuleDef_Base;
 
 struct PyModuleDef_Slot;

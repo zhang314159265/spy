@@ -52,3 +52,4 @@
 #include "Parser/peg_api.c.h"
 #include "Parser/pegen.c.h"
 #include "Modules/mathmodule.c.h"
+#include "Modules/_ctypes/_ctypes.c.h"

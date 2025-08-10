@@ -54,7 +54,17 @@ _PyImport_FixupExtensionObject(PyObject *mod, PyObject *name,
 
   if (_Py_IsMainInterpreter(tstate->interp) || def->m_size == -1) {
     if (def->m_size == -1) {
-      fail(0);
+      if (def->m_base.m_copy) {
+        fail(0);
+      }
+      PyObject *dict = PyModule_GetDict(mod);
+      if (dict == NULL) {
+        return -1;
+      }
+      def->m_base.m_copy = PyDict_Copy(dict);
+      if (def->m_base.m_copy == NULL) {
+        return -1;
+      }
     }
 
     if (extensions == NULL) {

@@ -147,8 +147,8 @@ struct _typeobject {
   PySequenceMethods *tp_as_sequence;
   vectorcallfunc tp_vectorcall;
 
-  getattrofunc tp_getattro;
   getattrfunc tp_getattr;
+  getattrofunc tp_getattro;
   struct PyMethodDef *tp_methods;
 
   reprfunc tp_repr;

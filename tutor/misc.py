@@ -333,7 +333,19 @@
 # 
 # test_ternary_conditional_expr()
 
-def test_assert():
-    assert False, "hi"
+# def test_assert():
+#     assert False, "hi"
+# 
+# test_assert()
 
-test_assert()
+def test_getattr():
+    class Cls:
+        def __getattr__(self, name):
+            if name == "foo":
+                return "bar"
+            raise RuntimeError("no such attribute") # TODO attribute error
+
+    o = Cls()
+    print(o.foo)
+
+test_getattr()

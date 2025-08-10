@@ -467,6 +467,7 @@ _PyBuiltin_Init(PyInterpreterState *interp)
   SETBUILTIN("str", &PyUnicode_Type);
   SETBUILTIN("bytes", &PyBytes_Type);
   SETBUILTIN("set", &PySet_Type);
+  SETBUILTIN("None", Py_None);
 
 	return mod;
 #undef ADD_TO_ALL

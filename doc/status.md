@@ -9,7 +9,7 @@ Based on cpython 3.10.11 which is the default used on meta devgpu.
 # Future Features
 - cprofile
 - unit test framework
-- c extension
+- c extension module
 - pickle
 - exception handling
 - write my own peg generator

@@ -1081,8 +1081,64 @@ wrap_init(PyObject *self, PyObject *args, void *wrapped, PyObject *kwds) {
   assert(false);
 }
 
+static PyObject *
+call_attribute(PyObject *self, PyObject *attr, PyObject *name) {
+  PyObject *res, *descr = NULL;
+  descrgetfunc f = Py_TYPE(attr)->tp_descr_get;
+
+  if (f != NULL) {
+    descr = f(attr, self, (PyObject *)(Py_TYPE(self)));
+    if (descr == NULL)
+      return NULL;
+    else
+      attr = descr;
+  }
+  res = PyObject_CallOneArg(attr, name);
+  Py_XDECREF(descr);
+  return res;
+}
+
+static PyObject *
+slot_tp_getattr_hook(PyObject *self, PyObject *name) {
+  // fail(0);
+  PyTypeObject *tp = Py_TYPE(self);
+  PyObject *getattr, *getattribute, *res;
+  _Py_IDENTIFIER(__getattr__);
+  _Py_IDENTIFIER(__getattribute__);
+
+  getattr = _PyType_LookupId(tp, &PyId___getattr__);
+  if (getattr == NULL) {
+    fail(0);
+  }
+  Py_INCREF(getattr);
+
+  getattribute = _PyType_LookupId(tp, &PyId___getattribute__);
+  if (getattribute == NULL ||
+      (Py_IS_TYPE(getattribute, &PyWrapperDescr_Type) &&
+      ((PyWrapperDescrObject *) getattribute)->d_wrapped ==
+      (void *) PyObject_GenericGetAttr))
+    res = PyObject_GenericGetAttr(self, name);
+  else {
+    fail(0);
+  }
+  if (res == NULL && PyErr_ExceptionMatches(PyExc_AttributeError)) {
+    PyErr_Clear();
+    res = call_attribute(self, getattr, name);
+  }
+  Py_DECREF(getattr);
+  return res;
+}
+
+static PyObject *
+wrap_binaryfunc(PyObject *self, PyObject *args, void *wrapped) {
+  fail(0);
+}
+
 static slotdef slotdefs[] = {
   TPSLOT("__getattribute__", tp_getattr, NULL, NULL, ""),
+  TPSLOT("__getattr__", tp_getattr, NULL, NULL, ""),
+  TPSLOT("__getattribute__", tp_getattro, slot_tp_getattr_hook, wrap_binaryfunc, ""),
+  TPSLOT("__getattr__", tp_getattro, slot_tp_getattr_hook, NULL, ""),
   FLSLOT("__init__", tp_init, slot_tp_init, (wrapperfunc) (void(*)(void)) wrap_init,
       "__init__", PyWrapperFlag_KEYWORDS),
   {NULL},
@@ -1182,6 +1238,7 @@ update_one_slot(PyTypeObject *type, slotdef *p) {
   assert(!PyErr_Occurred());
   do {
     descr = find_name_in_mro(type, p->name_strobj, &error);
+    // printf("update_one_slot find_name_in_mro name %s, descr %p, %s\n", (char *) PyUnicode_DATA(p->name_strobj), descr, descr ? Py_TYPE(descr)->tp_name : "");
     if (descr == NULL) {
       if (error == -1) {
         assert(false);

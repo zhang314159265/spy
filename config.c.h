@@ -8,6 +8,7 @@ extern PyObject *PyInit__io(void);
 extern PyObject *PyMarshal_Init(void);
 extern PyObject *PyInit_posix(void);
 extern PyObject *PyInit_math(void);
+extern PyObject *PyInit__ctypes(void);
 
 struct _inittab _PyImport_Inittab[] = {
   {"_imp", PyInit__imp},
@@ -19,5 +20,8 @@ struct _inittab _PyImport_Inittab[] = {
   {"posix", PyInit_posix},
   {"sys", NULL},
   {"math", PyInit_math}, // this is from cpy/PC/config.c
+
+  // XXX cpy load _ctypes as extension module, but I load it as a builtin module
+  {"_ctypes", PyInit__ctypes},
   {0, 0},
 };
