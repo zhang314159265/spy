@@ -561,7 +561,7 @@ import_from(PyThreadState *tstate, PyObject *v, PyObject *name) {
   if (_PyObject_LookupAttr(v, name, &x) != 0) {
     return x;
   }
-  fail(0);
+  fail("can not import %s from module", (char *) PyUnicode_DATA(name));
 }
 
 #define UNWIND_BLOCK(b) \

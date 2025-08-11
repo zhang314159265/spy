@@ -144,7 +144,7 @@ _PyObject_FastCallDictTstate(PyThreadState *tstate, PyObject *callable,
   // printf("_PyObject_FastCallDictTstate vectorcallfunc is %p, type %s\n", func, Py_TYPE(callable)->tp_name);
   if (func == NULL) {
     // Use tp_call instead
-    assert(false);
+    return _PyObject_MakeTpCall(tstate, callable, args, nargs, kwargs);
   }
 
   PyObject *res;

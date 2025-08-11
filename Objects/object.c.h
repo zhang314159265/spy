@@ -320,7 +320,7 @@ _PyObject_GenericGetAttrWithDict(PyObject *obj, PyObject *name,
       Py_DECREF(dict);
       goto done;
     } else {
-      printf("check '%s' object attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
+      // printf("check '%s' object attribute '%s'\n", tp->tp_name, (char*) PyUnicode_DATA(name));
       Py_DECREF(dict);
       if (PyErr_Occurred()) {
         assert(false);
@@ -378,7 +378,7 @@ int _PyObject_GetMethod(PyObject *obj, PyObject *name, PyObject **method) {
 
   assert(*method == NULL);
 
-  printf("Py_TYPE(obj)->tp_getattro %p, type %s, name %s\n", Py_TYPE(obj)->tp_getattro, Py_TYPE(obj)->tp_name, (char *) PyUnicode_DATA(name));
+  // printf("Py_TYPE(obj)->tp_getattro %p, type %s, name %s\n", Py_TYPE(obj)->tp_getattro, Py_TYPE(obj)->tp_name, (char *) PyUnicode_DATA(name));
   if (Py_TYPE(obj)->tp_getattro != PyObject_GenericGetAttr
       || !PyUnicode_Check(name)) {
     *method = PyObject_GetAttr(obj, name);

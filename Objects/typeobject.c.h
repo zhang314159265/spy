@@ -228,7 +228,23 @@ type_prepare(PyObject *self, PyObject *const *args, Py_ssize_t nargs,
   return PyDict_New();
 }
 
+static PyObject *
+type_mro_impl(PyTypeObject *self) {
+  PyObject *seq;
+  seq = mro_implementation(self);
+  if (seq != NULL && !PyList_Check(seq)) {
+    Py_SETREF(seq, PySequence_List(seq));
+  }
+  return seq;
+}
+
+static PyObject *
+type_mro(PyTypeObject *self, PyObject *ignored) {
+  return type_mro_impl(self);
+}
+
 static PyMethodDef type_methods[] = {
+  {"mro", (PyCFunction) type_mro, METH_NOARGS, ""},
   {"__prepare__", (PyCFunction)(void(*)(void)) type_prepare,
     METH_FASTCALL | METH_KEYWORDS | METH_CLASS,
     PyDoc_STR("") },
@@ -1021,7 +1037,7 @@ lookup_maybe_method(PyObject *self, _Py_Identifier *attrid, int *unbound) {
     return NULL;
   }
 
-  printf("lookup_maybe_method type is %s, name is %s\n", Py_TYPE(res)->tp_name, attrid->string);
+  // printf("lookup_maybe_method type is %s, name is %s\n", Py_TYPE(res)->tp_name, attrid->string);
   if (_PyType_HasFeature(Py_TYPE(res), Py_TPFLAGS_METHOD_DESCRIPTOR)) {
     *unbound = 1;
     Py_INCREF(res);
@@ -1037,11 +1053,14 @@ lookup_maybe_method(PyObject *self, _Py_Identifier *attrid, int *unbound) {
   return res;
 }
 
+void PyErr_SetObject(PyObject *exception, PyObject *value);
+
+
 static PyObject *
 lookup_method(PyObject *self, _Py_Identifier *attrid, int *unbound) {
   PyObject *res = lookup_maybe_method(self, attrid, unbound);
   if (res == NULL && !PyErr_Occurred()) {
-    assert(false);
+    PyErr_SetObject(PyExc_AttributeError, _PyUnicode_FromId(attrid));
   }
   return res;
 }
@@ -1457,7 +1476,7 @@ static int
 object_init(PyObject *self, PyObject *args, PyObject *kwds) {
   PyTypeObject *type = Py_TYPE(self);
   if (excess_args(args, kwds)) {
-    assert(false);
+    assert("object_init get excess arguments");
   }
   return 0;
 }

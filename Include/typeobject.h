@@ -128,6 +128,7 @@ int PyType_Ready(PyTypeObject *type) {
   type->tp_flags |= Py_TPFLAGS_READYING;
 
   if (type_ready(type) < 0) {
+    fail("type_ready fail");
     type->tp_flags &= ~Py_TPFLAGS_READYING;
     return -1;
   }
@@ -187,12 +188,25 @@ inherit_special(PyTypeObject *type, PyTypeObject *base) {
 	if (type->tp_basicsize == 0)
 		type->tp_basicsize = base->tp_basicsize;
 
+#define COPYVAL(SLOT) \
+  if (type->SLOT == 0) {type->SLOT = base->SLOT; }
+
+  COPYVAL(tp_itemsize);
+  COPYVAL(tp_weaklistoffset);
+  COPYVAL(tp_dictoffset);
+
+#undef COPYVAL
+
   if (PyType_IsSubtype(base, (PyTypeObject*) PyExc_BaseException)) {
     type->tp_flags |= Py_TPFLAGS_BASE_EXC_SUBCLASS;
+  } else if (PyType_IsSubtype(base, &PyType_Type)) {
+    type->tp_flags |= Py_TPFLAGS_TYPE_SUBCLASS;
   } else if (PyType_IsSubtype(base, &PyLong_Type)) {
     type->tp_flags |= Py_TPFLAGS_LONG_SUBCLASS;
   } else if (PyType_IsSubtype(base, &PyTuple_Type)) {
     type->tp_flags |= Py_TPFLAGS_TUPLE_SUBCLASS;
+  } else if (PyType_IsSubtype(base, &PyDict_Type)) {
+    type->tp_flags |= Py_TPFLAGS_DICT_SUBCLASS;
   }
 }
 
@@ -216,7 +230,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
 	if (!type->SLOT && SLOTDEFINED(SLOT)) type->SLOT = base->SLOT
 
 	PyTypeObject *basebase;
-	printf("inherit slots from %s for %s\n", base->tp_name, type->tp_name);
+	// printf("inherit slots from %s for %s\n", base->tp_name, type->tp_name);
 
 	basebase = base->tp_base;
 
@@ -226,11 +240,14 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
     type->tp_getattro = base->tp_getattro;
   }
   if (type->tp_setattr == NULL && type->tp_setattro == NULL) {
-    printf("type %s inherits setattr from base %s\n", type->tp_name, base->tp_name);
+    // printf("type %s inherits setattr from base %s\n", type->tp_name, base->tp_name);
     type->tp_setattr = base->tp_setattr;
     type->tp_setattro = base->tp_setattro;
   }
   COPYSLOT(tp_repr);
+  {
+    COPYSLOT(tp_call);
+  }
   COPYSLOT(tp_str);
 	{
 		if (type->tp_richcompare == NULL && type->tp_hash == NULL) {
@@ -245,6 +262,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base) {
 		}
 	}
   {
+    COPYSLOT(tp_init);
     COPYSLOT(tp_alloc);
     if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) ==
         (base->tp_flags & Py_TPFLAGS_HAVE_GC)) {
@@ -290,6 +308,7 @@ static int add_operators(PyTypeObject *type);
 static int type_add_getset(PyTypeObject *type);
 
 static int type_add_members(PyTypeObject *type);
+
 static int
 type_ready_fill_dict(PyTypeObject *type) {
   if (add_operators(type) < 0) {
@@ -363,7 +382,7 @@ type_ready_set_new(PyTypeObject *type) {
 
 static int
 type_ready(PyTypeObject *type) {
-  printf("type_ready: %s\n", type->tp_name);
+  // printf("type_ready: %s\n", type->tp_name);
   if (type_ready_set_dict(type) < 0) {
     return -1;
   }
@@ -371,6 +390,7 @@ type_ready(PyTypeObject *type) {
     return -1;
   }
   if (type_ready_mro(type) < 0) {
+    fail("type_ready_mro fail");
     return -1;
   }
   if (type_ready_set_new(type) < 0) {
@@ -451,15 +471,60 @@ static PyObject * mro_implementation(PyTypeObject *type) {
 	return result;
 }
 
+static PyObject *
+call_unbound_noarg(int unbound, PyObject *func, PyObject *self) {
+  if (unbound) {
+    return PyObject_CallOneArg(func, self);
+  } else {
+    fail(0);
+  }
+}
 
+static PyObject *lookup_method(PyObject *self, _Py_Identifier *attrid, int *unbound);
+
+static PyTypeObject * solid_base(PyTypeObject *type);
+
+static int
+mro_check(PyTypeObject *type, PyObject *mro) {
+  PyTypeObject *solid;
+  Py_ssize_t i, n;
+
+  solid = solid_base(type);
+  n = PyTuple_GET_SIZE(mro);
+  for (i = 0; i < n; i++) {
+    PyTypeObject *base;
+    PyObject *tmp;
+
+    tmp = PyTuple_GET_ITEM(mro, i);
+    if (!PyType_Check(tmp)) {
+      fail(0);
+    }
+
+    base = (PyTypeObject *) tmp;
+    if (!PyType_IsSubtype(solid, solid_base(base))) {
+      fail(0);
+    }
+  }
+  return 0;
+}
 
 static PyObject *
 mro_invoke(PyTypeObject *type) {
+  _Py_IDENTIFIER(mro);
+
   PyObject *mro_result;
   PyObject *new_mro;
   const int custom = !Py_IS_TYPE(type, &PyType_Type);
   if (custom) {
-    assert(false);
+    int unbound;
+    PyObject *mro_meth = lookup_method((PyObject *) type, &PyId_mro,
+        &unbound);
+    if (mro_meth == NULL) {
+      fail("got NULL mro_meth");
+      return NULL;
+    }
+    mro_result = call_unbound_noarg(unbound, mro_meth, (PyObject *) type);
+    Py_DECREF(mro_meth);
   } else {
     mro_result = mro_implementation(type);
   }
@@ -477,7 +542,7 @@ mro_invoke(PyTypeObject *type) {
     assert(false);
   }
 
-  if (custom) {
+  if (custom && mro_check(type, new_mro) < 0) {
     assert(false);
   }
   return new_mro;
@@ -494,6 +559,7 @@ mro_internal(PyTypeObject *type, PyObject **p_old_mro) {
   reent = (type->tp_mro != old_mro);
 	Py_XDECREF(old_mro);
 	if (new_mro == NULL) {
+    fail("got null new_mro");
 		return -1;
 	}
 
@@ -518,6 +584,7 @@ static int
 type_ready_mro(PyTypeObject *type) {
   // Calculate method resolution order
   if (mro_internal(type, NULL) < 0) {
+    fail("mro_internal fail");
     return -1;
   }
 	assert(type->tp_mro != NULL);

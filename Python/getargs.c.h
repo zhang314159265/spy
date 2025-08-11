@@ -48,7 +48,16 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
       else
         assert(false);
     } else if (*format == '&') {
-      assert(false);
+      typedef int (*converter)(PyObject *, void *);
+      converter convert = va_arg(*p_va, converter);
+      void *addr = va_arg(*p_va, void *);
+      int res;
+      format++;
+      if (!(res = (*convert)(arg, addr)))
+        fail(0);
+      if (res == Py_CLEANUP_SUPPORTED) {
+        fail(0);
+      }
     } else {
       p = va_arg(*p_va, PyObject **);
       *p = arg;
@@ -129,10 +138,15 @@ vgetargs1_impl(PyObject *compat_args, PyObject *const *stack, Py_ssize_t nargs, 
       if (level == 0)
         min = max;
       break;
+    case '\0':
+      endfmt = 1;
+      break;
+    case ';':
+      message = format;
+      endfmt = 1;
+      break;
     case '(':
     case ')':
-    case '\0':
-    case ';':
       printf("get char '%c'\n", c);
       assert(false);
     default:
@@ -178,7 +192,7 @@ vgetargs1_impl(PyObject *compat_args, PyObject *const *stack, Py_ssize_t nargs, 
     }
   }
 
-  printf("format %s, max is %d, nargs %ld\n", formatsave, max, nargs);
+  // printf("format %s, max is %d, nargs %ld\n", formatsave, max, nargs);
 
   if (*format != '\0' && !isalpha(*format) &&
       *format != '(' &&

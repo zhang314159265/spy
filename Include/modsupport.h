@@ -628,6 +628,7 @@ static PyObject *do_mktuple(const char **p_format, va_list *p_va, char endchar, 
 int
 PyModule_AddType(PyObject *module, PyTypeObject *type) {
   if (PyType_Ready(type) < 0) {
+    fail("fail to add type to module due to PyType_Ready fail");
     return -1;
   }
 

@@ -1,5 +1,12 @@
 #pragma once
 
+static int dict_update_common(PyObject *self, PyObject *args, PyObject *kwds, const char *methname);
+
+static int
+dict_init(PyObject *self, PyObject *args, PyObject *kwds) {
+  return dict_update_common(self, args, kwds, "dict");
+}
+
 static int
 dict_merge(PyObject *a, PyObject *b, int override) {
 	PyDictObject *mp, *other;
@@ -428,6 +435,29 @@ static PySequenceMethods dict_as_sequence = {
   .sq_contains = PyDict_Contains,
 };
 
+static PyObject *
+dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds) {
+  PyObject *self;
+  PyDictObject *d;
+
+  assert(type != NULL && type->tp_alloc != NULL);
+  self = type->tp_alloc(type, 0);
+  if (self == NULL)
+    return NULL;
+
+  d = (PyDictObject *) self;
+  if (type == &PyDict_Type) {
+    // ignore GC
+  }
+
+  d->ma_used = 0;
+  d->ma_version_tag = DICT_NEXT_VERSION();
+  dictkeys_incref(Py_EMPTY_KEYS);
+  d->ma_keys = Py_EMPTY_KEYS;
+  d->ma_values = empty_values;
+  return self;
+}
+
 PyTypeObject PyDict_Type = {
   PyVarObject_HEAD_INIT(&PyType_Type, 0)
   .tp_name = "dict",
@@ -440,6 +470,8 @@ PyTypeObject PyDict_Type = {
   .tp_as_mapping = &dict_as_mapping,
 	.tp_iter = (getiterfunc) dict_iter,
   .tp_methods = mapp_methods,
+  .tp_new = dict_new,
+  .tp_init = dict_init,
 };
 
 

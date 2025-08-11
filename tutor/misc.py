@@ -338,27 +338,27 @@
 # 
 # test_assert()
 
-# def test_getattr():
-#     class Cls:
-#         def __getattr__(self, name):
-#             if name == "foo":
-#                 return "bar"
-#             raise RuntimeError("no such attribute") # TODO attribute error
+def test_getattr():
+    class Cls:
+        def __getattr__(self, name):
+            if name == "foo":
+                return "bar"
+            raise RuntimeError("no such attribute") # TODO attribute error
+
+    o = Cls()
+    print(o.foo)
+
+test_getattr()
+
+# def test_and():
+#     if True and True:
+#         print("yes")
+#     else:
+#         print("no")
 # 
-#     o = Cls()
-#     print(o.foo)
+#     if False or False:
+#         print("yes")
+#     else:
+#         print("no")
 # 
-# test_getattr()
-
-def test_and():
-    if True and True:
-        print("yes")
-    else:
-        print("no")
-
-    if False or False:
-        print("yes")
-    else:
-        print("no")
-
-test_and()
+# test_and()

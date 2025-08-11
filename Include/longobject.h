@@ -31,6 +31,40 @@ long PyLong_AsLong(PyObject *obj) {
   return result;
 }
 
+unsigned long
+PyLong_AsUnsignedLong(PyObject *vv) {
+  PyLongObject *v;
+  unsigned long x, prev;
+  Py_ssize_t i;
+
+  if (vv == NULL) {
+    fail(0);
+  }
+  if (!PyLong_Check(vv)) {
+    fail(0);
+  }
+
+  v = (PyLongObject *) vv;
+  i = Py_SIZE(v);
+  x = 0;
+  if (i < 0) {
+    fail(0);
+  }
+
+  switch (i) {
+  case 0: return 0;
+  case 1: return v->ob_digit[0];
+  }
+  while (--i >= 0) {
+    prev = x;
+    x = (x << PyLong_SHIFT) | v->ob_digit[i];
+    if ((x >> PyLong_SHIFT) != prev) {
+      fail(0);
+    }
+  }
+  return x;
+}
+
 static PyObject *
 get_small_int(sdigit ival) {
   assert(IS_SMALL_INT(ival));
@@ -369,6 +403,52 @@ PyLong_FromDouble(double dval) {
   const double int_max = (unsigned long) LONG_MAX + 1;
   if (-int_max < dval && dval < int_max) {
     return PyLong_FromLong((long) dval);
+  }
+  fail(0);
+}
+
+void *
+PyLong_AsVoidPtr(PyObject *vv) {
+  long x;
+
+  if (PyLong_Check(vv) && _PyLong_Sign(vv) < 0) {
+    x = PyLong_AsLong(vv);
+  } else {
+    x = PyLong_AsUnsignedLong(vv);
+  }
+
+  if (x == -1 && PyErr_Occurred())
+    return NULL;
+
+  return (void *) x;
+}
+
+static unsigned long
+_PyLong_AsUnsignedLongMask(PyObject *vv) {
+  PyLongObject *v;
+  Py_ssize_t i;
+
+  if (vv == NULL || !PyLong_Check(vv)) {
+    fail(0);
+  }
+
+  v = (PyLongObject *) vv;
+  i = Py_SIZE(v);
+  switch (i) {
+  case 0: return 0;
+  case 1: return v->ob_digit[0];
+  }
+  fail(0);
+}
+
+unsigned long
+PyLong_AsUnsignedLongMask(PyObject *op) {
+  if (op == NULL) {
+    fail(0);
+  }
+
+  if (PyLong_Check(op)) {
+    return _PyLong_AsUnsignedLongMask(op);
   }
   fail(0);
 }

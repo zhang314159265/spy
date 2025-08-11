@@ -311,4 +311,9 @@ PyErr_SetFromErrnoWithFilenameObjects(PyObject *exc, PyObject *filenameObject, P
   return NULL;
 }
 
+void PyErr_SetObject(PyObject *exception, PyObject *value) {
+  PyThreadState *tstate = _PyThreadState_GET();
+  _PyErr_SetObject(tstate, exception, value);
+}
+
 
