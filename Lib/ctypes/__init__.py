@@ -19,4 +19,11 @@ class CDLL:
             self._handle = handle
 
     def __getattr__(self, name):
-        assert False, "get {} attr from cdll".format(name)
+        if name.startswith("__") and name.endswith("__"):
+            assert False, "__getattr__ with dunder for CDLL"
+        func = self.__getitem__(name)
+        setattr(self, name, func)
+        return func
+
+    def __getitem__(self, name_or_ordinal):
+        assert False, "CDLL.__getitem__"

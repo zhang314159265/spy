@@ -1944,7 +1944,25 @@ compiler_jump_if(struct compiler *c, expr_ty e, basicblock *next, int cond) {
     // fallback to general implementation
     break;
   case BoolOp_kind:
-    assert(false);
+    asdl_expr_seq *s = e->v.BoolOp.values;
+    Py_ssize_t i, n = asdl_seq_LEN(s) - 1;
+    assert(n >= 0);
+    int cond2 = e->v.BoolOp.op == Or;
+    basicblock *next2 = next;
+    if (!cond2 != !cond) {
+      next2 = compiler_new_block(c);
+      if (next2 == NULL)
+        return 0;
+    }
+    for (i = 0; i < n; ++i) {
+      if (!compiler_jump_if(c, (expr_ty) asdl_seq_GET(s, i), next2, cond2))
+        return 0;
+    }
+    if (!compiler_jump_if(c, (expr_ty) asdl_seq_GET(s, n), next, cond))
+      return 0;
+    if (next2 != next)
+      compiler_use_next_block(c, next2);
+    return 1;
   case IfExp_kind:
     assert(false);
   case Compare_kind: {

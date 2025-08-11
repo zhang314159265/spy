@@ -179,6 +179,17 @@ void dump_exception_handler(excepthandler_ty ex_handler, int indent) {
   dump_stmt_seq(NULL, ex_handler->v.ExceptHandler.body, indent + 2);
 }
 
+const char *boolop_ty_to_str(boolop_ty op) {
+  switch (op) {
+  case And:
+    return "and";
+  case Or:
+    return "or";
+  default:
+    fail(0);
+  }
+}
+
 void dump_expr(expr_ty expr, int indent) {
 	_INDENT();
 	if (!expr) {
@@ -282,6 +293,10 @@ void dump_expr(expr_ty expr, int indent) {
     dump_expr(expr->v.IfExp.test, indent + 2);
     dump_expr(expr->v.IfExp.body, indent + 2);
     dump_expr(expr->v.IfExp.orelse, indent + 2);
+    break;
+  case BoolOp_kind:
+    fprintf(stderr, "BoolOp: %s\n", boolop_ty_to_str(expr->v.BoolOp.op));
+    dump_expr_seq(NULL, expr->v.BoolOp.values, indent + 2);
     break;
 	default:
 		printf("expr->kind is %d\n", expr->kind);

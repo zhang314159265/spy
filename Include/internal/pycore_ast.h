@@ -85,6 +85,8 @@ typedef enum _cmpop {
 
 typedef enum _expr_context { Load=1, Store=2, Del=3} expr_context_ty;
 
+typedef enum _boolop { And = 1, Or = 2 } boolop_ty;
+
 typedef struct _mod *mod_ty;
 
 typedef struct _stmt *stmt_ty;
@@ -167,6 +169,11 @@ enum _expr_kind {
 struct _expr {
 	enum _expr_kind kind;
 	union {
+    struct {
+      boolop_ty op;
+      asdl_expr_seq *values;
+    } BoolOp;
+
     struct {
       expr_ty test;
       expr_ty body;

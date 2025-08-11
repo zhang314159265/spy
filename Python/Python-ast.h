@@ -111,6 +111,21 @@ _PyAST_AugAssign(expr_ty target, operator_ty op, expr_ty value) {
 }
 
 expr_ty
+_PyAST_BoolOp(boolop_ty op, asdl_expr_seq *values) {
+  expr_ty p;
+  if (!op) {
+    fail(0);
+  }
+  p = (expr_ty) malloc(sizeof(*p));
+  if (!p)
+    return NULL;
+  p->kind = BoolOp_kind;
+  p->v.BoolOp.op = op;
+  p->v.BoolOp.values = values;
+  return p;
+}
+
+expr_ty
 _PyAST_BinOp(expr_ty left, operator_ty op, expr_ty right) {
 	expr_ty p;
 	if (!left) {
