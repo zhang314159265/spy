@@ -112,7 +112,34 @@ PyCFuncPtr_clear(PyCFuncPtrObject *self) {
   fail(0);
 }
 
+static PyObject *
+PyCFuncPtr_get_restype(PyCFuncPtrObject *self, void *ignored) {
+  fail(0);
+}
+
+static int
+PyCFuncPtr_set_restype(PyCFuncPtrObject *self, PyObject *ob, void *ignored) {
+  _Py_IDENTIFIER(_check_retval_);
+  PyObject *checker, *oldchecker;
+  if (ob == NULL) {
+    fail(0);
+  }
+  if (ob != Py_None && !PyType_stgdict(ob) && !PyCallable_Check(ob)) {
+    fail(0);
+  }
+  if (_PyObject_LookupAttrId(ob, &PyId__check_retval_, &checker) < 0) {
+    return -1;
+  }
+  oldchecker = self->checker;
+  self->checker = checker;
+  Py_INCREF(ob);
+  Py_XSETREF(self->restype, ob);
+  Py_XDECREF(oldchecker);
+  return 0;
+}
+
 static PyGetSetDef PyCFuncPtr_getsets[] = {
+  {"restype", (getter) PyCFuncPtr_get_restype, (setter) PyCFuncPtr_set_restype, "", NULL},
   {NULL, NULL},
 };
 
@@ -208,7 +235,8 @@ KeepRef(CDataObject *target, Py_ssize_t index, PyObject *keep) {
   PyObject *key;
 
   if (keep == Py_None) {
-    fail(0);
+    Py_DECREF(Py_None);
+    return 0;
   }
   ob = PyCData_GetContainer(target);
   if (ob == NULL) {
@@ -441,14 +469,21 @@ PyTypeObject PyCFuncPtrType_Type = {
   .tp_new = PyCFuncPtrType_new,
 };
 
-static void
-PyCData_dealloc(PyObject *self) {
-  fail(0);
-}
-
 static int
 PyCData_clear(CDataObject *self) {
-  fail(0);
+  Py_CLEAR(self->b_objects);
+  if ((self->b_needsfree)
+      && _CDataObject_HasExternalBuffer(self))
+    PyMem_Free(self->b_ptr);
+  self->b_ptr = NULL;
+  Py_CLEAR(self->b_base);
+  return 0;
+}
+
+static void
+PyCData_dealloc(PyObject *self) {
+  PyCData_clear((CDataObject *) self);
+  Py_TYPE(self)->tp_free(self);
 }
 
 static PyMethodDef PyCData_methods[] = {
@@ -501,11 +536,33 @@ static PyMethodDef PyCSimpleType_methods[] = {
   {NULL, NULL},
 };
 
-static const char SIMPLE_TYPE_CHARS[] = "i";
+static const char SIMPLE_TYPE_CHARS[] = "id";
 
 static PyCArgObject *
 PyCSimpleType_paramfunc(CDataObject *self) {
-  fail(0);
+  StgDictObject *dict;
+  const char *fmt;
+  PyCArgObject *parg;
+  struct fielddesc *fd;
+
+  dict = PyObject_stgdict((PyObject *) self);
+  assert(dict);
+  fmt = PyUnicode_AsUTF8(dict->proto);
+  assert(fmt);
+
+  fd = _ctypes_get_fielddesc(fmt);
+  assert(fd);
+
+  parg = PyCArgObject_new();
+  if (parg == NULL)
+    return NULL;
+
+  parg->tag = fmt[0];
+  parg->pffi_type = fd->pffi_type;
+  Py_INCREF(self);
+  parg->obj = (PyObject *) self;
+  memcpy(&parg->value, self->b_ptr, self->b_size);
+  return parg;
 }
 
 extern PyTypeObject PyCSimpleType_Type;
@@ -614,8 +671,29 @@ static PyGetSetDef Simple_getsets[] = {
 };
 
 static int
+Simple_set_value(CDataObject *self, PyObject *value, void *ignored) {
+  PyObject *result;
+  StgDictObject *dict = PyObject_stgdict((PyObject *) self);
+  if (value == NULL) {
+    fail(0);
+  }
+  assert(dict);
+  assert(dict->setfunc);
+  result = dict->setfunc(self->b_ptr, value, dict->size);
+  if (!result)
+    return -1;
+
+  return KeepRef(self, 0, result);
+}
+
+static int
 Simple_init(CDataObject *self, PyObject *args, PyObject *kw) {
-  fail(0);
+  PyObject *value = NULL;
+  if (!PyArg_UnpackTuple(args, "__init__", 0, 1, &value))
+    return -1;
+  if (value)
+    return Simple_set_value(self, value, NULL);
+  return 0;
 }
 
 PyTypeObject Simple_Type = {

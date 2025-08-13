@@ -65,7 +65,15 @@ static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa) {
 
   dict = PyObject_stgdict(obj);
   if (dict) {
-    fail(0);
+    PyCArgObject *carg;
+    assert(dict->paramfunc);
+    carg = dict->paramfunc((CDataObject *) obj);
+    if (carg == NULL)
+      return -1;
+    pa->ffi_type = carg->pffi_type;
+    memcpy(&pa->value, &carg->value, sizeof(pa->value));
+    pa->keep = (PyObject *) carg;
+    return 0;
   }
 
   if (PyCArg_CheckExact(obj)) {
@@ -260,7 +268,8 @@ cleanup:
 
 static void
 PyCArg_dealloc(PyCArgObject *self) {
-  fail(0);
+  Py_XDECREF(self->obj);
+  PyObject_Free(self);
 }
 
 static PyMemberDef PyCArgType_members[] = {
@@ -275,3 +284,16 @@ PyTypeObject PyCArg_Type = {
   .tp_flags = Py_TPFLAGS_DEFAULT,
   .tp_members = PyCArgType_members,
 };
+
+
+PyCArgObject *PyCArgObject_new(void) {
+  PyCArgObject *p;
+  p = PyObject_New(PyCArgObject, &PyCArg_Type);
+  if (p == NULL)
+    return NULL;
+  p->pffi_type = NULL;
+  p->tag = '\0';
+  p->obj = NULL;
+  memset(&p->value, 0, sizeof(p->value));
+  return p;
+}

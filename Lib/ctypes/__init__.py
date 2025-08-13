@@ -1,6 +1,3 @@
-# TODO: properly implement these
-c_double = 5
-
 from _ctypes import RTLD_LOCAL
 from _ctypes import dlopen as _dlopen
 from _ctypes import CFuncPtr as _CFuncPtr
@@ -11,6 +8,9 @@ DEFAULT_MODE = RTLD_LOCAL
 
 class c_int(_SimpleCData):
     _type_ = "i"
+
+class c_double(_SimpleCData):
+    _type_ = "d"
 
 class CDLL:
 

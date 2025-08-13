@@ -34,6 +34,13 @@ struct tagCDataObject {
 
 struct tagPyCArgObject {
   PyObject_HEAD
+  ffi_type *pffi_type;
+  char tag;
+  union {
+    double d;
+  } value;
+  PyObject *obj;
+  Py_ssize_t size;
 };
 
 typedef struct {
@@ -104,3 +111,7 @@ extern PyTypeObject PyCArg_Type;
 int _ctypes_simple_instance(PyObject *obj);
 
 #define PyCSimpleTypeObject_Check(v) PyObject_TypeCheck(v, &PyCSimpleType_Type)
+
+PyCArgObject *PyCArgObject_new(void);
+
+#define _CDataObject_HasExternalBuffer(v) ((v)->b_ptr != (char *)&(v)->b_value)
